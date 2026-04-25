@@ -216,13 +216,13 @@
       <div class="exam-topbar">
         <div class="etb-left">
           <span class="etb-chip">{{ config.stream }}{{ config.subject !== 'All' ? ' / ' + config.subject : '' }}</span>
-          <span class="etb-progress">{{ currentIdx + 1 }} / {{ questions.length }}</span>
+          <span class="etb-progress">{{ answeredCount }} / {{ questions.length }} answered</span>
         </div>
 
         <div class="etb-center">
           <!-- Progress bar -->
           <div class="etb-progbar">
-            <div class="etb-progbar-fill" :style="{ width: ((currentIdx + 1) / questions.length * 100) + '%' }" />
+            <div class="etb-progbar-fill" :style="{ width: (answeredCount / questions.length * 100) + '%' }" />
           </div>
         </div>
 
@@ -251,7 +251,7 @@
               answered: answers[q.id] !== undefined,
               flagged: flagged.has(q.id),
             }"
-            @click="jumpTo(i)"
+            @click="scrollToQuestion(i)"
           >{{ i + 1 }}</button>
         </div>
         <div class="palette-legend">
@@ -261,75 +261,56 @@
         </div>
       </div>
 
-      <!-- Question card -->
+      <!-- Question list (scrollable) -->
       <div class="exam-body">
-        <div class="exam-question-card">
-
-          <!-- Q header -->
-          <div class="eq-header">
-            <div class="eq-meta">
-              <span class="eq-num">Q{{ currentIdx + 1 }}</span>
-              <span class="eq-diff" :class="currentQ.difficulty">{{ currentQ.difficulty }}</span>
-              <span class="eq-subject">{{ currentQ.subject }}</span>
-              <span class="eq-chapter">{{ currentQ.chapter }}</span>
+        <div class="exam-question-list">
+          <div
+            v-for="(q, i) in questions"
+            :key="q.id"
+            :id="`question-${i}`"
+            class="exam-question-card"
+            :class="{ 'card-flagged': flagged.has(q.id), 'card-answered': answers[q.id] !== undefined }"
+          >
+            <div class="eq-header">
+              <div class="eq-meta">
+                <span class="eq-num">Q{{ i + 1 }}</span>
+                <span class="eq-diff" :class="q.difficulty">{{ q.difficulty }}</span>
+                <span class="eq-subject">{{ q.subject }}</span>
+                <span class="eq-chapter">{{ q.chapter }}</span>
+              </div>
+              <button class="flag-btn" :class="{ active: flagged.has(q.id) }" @click="toggleFlag(q.id)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14">
+                  <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+                  <line x1="4" y1="22" x2="4" y2="15"/>
+                </svg>
+                {{ flagged.has(q.id) ? 'Flagged' : 'Flag' }}
+              </button>
             </div>
-            <button
-              class="flag-btn"
-              :class="{ active: flagged.has(currentQ.id) }"
-              @click="toggleFlag(currentQ.id)"
-              title="Flag for review"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14">
-                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
-                <line x1="4" y1="22" x2="4" y2="15"/>
-              </svg>
-              {{ flagged.has(currentQ.id) ? 'Flagged' : 'Flag' }}
-            </button>
+            <div class="eq-body">
+              <p class="eq-text">{{ q.question }}</p>
+            </div>
+            <div class="eq-options">
+              <button
+                v-for="(opt, oi) in q.options"
+                :key="oi"
+                class="eq-option"
+                :class="{ selected: answers[q.id] === oi }"
+                @click="selectAnswer(q.id, oi)"
+              >
+                <span class="opt-letter">{{ optLetters[oi] }}</span>
+                <span class="opt-text">{{ opt }}</span>
+                <span v-if="answers[q.id] === oi" class="opt-selected-mark">✓</span>
+              </button>
+            </div>
+            <div class="eq-footer">
+              <button class="iso-btn iso-btn--ghost clear-btn" :disabled="answers[q.id] === undefined" @click="clearAnswer(q.id)">Clear Selection</button>
+              <span v-if="answers[q.id] !== undefined" class="answered-badge">Answered</span>
+            </div>
           </div>
 
-          <!-- Question text -->
-          <div class="eq-body">
-            <p class="eq-text">{{ currentQ.question }}</p>
-          </div>
-
-          <!-- Options -->
-          <div class="eq-options">
-            <button
-              v-for="(opt, oi) in currentQ.options"
-              :key="oi"
-              class="eq-option"
-              :class="{ selected: answers[currentQ.id] === oi }"
-              @click="selectAnswer(currentQ.id, oi)"
-            >
-              <span class="opt-letter">{{ optLetters[oi] }}</span>
-              <span class="opt-text">{{ opt }}</span>
-            </button>
-          </div>
-
-          <!-- Nav footer -->
-          <div class="eq-footer">
-            <button
-              class="iso-btn iso-btn--ghost nav-btn"
-              :disabled="currentIdx === 0"
-              @click="currentIdx--"
-            >← Previous</button>
-
-            <button
-              class="iso-btn iso-btn--ghost clear-btn"
-              :disabled="answers[currentQ.id] === undefined"
-              @click="clearAnswer(currentQ.id)"
-            >Clear</button>
-
-            <button
-              v-if="currentIdx < questions.length - 1"
-              class="iso-btn iso-btn--fill nav-btn"
-              @click="currentIdx++"
-            >Next →</button>
-            <button
-              v-else
-              class="iso-btn iso-btn--fill nav-btn submit-btn"
-              @click="confirmEndExam"
-            >Submit Exam →</button>
+          <div class="exam-submit-bar">
+            <button class="iso-btn iso-btn--fill submit-end-btn" @click="confirmEndExam">Submit Exam →</button>
+            <span class="submit-bar-meta">{{ answeredCount }} / {{ questions.length }} answered</span>
           </div>
         </div>
 
@@ -364,7 +345,7 @@
                 v-for="id in [...flagged]"
                 :key="id"
                 class="flagged-item"
-                @click="jumpTo(questions.findIndex(q => q.id === id))"
+                @click="scrollToQuestion(questions.findIndex(q => q.id === id))"
               >
                 <span class="fi-num">Q{{ questions.findIndex(q => q.id === id) + 1 }}</span>
                 <span class="fi-text">{{ questions.find(q => q.id === id)?.question.slice(0, 50) }}…</span>
@@ -482,18 +463,25 @@
               </div>
             </div>
             <p class="rc-question">{{ q.question }}</p>
-            <div class="rc-answers">
-              <div v-if="answers[q.id] !== undefined" class="rc-answer" :class="answers[q.id] === q.correctIndex ? 'correct' : 'wrong'">
-                <span class="rca-label">Your answer:</span>
-                <span class="rca-text">{{ optLetters[answers[q.id]] }}. {{ q.options?.[answers[q.id]] }}</span>
+            <div class="rc-options">
+              <div
+                v-for="(opt, oi) in q.options"
+                :key="oi"
+                class="rc-option"
+                :class="{
+                  'rc-correct': oi === q.correctIndex,
+                  'rc-wrong': oi === answers[q.id] && oi !== q.correctIndex,
+                  'rc-user': oi === answers[q.id],
+                }"
+              >
+                <span class="rc-opt-letter">{{ optLetters[oi] }}</span>
+                <span class="rc-opt-text">{{ opt }}</span>
+                <span class="rc-opt-tag">
+                  <template v-if="oi === q.correctIndex">✓ Correct</template>
+                  <template v-else-if="oi === answers[q.id]">✗ Your answer</template>
+                </span>
               </div>
-              <div v-else class="rc-answer skipped">
-                <span class="rca-label">Skipped</span>
-              </div>
-              <div v-if="answers[q.id] !== q.correctIndex" class="rc-answer correct">
-                <span class="rca-label">Correct answer:</span>
-                <span class="rca-text">{{ optLetters[q.correctIndex!] }}. {{ q.options?.[q.correctIndex!] }}</span>
-              </div>
+              <div v-if="answers[q.id] === undefined" class="rc-skipped-note">— Skipped</div>
             </div>
             <div class="rc-explanation">
               <span class="exp-label">EXPLANATION</span>
@@ -866,9 +854,11 @@ function buildQuestions(): Question[] {
   return pool.slice(0, config.count)
 }
 
+let observer: IntersectionObserver | null = null
+
 function startExam() {
   questions.value = buildQuestions()
-  if (!questions.value.length) return // no questions for filter
+  if (!questions.value.length) return
   answers.value = {}
   flagged.value = new Set()
   currentIdx.value = 0
@@ -876,6 +866,24 @@ function startExam() {
   showEndConfirm.value = false
   phase.value = 'exam'
   startTimer()
+  nextTick(setupObserver)
+}
+
+function setupObserver() {
+  if (observer) observer.disconnect()
+  observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const id = e.target.id // "question-N"
+        const idx = parseInt(id.split('-')[1])
+        if (!isNaN(idx)) currentIdx.value = idx
+      }
+    })
+  }, { threshold: 0.4 })
+  questions.value.forEach((_, i) => {
+    const el = document.getElementById(`question-${i}`)
+    if (el) observer!.observe(el)
+  })
 }
 
 function startTimer() {
@@ -910,7 +918,15 @@ function toggleFlag(id: number) {
   flagged.value = s
 }
 
-function jumpTo(i: number) { currentIdx.value = i }
+function scrollToQuestion(i: number) {
+  currentIdx.value = i
+  nextTick(() => {
+    const el = document.getElementById(`question-${i}`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
+function jumpTo(i: number) { scrollToQuestion(i) }
 
 function confirmEndExam() { showEndConfirm.value = true }
 
@@ -948,7 +964,7 @@ function reviewClass(id: number) {
   return ans === q.correctIndex ? 'correct' : 'wrong'
 }
 
-onUnmounted(stopTimer)
+onUnmounted(() => { stopTimer(); observer?.disconnect() })
 </script>
 
 <style scoped>
@@ -1331,10 +1347,18 @@ onUnmounted(stopTimer)
   gap: 1.5rem; align-items: start;
 }
 
+/* Exam scrollable list */
+.exam-question-list { display: flex; flex-direction: column; gap: 1.5rem; }
+
 .exam-question-card {
   border: 1px solid var(--border); background: #0a0a0a;
   box-shadow: 4px 4px 0 0 rgba(240,240,234,0.04);
+  border-left: 3px solid transparent;
+  transition: border-color 0.2s;
+  scroll-margin-top: 80px;
 }
+.exam-question-card.card-answered { border-left-color: rgba(240,240,234,0.25); }
+.exam-question-card.card-flagged  { border-left-color: rgba(255,200,80,0.5); }
 
 .eq-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -1396,18 +1420,31 @@ onUnmounted(stopTimer)
 }
 .eq-option.selected .opt-letter { border-color: var(--white); color: var(--white); background: rgba(240,240,234,0.1); }
 .opt-text { font-size: 0.88rem; color: var(--white); }
+.opt-selected-mark { font-family: var(--font-mono); font-size: 0.65rem; color: var(--white); margin-left: auto; flex-shrink: 0; }
 
 .eq-footer {
   display: flex; align-items: center; gap: 10px;
-  padding: 1.2rem 1.6rem;
+  padding: 0.9rem 1.6rem;
   border-top: 1px solid var(--border);
 }
-.nav-btn { font-size: 0.7rem !important; padding: 10px 18px !important; }
-.clear-btn {
-  font-size: 0.65rem !important; padding: 9px 14px !important;
+.clear-btn { font-size: 0.65rem !important; padding: 7px 14px !important; }
+.answered-badge {
+  font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.1em;
+  text-transform: uppercase; color: rgba(120,230,120,0.8);
+  border: 1px solid rgba(120,230,120,0.2); padding: 3px 10px;
   margin-left: auto;
 }
-.submit-btn { font-size: 0.7rem !important; padding: 10px 18px !important; }
+
+.exam-submit-bar {
+  display: flex; align-items: center; gap: 1.2rem;
+  padding: 1.4rem 1.6rem;
+  border: 1px solid var(--border); background: #0a0a0a;
+  box-shadow: 4px 4px 0 0 rgba(240,240,234,0.04);
+}
+.submit-end-btn { font-size: 0.82rem !important; padding: 14px 32px !important; }
+.submit-bar-meta {
+  font-family: var(--font-mono); font-size: 0.7rem; color: var(--gray);
+}
 
 /* Exam sidebar */
 .exam-sidebar { display: flex; flex-direction: column; gap: 1.5rem; }
@@ -1621,20 +1658,48 @@ onUnmounted(stopTimer)
 
 .rc-question { font-size: 0.87rem; color: var(--white); line-height: 1.6; }
 
-.rc-answers { display: flex; flex-direction: column; gap: 6px; }
-.rc-answer {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 12px; border: 1px solid var(--border);
-  font-size: 0.8rem;
+.rc-options { display: flex; flex-direction: column; gap: 6px; }
+
+.rc-option {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; border: 1px solid var(--border);
+  font-size: 0.83rem; color: var(--dim);
+  transition: background 0.1s;
 }
-.rc-answer.correct { border-color: rgba(120,230,120,0.3); background: rgba(120,230,120,0.05); }
-.rc-answer.wrong   { border-color: rgba(255,100,100,0.3); background: rgba(255,100,100,0.05); }
-.rc-answer.skipped { color: var(--gray); }
-.rca-label {
-  font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--gray); flex-shrink: 0;
+.rc-option.rc-correct {
+  border-color: rgba(120,230,120,0.4);
+  background: rgba(120,230,120,0.06);
+  color: var(--white);
 }
-.rca-text { color: var(--white); }
+.rc-option.rc-wrong {
+  border-color: rgba(255,100,100,0.4);
+  background: rgba(255,100,100,0.06);
+  color: var(--white);
+}
+
+.rc-opt-letter {
+  font-family: var(--font-mono); font-size: 0.62rem; font-weight: 700;
+  width: 22px; height: 22px; flex-shrink: 0;
+  border: 1px solid var(--border-bright);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gray);
+}
+.rc-option.rc-correct .rc-opt-letter { border-color: rgba(120,230,120,0.5); color: rgba(120,230,120,0.9); }
+.rc-option.rc-wrong   .rc-opt-letter { border-color: rgba(255,100,100,0.5); color: rgba(255,100,100,0.9); }
+
+.rc-opt-text { flex: 1; }
+
+.rc-opt-tag {
+  font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.08em;
+  flex-shrink: 0; padding: 2px 8px; border: 1px solid transparent;
+}
+.rc-option.rc-correct .rc-opt-tag { color: rgba(120,230,120,0.9); border-color: rgba(120,230,120,0.25); }
+.rc-option.rc-wrong   .rc-opt-tag { color: rgba(255,100,100,0.8); border-color: rgba(255,100,100,0.25); }
+
+.rc-skipped-note {
+  font-family: var(--font-mono); font-size: 0.7rem; color: var(--gray);
+  padding: 8px 14px; border: 1px solid var(--border);
+}
 
 .rc-explanation { display: flex; flex-direction: column; gap: 5px; }
 .exp-label {
