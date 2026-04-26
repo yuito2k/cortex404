@@ -47,29 +47,15 @@ onMounted(() => {
   gap: 1px;
   background: var(--border);
   border: 1px solid var(--border);
-  box-shadow: 6px 6px 0 0 rgba(240,240,234,0.05);
 }
 
 .stream-card {
   background: #0d0d0d;
   padding: 2rem 1.8rem;
   display: flex; flex-direction: column; gap: 0.9rem;
-  transition: background 0.2s, border-color 0.2s; cursor: pointer;
-  border-left: 2px solid transparent;
-  position: relative;
+  transition: background 0.2s; cursor: pointer;
 }
-.stream-card:hover {
-  background: #161616;
-  border-left-color: var(--border-bright);
-}
-.stream-card::after {
-  content: '→';
-  position: absolute; bottom: 1.8rem; right: 1.8rem;
-  font-family: var(--font-mono); font-size: 0.75rem;
-  color: var(--gray); opacity: 0;
-  transition: opacity 0.2s, transform 0.2s;
-}
-.stream-card:hover::after { opacity: 1; transform: translateX(3px); }
+.stream-card:hover { background: #161616; }
 
 .stream-label {
   font-family: var(--font-mono);

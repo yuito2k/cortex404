@@ -8,7 +8,7 @@
           Built from actual board and competitive exam papers going back 7+ years.
           Every question tagged by topic, difficulty, and year — so you always practice what matters.
         </p>
-        <NuxtLink to="/auth/register" class="iso-btn iso-btn--fill">Browse Questions →</NuxtLink>
+        <a href="#" class="btn-fill">Browse Questions →</a>
       </div>
 
       <div class="qbank-cards">
@@ -91,13 +91,9 @@ onMounted(() => {
   border: 1px solid var(--border);
   padding: 1.5rem 1.8rem;
   margin-bottom: 12px;
-  transition: transform 0.2s, box-shadow 0.2s;
-  box-shadow: 4px 4px 0 0 rgba(240,240,234,0.06), 3px 3px 0 0 rgba(240,240,234,0.04);
+  transition: transform 0.2s;
 }
-.qcard:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0 0 rgba(240,240,234,0.08), 4px 4px 0 0 rgba(240,240,234,0.05);
-}
+.qcard:hover { transform: translateX(6px); }
 
 .qcard-meta {
   display: flex; justify-content: space-between; align-items: center;
@@ -123,14 +119,12 @@ onMounted(() => {
   font-size: 0.73rem; color: var(--dim);
   padding: 7px 10px; border: 1px solid var(--border);
   cursor: pointer; transition: background 0.15s, border-color 0.15s;
-  box-shadow: 2px 2px 0 0 rgba(240,240,234,0.03);
 }
 .qcard-opt:hover { background: #1a1a1a; border-color: var(--border-bright); }
 .qcard-opt.correct {
-  border-color: rgba(240,240,234,0.4);
-  background: rgba(240,240,234,0.06);
+  border-color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.07);
   color: var(--white);
-  box-shadow: 2px 2px 0 0 rgba(240,240,234,0.1);
 }
 
 @media (max-width: 960px) {

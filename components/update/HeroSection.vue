@@ -21,8 +21,8 @@
       </p>
 
       <div class="hero-btns">
-        <NuxtLink to="/auth/register" class="iso-btn iso-btn--fill">Get Started Free →</NuxtLink>
-        <a href="#features" class="iso-btn iso-btn--ghost">Explore Features</a>
+        <a href="#" class="btn-fill">Get Started Free</a>
+        <a href="#features" class="btn-ghost">Explore Features</a>
       </div>
 
       <div class="hero-stats">
@@ -209,16 +209,10 @@ h1 { margin-bottom: 1.5rem; }
 .hero-btns { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 3.5rem; }
 
 .hero-stats {
-  display: flex; gap: 0;
+  display: flex; gap: 3rem;
   padding-top: 2rem; border-top: 1px solid var(--border);
 }
-.stat {
-  display: flex; flex-direction: column; gap: 3px;
-  padding: 0 2.5rem 0 0;
-  border-right: 1px solid var(--border);
-  margin-right: 2.5rem;
-}
-.stat:last-child { border-right: none; margin-right: 0; }
+.stat { display: flex; flex-direction: column; gap: 3px; }
 .stat-n {
   font-family: var(--font-mono);
   font-weight: 700; font-size: 1.6rem; color: var(--white);

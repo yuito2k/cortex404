@@ -49,17 +49,13 @@ onMounted(() => {
   gap: 1px;
   background: var(--border);
   border: 1px solid var(--border);
-  box-shadow: 6px 6px 0 0 rgba(240,240,234,0.05);
 }
 
 .tcard {
   background: var(--black);
   padding: 2rem;
   display: flex; flex-direction: column; gap: 1rem;
-  border-left: 2px solid transparent;
-  transition: background 0.2s, border-color 0.2s;
 }
-.tcard:hover { background: #0d0d0d; border-left-color: var(--border-bright); }
 
 .stars { font-size: 0.75rem; color: var(--white); letter-spacing: 2px; }
 
@@ -80,7 +76,6 @@ onMounted(() => {
   display: flex; align-items: center; justify-content: center;
   font-family: var(--font-mono); font-size: 0.65rem; font-weight: 700;
   color: var(--white); flex-shrink: 0;
-  box-shadow: 2px 2px 0 0 rgba(240,240,234,0.08), 1px 1px 0 0 rgba(240,240,234,0.05);
 }
 
 .tcard-name {

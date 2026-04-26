@@ -74,7 +74,6 @@ onMounted(() => {
   gap: 1px;
   background: var(--border);
   border: 1px solid var(--border);
-  box-shadow: 6px 6px 0 0 rgba(240,240,234,0.05);
 }
 
 .fcard {
@@ -82,9 +81,8 @@ onMounted(() => {
   padding: 2.5rem 2rem;
   position: relative;
   transition: background 0.25s;
-  border-left: 2px solid transparent;
 }
-.fcard:hover { background: #111; border-left-color: var(--border-bright); }
+.fcard:hover { background: #111; }
 
 .fcard-num {
   position: absolute; top: 1.5rem; right: 1.8rem;
@@ -97,7 +95,6 @@ onMounted(() => {
   border: 1px solid var(--border-bright);
   display: flex; align-items: center; justify-content: center;
   margin-bottom: 1.8rem; color: var(--white);
-  box-shadow: 3px 3px 0 0 rgba(240,240,234,0.08), 2px 2px 0 0 rgba(240,240,234,0.05);
 }
 .fcard-icon :deep(svg) { width: 22px; height: 22px; }
 

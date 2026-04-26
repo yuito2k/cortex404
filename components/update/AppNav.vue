@@ -12,11 +12,11 @@
 
       <template v-if="user">
         <NuxtLink to="/dashboard" class="nav-link">Dashboard</NuxtLink>
-        <button class="iso-btn iso-btn--ghost nav-iso-btn" @click="handleSignOut">Logout</button>
+        <button class="nav-cta nav-cta--ghost" @click="handleSignOut">Logout</button>
       </template>
       <template v-else>
         <NuxtLink to="/auth/login" class="nav-link">Login</NuxtLink>
-        <NuxtLink to="/auth/register" class="iso-btn iso-btn--fill nav-iso-btn">Start Free →</NuxtLink>
+        <NuxtLink to="/auth/register" class="nav-cta">Start Free →</NuxtLink>
       </template>
     </div>
 
@@ -35,11 +35,11 @@
 
       <template v-if="user">
         <NuxtLink to="/dashboard" class="mobile-link" @click="menuOpen = false">Dashboard</NuxtLink>
-        <button class="iso-btn iso-btn--ghost iso-btn--full" @click="handleSignOut">Logout</button>
+        <button class="mobile-cta" @click="handleSignOut">Logout</button>
       </template>
       <template v-else>
         <NuxtLink to="/auth/login" class="mobile-link" @click="menuOpen = false">Login</NuxtLink>
-        <NuxtLink to="/auth/register" class="iso-btn iso-btn--fill iso-btn--full" @click="menuOpen = false">Start Free →</NuxtLink>
+        <NuxtLink to="/auth/register" class="mobile-cta" @click="menuOpen = false">Start Free →</NuxtLink>
       </template>
     </div>
   </nav>
@@ -87,10 +87,23 @@ async function handleSignOut() {
 }
 .nav-link:hover { color: var(--white); }
 
-.nav-iso-btn {
-  font-size: 0.68rem !important;
-  padding: 9px 18px !important;
+.nav-cta {
+  font-family: var(--font-mono);
+  font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 9px 20px;
+  background: var(--white); color: var(--black);
+  transition: background 0.15s, transform 0.15s;
+  display: inline-block;
 }
+.nav-cta:hover { background: #d4d4ce; transform: translateY(-1px); }
+
+.nav-cta--ghost {
+  background: transparent; color: var(--dim);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+.nav-cta--ghost:hover { color: var(--white); border-color: var(--white); background: transparent; }
 
 /* Hamburger */
 .hamburger {
@@ -127,6 +140,13 @@ async function handleSignOut() {
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim);
 }
 .mobile-link:hover { color: var(--white); }
+.mobile-cta {
+  font-family: var(--font-mono);
+  font-size: 0.8rem; font-weight: 700;
+  text-transform: uppercase;
+  padding: 12px 0; color: var(--black);
+  background: var(--white); text-align: center;
+}
 
 @media (max-width: 700px) {
   .nav-right { display: none; }
