@@ -1269,7 +1269,6 @@ onUnmounted(() => { stopTimer(); observer?.disconnect() })
   border: 1px solid var(--border); background: #0a0a0a;
   box-shadow: 4px 4px 0 0 rgba(240,240,234,0.04);
   gap: 1.5rem;
-  position: sticky; top: 60px; z-index: 50;
 }
 
 .etb-left { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
@@ -1309,7 +1308,6 @@ onUnmounted(() => { stopTimer(); observer?.disconnect() })
   padding: 1rem 1.4rem;
   box-shadow: 4px 4px 0 0 rgba(240,240,234,0.04);
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  position: sticky; top: 120px; z-index: 40;
 }
 .q-palette {
   display: flex; flex-wrap: wrap; gap: 5px; flex: 1;
