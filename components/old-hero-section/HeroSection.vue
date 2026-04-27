@@ -157,21 +157,20 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* ── Base (desktop ≥ 1024px) ─────────────────────────────── */
 .hero {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: center;
   gap: 3rem;
-  padding: 120px 6vw 80px;
+  padding: 100px 6vw 80px;
   position: relative;
   overflow: hidden;
 }
 
 /* Corner brackets */
 .corner-tl {
-  position: absolute; top: 88px; left: 4vw;
+  position: absolute; top: 80px; left: 4vw;
   width: 50px; height: 50px;
   border-top: 1px solid var(--border-bright);
   border-left: 1px solid var(--border-bright);
@@ -185,18 +184,14 @@ onMounted(() => {
   pointer-events: none;
 }
 
-.hero-left {
-  position: relative; z-index: 2;
-  max-width: 580px;
-}
+.hero-left { position: relative; z-index: 2; }
 
-/* Chip */
 .chip {
   display: inline-flex; align-items: center; gap: 8px;
   font-family: var(--font-mono);
   font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase;
   color: var(--gray); border: 1px solid var(--border-bright);
-  padding: 6px 14px; margin-bottom: 1.8rem;
+  padding: 6px 14px; margin-bottom: 2rem;
 }
 .chip-dot {
   width: 5px; height: 5px; border-radius: 50%;
@@ -204,48 +199,35 @@ onMounted(() => {
   animation: blink 2s infinite;
 }
 
-h1 {
-  margin-bottom: 1.4rem;
-  /* h1 size comes from global.css — no override needed */
-}
+h1 { margin-bottom: 1.5rem; }
 
 .hero-desc {
   font-size: 1rem; font-weight: 300; line-height: 1.75;
-  color: var(--dim); max-width: 480px; margin-bottom: 2.4rem;
+  color: var(--dim); max-width: 480px; margin-bottom: 2.5rem;
 }
 
-/* Buttons */
-.hero-btns {
-  display: flex; gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 3rem;
-}
+.hero-btns { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 3.5rem; }
 
-/* Stats row */
 .hero-stats {
-  display: flex;
-  padding-top: 2rem;
-  border-top: 1px solid var(--border);
+  display: flex; gap: 0;
+  padding-top: 2rem; border-top: 1px solid var(--border);
 }
 .stat {
   display: flex; flex-direction: column; gap: 3px;
-  padding: 0 2.2rem 0 0;
+  padding: 0 2.5rem 0 0;
   border-right: 1px solid var(--border);
-  margin-right: 2.2rem;
+  margin-right: 2.5rem;
 }
-.stat:last-child { border-right: none; margin-right: 0; padding-right: 0; }
+.stat:last-child { border-right: none; margin-right: 0; }
 .stat-n {
   font-family: var(--font-mono);
   font-weight: 700; font-size: 1.6rem; color: var(--white);
-  letter-spacing: -0.5px; line-height: 1;
 }
 .stat-l {
-  font-size: 0.65rem; font-weight: 500;
+  font-size: 0.68rem; font-weight: 500;
   letter-spacing: 0.1em; text-transform: uppercase; color: var(--gray);
-  margin-top: 4px;
 }
 
-/* Canvas */
 .hero-right {
   display: flex; justify-content: center; align-items: center;
 }
@@ -255,117 +237,9 @@ h1 {
   animation: floatY 5s ease-in-out infinite;
 }
 
-/* ── Tablet landscape (≤ 1100px) ─────────────────────────── */
-@media (max-width: 1100px) {
-  .hero {
-    gap: 2rem;
-    padding: 110px 5vw 70px;
-  }
-  .neural-canvas { max-width: 380px; }
-}
-
-/* ── Tablet portrait (≤ 900px) ───────────────────────────── */
-@media (max-width: 900px) {
-  .hero {
-    grid-template-columns: 1fr;
-    min-height: auto;
-    padding: 110px 6vw 60px;
-    gap: 0;
-  }
-
-  .hero-left { max-width: 100%; }
-
-  /* Show canvas below content at tablet, smaller size */
-  .hero-right {
-    display: flex;
-    margin-top: 2.5rem;
-    justify-content: center;
-  }
-  .neural-canvas {
-    max-width: 320px;
-    opacity: 0.7;
-    animation: none; /* reduce motion on smaller screens */
-  }
-
-  .hero-desc { max-width: 100%; }
-
-  .corner-br { display: none; }
-}
-
-/* ── Mobile (≤ 640px) ────────────────────────────────────── */
-@media (max-width: 640px) {
-  .hero {
-    padding: 100px 5vw 50px;
-  }
-
-  .chip {
-    font-size: 0.6rem;
-    padding: 5px 12px;
-    margin-bottom: 1.4rem;
-  }
-
-  .hero-desc {
-    font-size: 0.92rem;
-    margin-bottom: 2rem;
-  }
-
-  /* Stack buttons vertically */
-  .hero-btns {
-    flex-direction: column;
-    gap: 10px;
-    margin-bottom: 2.5rem;
-  }
-  .hero-btns :deep(.iso-btn),
-  .hero-btns a,
-  .hero-btns button {
-    width: 100%;
-    text-align: center;
-    justify-content: center;
-  }
-
-  /* Compress stats */
-  .hero-stats { padding-top: 1.6rem; }
-  .stat {
-    padding-right: 1.4rem;
-    margin-right: 1.4rem;
-  }
-  .stat-n { font-size: 1.3rem; }
-  .stat-l { font-size: 0.6rem; }
-
-  /* Hide canvas on small phones */
+@media (max-width: 960px) {
+  .hero { grid-template-columns: 1fr; }
   .hero-right { display: none; }
-
-  .corner-tl { top: 72px; left: 3vw; }
-  .corner-br { display: none; }
-}
-
-/* ── Very small (≤ 380px) ────────────────────────────────── */
-@media (max-width: 380px) {
-  .hero { padding: 90px 4vw 40px; }
-
-  .chip { font-size: 0.55rem; letter-spacing: 0.12em; }
-
-  .hero-desc { font-size: 0.88rem; line-height: 1.65; }
-
-  .stat-n { font-size: 1.1rem; }
-
-  /* When stats get too cramped, stack them */
-  .hero-stats {
-    flex-direction: column;
-    gap: 1rem;
-    border-top: 1px solid var(--border);
-  }
-  .stat {
-    flex-direction: row;
-    align-items: center;
-    gap: 10px;
-    padding: 0;
-    border-right: none;
-    margin-right: 0;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 1rem;
-  }
-  .stat:last-child { border-bottom: none; padding-bottom: 0; }
-  .stat-n { font-size: 1.2rem; min-width: 60px; }
+  .hero-stats { gap: 1.5rem; }
 }
 </style>
