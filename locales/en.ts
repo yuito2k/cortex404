@@ -248,11 +248,6 @@ export default {
 
   // ── Dashboard — shared
   dashboard: {
-    overview: 'Overview',
-    questionBank: 'Question Bank',
-    mockExam: 'Mock Exam',
-    progress: 'Progress',
-    leaderboard: 'Leaderboard',
     settings: 'Settings',
     welcome: 'Welcome back',
     startExam: 'Start Exam',
@@ -260,6 +255,38 @@ export default {
     totalScore: 'Total Score',
     accuracy: 'Accuracy',
     rank: 'Rank',
+    navItems: [
+      {
+        to: '/dashboard',
+        label: 'Overview',
+        badge: null,
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>`,
+      },
+      {
+        to: '/dashboard/mock-exam',
+        label: 'Mock Exam',
+        badge: null,
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`,
+      },
+      {
+        to: '/dashboard/question-bank',
+        label: 'Question Bank',
+        badge: '1M+',
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 4v16"/></svg>`,
+      },
+      {
+        to: '/dashboard/progress',
+        label: 'Progress',
+        badge: null,
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+      },
+      {
+        to: '/dashboard/leaderboard',
+        label: 'Leaderboard',
+        badge: null,
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>`,
+      },
+    ],
   },
 
   // ── Question Bank page
