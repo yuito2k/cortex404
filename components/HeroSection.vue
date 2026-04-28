@@ -6,23 +6,22 @@
     <div class="hero-left">
       <div class="chip">
         <span class="chip-dot" />
-        Intelligent Exam Preparation
+        {{ t('hero.chip') }}
       </div>
 
       <h1>
-        Study Smarter.<br />
-        <span class="text-outline">Score Higher.</span><br />
-        Engineer Your Future.
+        {{ t('hero.headline1') }}<br />
+        <span class="text-outline">{{ t('hero.headline2') }}</span><br />
+        {{ t('hero.headline3') }}
       </h1>
 
       <p class="hero-desc">
-        Practice from 1M+ questions across SSC, HSC, University Admission, and BCS.
-        AI-powered doubt solving, live mock tests, and nationwide leaderboards — all in one platform.
+        {{ t('hero.subheadline') }}
       </p>
 
       <div class="hero-btns">
-        <NuxtLink to="/auth/register" class="iso-btn iso-btn--fill">Get Started Free →</NuxtLink>
-        <a href="#features" class="iso-btn iso-btn--ghost">Explore Features</a>
+        <NuxtLink to="/auth/register" class="iso-btn iso-btn--fill">{{ t('hero.ctaPrimary') }}</NuxtLink>
+        <a href="#features" class="iso-btn iso-btn--ghost">{{ t('hero.ctaSecondary') }}</a>
       </div>
 
       <div class="hero-stats">
@@ -43,13 +42,10 @@
 </template>
 
 <script setup>
-const canvasRef = ref(null)
+const { t, ta } = useI18n()
 
-const stats = [
-  { value: '500K+', label: 'Active Students' },
-  { value: '1M+',   label: 'Questions' },
-  { value: '4.8★',  label: 'App Rating' },
-]
+const stats = computed(() => ta('hero.stats'))
+const canvasRef = ref(null)
 
 onMounted(() => {
   const canvas = canvasRef.value

@@ -1,7 +1,7 @@
 <template>
   <div class="ticker-section">
     <div class="ticker-track">
-      <div v-for="(item, i) in doubled" :key="i" class="ticker-item">
+      <div v-for="item in items" :key="item.label" class="ticker-item">
         <span class="ticker-num">{{ item.value }}</span>
         <span class="ticker-label">{{ item.label }}</span>
       </div>
@@ -10,17 +10,8 @@
 </template>
 
 <script setup>
-const items = [
-  { value: '1M+',   label: 'Questions in Bank' },
-  { value: '500K+', label: 'Students Enrolled' },
-  { value: '50+',   label: 'Exam Categories' },
-  { value: '4.8★',  label: 'Average Rating' },
-  { value: '24/7',  label: 'AI Doubt Solving' },
-  { value: '100%',  label: 'Ad-Free Platform' },
-]
-
-// Duplicate for seamless loop
-const doubled = [...items, ...items]
+const { ta } = useI18n()
+const items = computed(() => ta('statsTicker.stats'))
 </script>
 
 <style scoped>

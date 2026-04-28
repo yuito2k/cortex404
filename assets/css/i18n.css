@@ -1,0 +1,138 @@
+/* ============================================================
+   i18n additions — paste into assets/css/global.css
+   (or @import this file from global.css)
+   ============================================================ */
+
+/* ── Bangla font import ───────────────────────────────────────
+   Hind Siliguri: clean, modern, great for UI at small sizes.
+   Noto Sans Bengali: most comprehensive Unicode coverage.
+   We load both; Hind Siliguri is used for UI, Noto as fallback.
+   ──────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&family=Noto+Sans+Bengali:wght@300;400;500;600;700&display=swap');
+
+/* ── CSS variable for Bangla font stack ─────────────────────── */
+:root {
+  --font-bangla: 'Hind Siliguri', 'Noto Sans Bengali', 'SolaimanLipi', sans-serif;
+}
+
+/* ── When lang-bn is active on <body> ───────────────────────── */
+
+/* Headings: keep Space Mono for branding/numbers,
+   switch prose/label text to Bangla font */
+body.lang-bn h1,
+body.lang-bn h2,
+body.lang-bn h3,
+body.lang-bn h4,
+body.lang-bn h5,
+body.lang-bn h6 {
+  font-family: var(--font-bangla);
+  /* Bangla script needs slightly more line-height */
+  line-height: 1.5;
+}
+
+/* Body / paragraph text */
+body.lang-bn p,
+body.lang-bn span:not(.mono-keep),
+body.lang-bn label,
+body.lang-bn li,
+body.lang-bn td,
+body.lang-bn th,
+body.lang-bn input::placeholder,
+body.lang-bn textarea::placeholder,
+body.lang-bn button:not(.mono-keep),
+body.lang-bn a:not(.mono-keep) {
+  font-family: var(--font-bangla);
+}
+
+/* ── Elements that STAY monospace even in BN mode ──────────────
+   e.g. score values, rank numbers, stat chips, code
+   Add class="mono-keep" to any element you want to stay Space Mono
+   ──────────────────────────────────────────────────────────── */
+body.lang-bn .mono-keep,
+body.lang-bn code,
+body.lang-bn pre,
+body.lang-bn .page-chip .chip-dot,
+body.lang-bn [class*="score"],
+body.lang-bn [class*="rank-num"],
+body.lang-bn [class*="stat-value"] {
+  font-family: var(--font-mono);
+}
+
+/* ── Page chips / badges — Bangla needs slight size bump ────── */
+body.lang-bn .page-chip {
+  font-family: var(--font-bangla);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em; /* Bangla doesn't need wide tracking */
+}
+
+/* ── Nav links ───────────────────────────────────────────────── */
+body.lang-bn .nav-link,
+body.lang-bn .nav-links a {
+  font-family: var(--font-bangla);
+  letter-spacing: 0;
+  font-size: 0.92rem;
+}
+
+/* ── iso-btn labels in BN mode ─────────────────────────────── */
+body.lang-bn .iso-btn {
+  font-family: var(--font-bangla);
+  letter-spacing: 0;
+  font-size: 0.9rem;
+}
+
+/* ── Dashboard sidebar items ─────────────────────────────────── */
+body.lang-bn .sidebar-label,
+body.lang-bn .dash-nav-item span {
+  font-family: var(--font-bangla);
+  letter-spacing: 0;
+}
+
+/* ── Filter pills / difficulty badges ───────────────────────── */
+body.lang-bn .pill,
+body.lang-bn .diff-badge,
+body.lang-bn .stream-pill,
+body.lang-bn .subject-pill {
+  font-family: var(--font-bangla);
+  letter-spacing: 0;
+  font-size: 0.8rem;
+}
+
+/* ── Table cells ─────────────────────────────────────────────── */
+body.lang-bn .table-cell,
+body.lang-bn td {
+  font-family: var(--font-bangla);
+  line-height: 1.6;
+}
+
+/* ── Form inputs ─────────────────────────────────────────────── */
+body.lang-bn input[type='text'],
+body.lang-bn input[type='email'],
+body.lang-bn input[type='password'],
+body.lang-bn input[type='search'],
+body.lang-bn textarea,
+body.lang-bn select {
+  font-family: var(--font-bangla);
+}
+
+/* ── Toast / notification text ───────────────────────────────── */
+body.lang-bn .toast-msg {
+  font-family: var(--font-bangla);
+}
+
+/* ── LangToggle: BN knob label uses Bangla font (scoped already,
+   but this ensures specificity from global scope) ─────────────── */
+.lt-knob-label {
+  /* handled in component scoped style */
+}
+
+/* ── Smooth language transition ──────────────────────────────── */
+body {
+  transition: font-family 0s; /* immediate, no visual delay */
+}
+
+/* ── Accessibility: honour prefers-reduced-motion ─────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .lt-knob {
+    transition: none !important;
+  }
+}

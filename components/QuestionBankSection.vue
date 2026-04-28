@@ -2,13 +2,12 @@
   <section class="section-wrap">
     <div ref="wrapRef" class="qbank-wrap fade-up">
       <div class="qbank-text">
-        <p class="section-tag">Question Bank</p>
-        <h2>1,000,000+ Questions.<br />Zero Repetition.</h2>
+        <p class="section-tag">{{ t('questionBankSection.chip') }}</p>
+        <h2>{{ t('questionBankSection.heading1') }}<br />{{ t('questionBankSection.heading2') }}</h2>
         <p class="section-sub">
-          Built from actual board and competitive exam papers going back 7+ years.
-          Every question tagged by topic, difficulty, and year — so you always practice what matters.
+          {{ t('questionBankSection.subHeading') }}
         </p>
-        <NuxtLink to="/auth/register" class="iso-btn iso-btn--fill">Browse Questions →</NuxtLink>
+        <NuxtLink to="/dashboard/question-bank" class="iso-btn iso-btn--fill">{{ t('questionBankSection.ctaBrowse') }}</NuxtLink>
       </div>
 
       <div class="qbank-cards">
@@ -35,40 +34,10 @@
 </template>
 
 <script setup>
+const { t, ta } = useI18n()
 const wrapRef = ref(null)
 
-const questions = [
-  {
-    subject: 'Physics · HSC', difficulty: 'Medium',
-    question: 'A body of mass 5 kg is acted upon by a net force of 20 N. What is the acceleration of the body?',
-    options: [
-      { label: 'A', text: '2 m/s²',  correct: false },
-      { label: 'B', text: '4 m/s²',  correct: true  },
-      { label: 'C', text: '6 m/s²',  correct: false },
-      { label: 'D', text: '8 m/s²',  correct: false },
-    ],
-  },
-  {
-    subject: 'Chemistry · HSC', difficulty: 'Hard',
-    question: 'Which of the following elements has the highest electronegativity?',
-    options: [
-      { label: 'A', text: 'Oxygen',   correct: false },
-      { label: 'B', text: 'Nitrogen', correct: false },
-      { label: 'C', text: 'Fluorine', correct: true  },
-      { label: 'D', text: 'Chlorine', correct: false },
-    ],
-  },
-  {
-    subject: 'BCS General Knowledge', difficulty: 'Easy',
-    question: 'Which is the longest river system flowing through Bangladesh?',
-    options: [
-      { label: 'A', text: 'Meghna',    correct: true  },
-      { label: 'B', text: 'Buriganga', correct: false },
-      { label: 'C', text: 'Karnaphuli',correct: false },
-      { label: 'D', text: 'Surma',     correct: false },
-    ],
-  },
-]
+const questions = computed(() => ta('questionBankSection.questions'))
 
 onMounted(() => {
   const obs = new IntersectionObserver(entries => {

@@ -1,9 +1,9 @@
 <template>
   <section id="exams" class="section-wrap streams-bg">
-    <p class="section-tag">Exam Coverage</p>
-    <h2>Every Exam.<br />One Platform.</h2>
+    <p class="section-tag">{{ t('examStreams.chip') }}</p>
+    <h2>{{ t('examStreams.heading1') }}<br />{{ t('examStreams.heading2') }}</h2>
     <p class="section-sub">
-      From school board to BCS — Cortex404 covers all major exams in Bangladesh.
+      {{ t('examStreams.subHeading') }}
     </p>
 
     <div ref="gridRef" class="streams-grid fade-up">
@@ -17,18 +17,10 @@
 </template>
 
 <script setup>
+const { t, ta } = useI18n()
 const gridRef = ref(null)
 
-const streams = [
-  { label: 'Board Exam',           title: 'SSC',                   count: 'All boards · Science, Arts, Commerce' },
-  { label: 'Board Exam',           title: 'HSC Science',           count: 'Physics · Chemistry · Biology · Math' },
-  { label: 'Board Exam',           title: 'HSC Arts & Commerce',   count: 'All subjects covered' },
-  { label: 'University Admission', title: 'BUET · DU · CU · RU',  count: 'All units & clusters' },
-  { label: 'University Admission', title: 'Medical & Dental',      count: 'MBBS · BDS · AFMC · Nursing' },
-  { label: 'Competitive',          title: 'BCS Preliminary',       count: '38th – 47th BCS full archives' },
-  { label: 'Job Prep',             title: 'Bank & Govt Jobs',      count: 'Bangladesh Bank · Primary · Others' },
-  { label: 'Engineering',          title: 'RUET · KUET · CUET',   count: 'IUT · MIST · BUP · SUST included' },
-]
+const streams = computed(() => ta('examStreams.streams'))
 
 onMounted(() => {
   const obs = new IntersectionObserver(entries => {

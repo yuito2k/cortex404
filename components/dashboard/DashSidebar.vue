@@ -1,273 +1,253 @@
 <template>
-  <aside class="sidebar" :class="{ collapsed: collapsed }">
+  <!-- DashSidebar.vue — i18n updated -->
+  <aside class="dash-sidebar">
     <!-- Logo -->
-    <NuxtLink to="/" class="sidebar-logo">
-      <span class="logo-full">CORTEX<span class="gray">404</span></span>
-      <span class="logo-short">CX</span>
+    <NuxtLink to="/" class="sidebar-logo mono-keep">
+      Cortex<span class="logo-accent">404</span>
     </NuxtLink>
-
-    <!-- Toggle -->
-    <button class="collapse-btn" @click="$emit('toggle')" aria-label="Toggle sidebar">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path v-if="!collapsed" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
-        <path v-else d="M13 5l7 7-7 7M6 5l7 7-7 7" />
-      </svg>
-    </button>
 
     <!-- Nav items -->
     <nav class="sidebar-nav">
-      <div class="nav-section-label" v-if="!collapsed">Main</div>
       <NuxtLink
         v-for="item in navItems"
         :key="item.to"
         :to="item.to"
-        class="nav-item"
-        :class="{ active: route.path === item.to }"
+        class="dash-nav-item"
+        active-class="is-active"
       >
         <span class="nav-icon" v-html="item.icon" />
-        <span class="nav-label">{{ item.label }}</span>
-        <span v-if="item.badge" class="nav-badge">{{ item.badge }}</span>
-      </NuxtLink>
-
-      <div class="nav-divider" />
-      <div class="nav-section-label" v-if="!collapsed">Account</div>
-
-      <NuxtLink to="/dashboard/settings" class="nav-item" :class="{ active: route.path === '/dashboard/settings' }">
-        <span class="nav-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </span>
-        <span class="nav-label">Settings</span>
+        <span class="sidebar-label">{{ item.label }}</span>
       </NuxtLink>
     </nav>
 
-    <!-- User profile -->
-    <div class="sidebar-user">
-      <div class="user-avatar">{{ userInitials }}</div>
-      <div class="user-info" v-if="!collapsed">
-        <span class="user-name">{{ userName }}</span>
-        <span class="user-email">{{ userEmail }}</span>
+    <!-- Bottom: lang toggle + user -->
+    <div class="sidebar-bottom">
+      <!-- Language toggle in sidebar -->
+      <div class="sidebar-lang">
+        <span class="sidebar-lang-label mono-keep">
+          {{ locale === 'en' ? 'LANG' : 'ভাষা' }}
+        </span>
+        <LangToggle />
       </div>
-      <button class="signout-btn" @click="handleSignOut" title="Sign out">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
-        </svg>
-      </button>
+
+      <!-- User row -->
+      <div class="sidebar-user">
+        <div class="user-avatar mono-keep">
+          {{ userInitials }}
+        </div>
+        <div class="user-info">
+          <span class="user-name">{{ userName }}</span>
+          <span class="user-exam mono-keep">{{ userExam }}</span>
+        </div>
+        <NuxtLink to="/dashboard/settings" class="settings-icon" :aria-label="t('dashboard.settings')">
+          ⚙
+        </NuxtLink>
+      </div>
     </div>
   </aside>
 </template>
 
 <script setup lang="ts">
-defineProps<{ collapsed: boolean }>()
-defineEmits(['toggle'])
+const { t, locale } = useI18n()
+const user = useSupabaseUser()
 
-const route = useRoute()
-const { user, signOut } = useAuth()
-
-const userName = computed(() => user.value?.user_metadata?.full_name ?? 'Student')
-const userEmail = computed(() => user.value?.email ?? '')
-const userInitials = computed(() =>
-  userName.value.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
-)
-
-const navItems = [
+const navItems = computed(() => [
   {
     to: '/dashboard',
-    label: 'Overview',
-    badge: null,
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>`,
-  },
-  {
-    to: '/dashboard/mock-exam',
-    label: 'Mock Exam',
-    badge: null,
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`,
+    label: t('dashboard.overview'),
+    icon: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" stroke="currentColor"/><rect x="9" y="1" width="6" height="6" stroke="currentColor"/><rect x="1" y="9" width="6" height="6" stroke="currentColor"/><rect x="9" y="9" width="6" height="6" stroke="currentColor"/></svg>',
   },
   {
     to: '/dashboard/question-bank',
-    label: 'Question Bank',
-    badge: '1M+',
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 4v16"/></svg>`,
+    label: t('dashboard.questionBank'),
+    icon: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" stroke="currentColor"/><line x1="5" y1="6" x2="11" y2="6" stroke="currentColor"/><line x1="5" y1="9" x2="9" y2="9" stroke="currentColor"/></svg>',
+  },
+  {
+    to: '/dashboard/mock-exam',
+    label: t('dashboard.mockExam'),
+    icon: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor"/><polyline points="8,5 8,8 10,10" stroke="currentColor"/></svg>',
   },
   {
     to: '/dashboard/progress',
-    label: 'Progress',
-    badge: null,
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+    label: t('dashboard.progress'),
+    icon: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polyline points="2,12 6,7 9,10 14,4" stroke="currentColor"/></svg>',
   },
   {
     to: '/dashboard/leaderboard',
-    label: 'Leaderboard',
-    badge: null,
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>`,
+    label: t('dashboard.leaderboard'),
+    icon: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="9" width="4" height="5" stroke="currentColor"/><rect x="6" y="6" width="4" height="8" stroke="currentColor"/><rect x="11" y="3" width="4" height="11" stroke="currentColor"/></svg>',
   },
-]
+  {
+    to: '/dashboard/settings',
+    label: t('dashboard.settings'),
+    icon: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2" stroke="currentColor"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor"/></svg>',
+  },
+])
 
-async function handleSignOut() {
-  await signOut()
-}
+const userInitials = computed(() => {
+  const name = user.value?.user_metadata?.full_name ?? user.value?.email ?? 'U'
+  return name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+})
+
+const userName = computed(() =>
+  user.value?.user_metadata?.full_name ?? user.value?.email?.split('@')[0] ?? 'Student'
+)
+
+const userExam = computed(() =>
+  user.value?.user_metadata?.primary_exam ?? 'HSC'
+)
 </script>
 
 <style scoped>
-.sidebar {
-  width: 240px;
+.dash-sidebar {
+  width: 220px;
   min-height: 100vh;
-  background: #0a0a0a;
+  background: var(--black);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  transition: width 0.25s ease;
-  position: fixed;
-  top: 0; left: 0; bottom: 0;
-  z-index: 200;
-  overflow: hidden;
+  padding: 24px 0;
+  flex-shrink: 0;
 }
-.sidebar.collapsed { width: 64px; }
 
 .sidebar-logo {
-  display: flex;
-  align-items: center;
-  padding: 0 20px;
-  height: 62px;
-  border-bottom: 1px solid var(--border);
   font-family: var(--font-mono);
+  font-size: 0.9rem;
   font-weight: 700;
-  font-size: 1rem;
   color: var(--white);
-  flex-shrink: 0;
-  white-space: nowrap;
+  text-decoration: none;
+  padding: 0 20px 24px;
+  border-bottom: 1px solid var(--border);
+  letter-spacing: 0.05em;
 }
-.gray { color: var(--gray); }
-.logo-short { display: none; }
-.collapsed .logo-full { display: none; }
-.collapsed .logo-short { display: block; }
-
-.collapse-btn {
-  position: absolute;
-  top: 16px; right: -12px;
-  width: 24px; height: 24px;
-  background: #0a0a0a;
-  border: 1px solid var(--border-bright);
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; color: var(--gray);
-  transition: color 0.2s, border-color 0.2s;
-  z-index: 10;
-}
-.collapse-btn:hover { color: var(--white); border-color: var(--white); }
-.collapse-btn svg { width: 12px; height: 12px; }
+.logo-accent { opacity: 0.4; }
 
 .sidebar-nav {
   flex: 1;
   padding: 16px 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.nav-section-label {
-  font-family: var(--font-mono);
-  font-size: 0.55rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--gray);
-  padding: 8px 20px 4px;
-  opacity: 0.6;
-  white-space: nowrap;
-}
-
-.nav-item {
+.dash-nav-item {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 10px 20px;
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: var(--gray);
-  transition: background 0.15s, color 0.15s;
-  position: relative;
-  white-space: nowrap;
+  color: var(--dim);
   text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.nav-item:hover { background: rgba(240,240,234,0.04); color: var(--white); }
-.nav-item.active {
+.dash-nav-item:hover {
   color: var(--white);
-  background: rgba(240,240,234,0.06);
+  background: rgba(240, 240, 234, 0.03);
 }
-.nav-item.active::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 2px;
-  background: var(--white);
+.dash-nav-item.is-active {
+  color: var(--white);
+  border-left-color: var(--white);
+  background: rgba(240, 240, 234, 0.04);
 }
 
-.nav-icon { width: 20px; height: 20px; flex-shrink: 0; display: flex; align-items: center; }
-.nav-icon :deep(svg) { width: 18px; height: 18px; }
-.nav-label { flex: 1; }
+.nav-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.dash-nav-item.is-active .nav-icon { opacity: 1; }
 
-.nav-badge {
+.sidebar-label {
   font-family: var(--font-mono);
-  font-size: 0.55rem;
-  letter-spacing: 0.06em;
-  padding: 2px 6px;
-  border: 1px solid var(--border-bright);
-  color: var(--gray);
-}
-.collapsed .nav-label,
-.collapsed .nav-badge,
-.collapsed .nav-section-label { display: none; }
-
-.nav-divider {
-  height: 1px;
-  background: var(--border);
-  margin: 12px 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
-/* User area */
+.sidebar-bottom {
+  border-top: 1px solid var(--border);
+  padding: 16px 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Lang toggle row in sidebar */
+.sidebar-lang {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sidebar-lang-label {
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+
 .sidebar-user {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 16px;
-  border-top: 1px solid var(--border);
-  min-height: 64px;
-  overflow: hidden;
+  padding-bottom: 8px;
 }
 
 .user-avatar {
-  width: 32px; height: 32px;
-  background: #1e1e1e;
-  border: 1px solid var(--border-bright);
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-mono);
-  font-size: 0.65rem; font-weight: 700;
+  width: 32px;
+  height: 32px;
+  background: rgba(240, 240, 234, 0.08);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
   color: var(--white);
   flex-shrink: 0;
 }
 
 .user-info {
   flex: 1;
-  display: flex; flex-direction: column; gap: 2px;
-  overflow: hidden;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
+
 .user-name {
-  font-size: 0.78rem; font-weight: 600;
+  font-size: 0.78rem;
   color: var(--white);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.user-email {
-  font-size: 0.65rem; color: var(--gray);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.signout-btn {
-  background: none; border: none; cursor: pointer;
-  color: var(--gray); flex-shrink: 0;
-  padding: 4px; display: flex; align-items: center;
-  transition: color 0.2s;
+.user-exam {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
-.signout-btn:hover { color: var(--white); }
-.signout-btn svg { width: 16px; height: 16px; }
 
-.collapsed .user-info { display: none; }
-.collapsed .signout-btn { display: none; }
+.settings-icon {
+  color: var(--dim);
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.settings-icon:hover { color: var(--white); }
+
+/* Bangla sidebar labels */
+:global(body.lang-bn) .sidebar-label {
+  font-family: var(--font-bangla);
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 0.85rem;
+}
+:global(body.lang-bn) .user-name {
+  font-family: var(--font-bangla);
+}
 </style>

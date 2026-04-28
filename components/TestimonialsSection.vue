@@ -1,9 +1,9 @@
 <template>
   <section id="testimonials" class="section-wrap">
-    <p class="section-tag">Student Stories</p>
-    <h2>Results That Speak.</h2>
+    <p class="section-tag">{{ t('testimonials.chip') }}</p>
+    <h2>{{ t('testimonials.heading') }}</h2>
     <p class="section-sub">
-      Thousands of students have used Cortex404 to crack their dream exams.
+      {{ t('testimonials.subHeading') }}
     </p>
 
     <div ref="gridRef" class="t-grid fade-up">
@@ -23,16 +23,10 @@
 </template>
 
 <script setup>
+const { t, ta } = useI18n()
 const gridRef = ref(null)
 
-const testimonials = [
-  { initials: 'IH', name: 'Imran Hossain',   uni: 'BUET · EEE',           quote: 'Cortex404 completely changed how I study. The mock tests and AI explanations helped me nail my HSC physics. I recommend it to every student I know.' },
-  { initials: 'SK', name: 'Sara Khatun',     uni: 'Dhaka University',      quote: 'The streak system made me study every single day without fail. It feels like a game but the results are very real. Got into DU on my first attempt.' },
-  { initials: 'TA', name: 'Tanvir Ahmed',    uni: 'KUET · Mechanical',     quote: 'Works perfectly even on my old Android with slow internet. The app is lightweight and the question bank is massive. One of the best study tools in Bangladesh.' },
-  { initials: 'MS', name: 'Mousumi Sultana', uni: 'SUST · Chemistry',      quote: 'The explanations are crystal clear. I used to struggle with BCS questions but now I understand the reasoning behind every answer. Truly impressive platform.' },
-  { initials: 'NI', name: 'Nabila Islam',    uni: 'Chittagong University', quote: 'Completely ad-free even on the free plan. Finally a platform that respects students. The leaderboard keeps me motivated and competitive every day.' },
-  { initials: 'RI', name: 'Raihan ul Islam', uni: 'RUET · CSE',            quote: 'Once you start giving daily tests, you fall in love with the habit. It pushed my scores up week after week until I finally cleared my admission exam.' },
-]
+const testimonials = computed(() => ta('testimonials.testimonials'))
 
 onMounted(() => {
   const obs = new IntersectionObserver(entries => {

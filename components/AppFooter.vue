@@ -5,7 +5,7 @@
         <NuxtLink to="/" class="footer-logo">
           CORTEX<span class="gray">404</span>
         </NuxtLink>
-        <p>Intelligent exam preparation for SSC, HSC, University Admission, BCS, and beyond. Learn · Build · Engineer.</p>
+        <p>{{ t('footer.tagline') }}</p>
         <div class="socials">
           <a v-for="s in socials" :key="s.label" href="#" class="social-btn" :aria-label="s.label">{{ s.icon }}</a>
         </div>
@@ -23,12 +23,15 @@
 
     <div class="footer-bottom">
       <span>© 2026 Cortex404. All rights reserved.</span>
-      <span class="mono">hi@cortex404.com</span>
+      <div class="footer-bottom-right">
+          <LangToggle />
+      </div>
     </div>
   </footer>
 </template>
 
 <script setup>
+const { t, ta } = useI18n()
 const socials = [
   { label: 'Facebook',  icon: 'fb' },
   { label: 'LinkedIn',  icon: 'in' },
@@ -36,20 +39,7 @@ const socials = [
   { label: 'Instagram', icon: 'ig' },
 ]
 
-const footerCols = [
-  {
-    heading: 'Features',
-    links: ['Mock Exams', 'Question Bank', 'AI Doubt Solver', 'Leaderboard'],
-  },
-  {
-    heading: 'Exams',
-    links: ['SSC & HSC', 'University Admission', 'BCS & Job Prep', 'Medical & Engineering'],
-  },
-  {
-    heading: 'Company',
-    links: ['About Us', 'FAQ', 'Privacy Policy', 'Terms & Conditions'],
-  },
-]
+const footerCols = computed(() => ta('footer.footerCols'))
 </script>
 
 <style scoped>
@@ -105,7 +95,7 @@ const footerCols = [
   padding-top: 2rem; border-top: 1px solid var(--border);
   font-size: 0.7rem; color: var(--gray);
 }
-.mono { font-family: var(--font-mono); }
+.footer-bottom-right { display: flex; align-items: center; gap: 16px; }
 
 @media (max-width: 960px) { .footer-top { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .footer-top { grid-template-columns: 1fr; } }

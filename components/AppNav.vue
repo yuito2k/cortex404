@@ -2,21 +2,22 @@
   <nav class="nav">
     <NuxtLink to="/" class="logo">
       CORTEX<span class="logo-gray">404</span>
-      <span class="logo-sub">Learn · Build · Engineer</span>
+      <span class="logo-sub">{{ t('nav.learn') }} · {{ t('nav.build') }} · {{ t('nav.engineer') }}</span>
     </NuxtLink>
 
     <div class="nav-right">
-      <a href="#features" class="nav-link">Features</a>
-      <a href="#exams" class="nav-link">Exams</a>
-      <a href="#testimonials" class="nav-link">Stories</a>
+      <a href="#features" class="nav-link">{{ t('nav.features') }}</a>
+      <a href="#exams" class="nav-link">{{ t('nav.exams') }}</a>
+      <a href="#testimonials" class="nav-link">{{ t('nav.stories') }}</a>
+      <LangToggle />
 
       <template v-if="user">
-        <NuxtLink to="/dashboard" class="nav-link">Dashboard</NuxtLink>
-        <button class="iso-btn iso-btn--ghost nav-iso-btn" @click="handleSignOut">Logout</button>
+        <NuxtLink to="/dashboard" class="nav-link">{{ t('nav.dashboard') }}</NuxtLink>
+        <button class="iso-btn iso-btn--ghost nav-iso-btn" @click="handleSignOut">{{ t('nav.logout') }}</button>
       </template>
       <template v-else>
-        <NuxtLink to="/auth/login" class="nav-link">Login</NuxtLink>
-        <NuxtLink to="/auth/register" class="iso-btn iso-btn--fill nav-iso-btn">Start Free →</NuxtLink>
+        <NuxtLink to="/auth/login" class="nav-link">{{ t('nav.login') }}</NuxtLink>
+        <NuxtLink to="/auth/register" class="iso-btn iso-btn--fill nav-iso-btn">{{ t('nav.startFree') }}</NuxtLink>
       </template>
     </div>
 
@@ -29,23 +30,28 @@
 
     <!-- Mobile menu -->
     <div class="mobile-menu" :class="{ active: menuOpen }">
-      <a href="#features" class="mobile-link" @click="menuOpen = false">Features</a>
-      <a href="#exams" class="mobile-link" @click="menuOpen = false">Exams</a>
-      <a href="#testimonials" class="mobile-link" @click="menuOpen = false">Stories</a>
+      <a href="#features" class="mobile-link" @click="menuOpen = false">{{ t('nav.features') }}</a>
+      <a href="#exams" class="mobile-link" @click="menuOpen = false">{{ t('nav.exams') }}</a>
+      <a href="#testimonials" class="mobile-link" @click="menuOpen = false">{{ t('nav.stories') }}</a>
+      <a href="#" class="mobile-link">
+        <span>{{ isBn ? 'ভাষা' : 'Language' }}</span>
+        <span class="mobile-lang-label"><LangToggle /></span>
+      </a>
 
       <template v-if="user">
-        <NuxtLink to="/dashboard" class="mobile-link" @click="menuOpen = false">Dashboard</NuxtLink>
-        <button class="iso-btn iso-btn--ghost iso-btn--full" @click="handleSignOut">Logout</button>
+        <NuxtLink to="/dashboard" class="mobile-link" @click="menuOpen = false">{{ t('nav.dashboard') }}</NuxtLink>
+        <button class="iso-btn iso-btn--ghost iso-btn--full" @click="handleSignOut">{{ t('nav.logout') }}</button>
       </template>
       <template v-else>
-        <NuxtLink to="/auth/login" class="mobile-link" @click="menuOpen = false">Login</NuxtLink>
-        <NuxtLink to="/auth/register" class="iso-btn iso-btn--fill iso-btn--full" @click="menuOpen = false">Start Free →</NuxtLink>
+        <NuxtLink to="/auth/login" class="mobile-link" @click="menuOpen = false">{{ t('nav.login') }}</NuxtLink>
+        <NuxtLink to="/auth/register" class="iso-btn iso-btn--fill iso-btn--full" @click="menuOpen = false">{{ t('nav.startFree') }}</NuxtLink>
       </template>
     </div>
   </nav>
 </template>
 
 <script setup>
+const { t, isBn } = useI18n()
 const { user, signOut } = useAuth()
 const menuOpen = ref(false)
 
@@ -127,6 +133,12 @@ async function handleSignOut() {
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim);
 }
 .mobile-link:hover { color: var(--white); }
+
+.mobile-lang-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 
 @media (max-width: 700px) {
   .nav-right { display: none; }

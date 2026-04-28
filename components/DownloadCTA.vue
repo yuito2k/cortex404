@@ -4,18 +4,18 @@
     <div class="corner corner-tl" /><div class="corner corner-tr" />
     <div class="corner corner-bl" /><div class="corner corner-br" />
 
-    <p class="section-tag centered">Get Started</p>
-    <h2>Your Exam.<br />Your Pace.<br />Your Cortex.</h2>
-    <p class="dl-sub">Join 500,000+ students already cracking their exams on Cortex404.</p>
+    <p class="section-tag centered">{{ t('downloadCTA.chip') }}</p>
+    <h2>{{ t('downloadCTA.heading1') }}<br />{{ t('downloadCTA.heading2') }}<br />{{ t('downloadCTA.heading3') }}</h2>
+    <p class="dl-sub">{{ t('downloadCTA.subHeading') }}</p>
 
     <!-- Primary CTA -->
     <div class="dl-cta-row">
-      <NuxtLink to="/auth/register" class="iso-btn iso-btn--fill dl-primary-btn">Start Free — No Card Required →</NuxtLink>
-      <NuxtLink to="/auth/login" class="iso-btn iso-btn--ghost">Sign In</NuxtLink>
+      <NuxtLink to="/auth/register" class="iso-btn iso-btn--fill dl-primary-btn">{{ t('downloadCTA.btnPrimary') }}</NuxtLink>
+      <NuxtLink to="/auth/login" class="iso-btn iso-btn--ghost">{{ t('downloadCTA.btnSecondary') }}</NuxtLink>
     </div>
 
     <div class="dl-divider">
-      <span>or download the app</span>
+      <span>{{ t('downloadCTA.divider') }}</span>
     </div>
 
     <div class="dl-btns">
@@ -26,8 +26,8 @@
           </svg>
         </span>
         <div class="dl-text">
-          <span class="dl-small">Download on the</span>
-          <span class="dl-main">App Store</span>
+          <span class="dl-small">{{ t('downloadCTA.appStoreSub') }}</span>
+          <span class="dl-main">{{ t('downloadCTA.appStore') }}</span>
         </div>
       </a>
       <a href="#" class="dl-btn iso-btn iso-btn--ghost">
@@ -37,32 +37,28 @@
           </svg>
         </span>
         <div class="dl-text">
-          <span class="dl-small">Get it on</span>
-          <span class="dl-main">Google Play</span>
+          <span class="dl-small">{{ t('downloadCTA.playStoreSub') }}</span>
+          <span class="dl-main">{{ t('downloadCTA.playStore') }}</span>
         </div>
       </a>
     </div>
 
     <!-- Trust strip -->
     <div class="trust-strip">
-      <span v-for="t in trustItems" :key="t" class="trust-item">
+      <span v-for="i in trustItems" :key="i" class="trust-item">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12">
           <path d="M20 6L9 17l-5-5"/>
         </svg>
-        {{ t }}
+        {{ i }}
       </span>
     </div>
   </div>
 </template>
 
 <script setup>
-const trustItems = [
-  '100% Free to Start',
-  'No Credit Card',
-  'Ad-Free Platform',
-  '500K+ Students',
-  'All Major Exams',
-]
+const { t, ta } = useI18n();
+
+const trustItems = computed(() => ta('downloadCTA.trustItems'));
 </script>
 
 <style scoped>
