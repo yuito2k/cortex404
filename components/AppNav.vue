@@ -33,7 +33,7 @@
       <a href="#features" class="mobile-link" @click="menuOpen = false">{{ t('nav.features') }}</a>
       <a href="#exams" class="mobile-link" @click="menuOpen = false">{{ t('nav.exams') }}</a>
       <a href="#testimonials" class="mobile-link" @click="menuOpen = false">{{ t('nav.stories') }}</a>
-      <a href="#" class="mobile-link">
+      <a href="#" class="mobile-link" @click="menuOpen = false">
         <span>{{ isBn ? 'ভাষা' : 'Language' }}</span>
         <span class="mobile-lang-label"><LangToggle /></span>
       </a>

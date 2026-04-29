@@ -123,13 +123,43 @@ export default {
 
   // ── Question Bank Section
   questionBankSection: {
-    chip: 'প্রশ্নব্যাংক',
-    heading: 'হাজার হাজার প্রশ্ন,',
-    headingAccent: 'পরিচ্ছন্নভাবে সাজানো।',
-    subtext: 'পরীক্ষা, বিষয়, অধ্যায় ও কঠিনতা অনুযায়ী ফিল্টার করো। তাৎক্ষণিক ফিডব্যাক ও সম্পূর্ণ ব্যাখ্যা সহ অনুশীলন করো।',
-    ctaBrowse: 'প্রশ্ন দেখুন →',
-    diffLabels: { easy: 'সহজ', medium: 'মাঝারি', hard: 'কঠিন' },
-    tagExplanation: 'ব্যাখ্যা',
+    chip: 'Question Bank',
+    heading1: '1,000,000+ Questions.',
+    heading2: 'Zero Repetition.',
+    subHeading: 'Built from actual board and competitive exam papers going back 7+ years.\nEvery question tagged by topic, difficulty, and year — so you always practice what matters.',
+    ctaBrowse: 'Browse Questions →',
+    questions: [
+      {
+        subject: 'Physics · HSC', difficulty: 'Medium',
+        question: 'A body of mass 5 kg is acted upon by a net force of 20 N. What is the acceleration of the body?',
+        options: [
+          { label: 'A', text: '2 m/s²', correct: false },
+          { label: 'B', text: '4 m/s²', correct: true },
+          { label: 'C', text: '6 m/s²', correct: false },
+          { label: 'D', text: '8 m/s²', correct: false },
+        ],
+      },
+      {
+        subject: 'Chemistry · HSC', difficulty: 'Hard',
+        question: 'Which of the following elements has the highest electronegativity?',
+        options: [
+          { label: 'A', text: 'Oxygen', correct: false },
+          { label: 'B', text: 'Nitrogen', correct: false },
+          { label: 'C', text: 'Fluorine', correct: true },
+          { label: 'D', text: 'Chlorine', correct: false },
+        ],
+      },
+      {
+        subject: 'BCS General Knowledge', difficulty: 'Easy',
+        question: 'Which is the longest river system flowing through Bangladesh?',
+        options: [
+          { label: 'A', text: 'Meghna', correct: true },
+          { label: 'B', text: 'Buriganga', correct: false },
+          { label: 'C', text: 'Karnaphuli', correct: false },
+          { label: 'D', text: 'Surma', correct: false },
+        ],
+      },
+    ],
   },
 
   // ── Testimonials

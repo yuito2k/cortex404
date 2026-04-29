@@ -274,9 +274,10 @@
             <div class="eq-header">
               <div class="eq-meta">
                 <span class="eq-num">Q{{ i + 1 }}</span>
-                <span class="eq-diff" :class="q.difficulty">{{ q.difficulty }}</span>
-                <span class="eq-subject">{{ q.subject }}</span>
-                <span class="eq-chapter">{{ q.chapter }}</span>
+                <span class="eq-diff" :class="q.difficultyLevel">{{ q.difficulty[selectedLang] }}</span>
+                <span class="eq-subject">{{ q.subject[selectedLang] }}</span>
+                <span class="eq-chapter">{{ q.chapter[selectedLang] }}</span>
+                <span class="eq-chapter">{{ q.year[selectedLang] }}</span>
               </div>
               <button class="flag-btn" :class="{ active: flagged.has(q.id) }" @click="toggleFlag(q.id)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14">
@@ -287,11 +288,11 @@
               </button>
             </div>
             <div class="eq-body">
-              <p class="eq-text">{{ q.question }}</p>
+              <p class="eq-text">{{ q.question[selectedLang] }}</p>
             </div>
             <div class="eq-options">
               <button
-                v-for="(opt, oi) in q.options"
+                v-for="(opt, oi) in q.options[selectedLang]"
                 :key="oi"
                 class="eq-option"
                 :class="{ selected: answers[q.id] === oi }"
@@ -458,14 +459,16 @@
                   {{ reviewClass(q.id) === 'correct' ? '✓' : reviewClass(q.id) === 'wrong' ? '✗' : '–' }}
                 </span>
                 <span class="rc-num">Q{{ i + 1 }}</span>
-                <span class="rc-diff" :class="q.difficulty">{{ q.difficulty }}</span>
-                <span class="rc-subject">{{ q.subject }}</span>
+                <span class="rc-diff" :class="q.difficultyLevel">{{ q.difficulty[selectedLang] }}</span>
+                <span class="rc-subject">{{ q.subject[selectedLang] }}</span>
+                <span class="eq-chapter">{{ q.chapter[selectedLang] }}</span>
+                <span class="eq-chapter">{{ q.year[selectedLang] }}</span>
               </div>
             </div>
-            <p class="rc-question">{{ q.question }}</p>
+            <p class="rc-question">{{ q.question[selectedLang] }}</p>
             <div class="rc-options">
               <div
-                v-for="(opt, oi) in q.options"
+                v-for="(opt, oi) in q.options[selectedLang]"
                 :key="oi"
                 class="rc-option"
                 :class="{
@@ -485,7 +488,7 @@
             </div>
             <div class="rc-explanation">
               <span class="exp-label">EXPLANATION</span>
-              <p class="exp-text">{{ q.explanation }}</p>
+              <p class="exp-text">{{ q.explanation[selectedLang] }}</p>
             </div>
           </div>
         </div>
@@ -580,19 +583,23 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'auth', layout: 'dashboard' })
 
-// ── Types ──────────────────────────────────────────────────
+
 interface Question {
   id: number
-  question: string
-  options: string[]
-  correctIndex: number
-  explanation: string
-  subject: string
-  chapter: string
+  question: string | { english: string; bangla: string }
+  options: string[] | { english: string[]; bangla: string[] }
+  correctIndex: number  // unchanged — index is language-agnostic
+  explanation: string | { english: string; bangla: string }
+  subject: string | { english: string; bangla: string }
+  chapter: string | { english: string; bangla: string }
   exam: string
-  difficulty: 'easy' | 'medium' | 'hard'
-  year?: string
+  difficulty: string | { english: string; bangla: string }
+  difficultyLevel: 'easy' | 'medium' | 'hard'
+  year?: string | { english: string; bangla: string }
 }
+
+const { isBn } = useI18n()
+let selectedLang = computed(() => isBn.value ? 'bangla' : 'english')
 
 // ── Constants ──────────────────────────────────────────────
 const optLetters = ['A', 'B', 'C', 'D', 'E']
@@ -658,85 +665,345 @@ const pastResults = [
 const lastResult = pastResults[0]
 
 const questionBank: Question[] = [
-  { id: 1, exam:'HSC', subject:'Physics', chapter:'Optics', difficulty:'hard', year:'2023',
-    question: 'A convex lens of focal length 20 cm is placed coaxially with a concave lens of focal length 40 cm. The combination behaves as:',
-    options: ['Converging lens of f = 40 cm','Diverging lens of f = 40 cm','Converging lens of f = 20 cm','Plane glass'],
-    correctIndex: 0, explanation: '1/f = 1/20 + 1/(−40) = 1/40. So f = 40 cm converging.' },
+  {
+    id: 1, exam: 'HSC',
+    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
+    chapter: { english: 'Optics', bangla: 'আলোকবিজ্ঞান' },
+    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'hard',
+    question: {
+      english: 'A convex lens of focal length 20 cm is placed coaxially with a concave lens of focal length 40 cm. The combination behaves as:',
+      bangla: '২০ সেমি ফোকাস দূরত্বের একটি উত্তল লেন্স ৪০ সেমি ফোকাস দূরত্বের একটি অবতল লেন্সের সাথে সমাক্ষীয়ভাবে স্থাপিত। সমন্বয়টি কাজ করে:'
+    },
+    options: {
+      english: ['Converging lens of f = 40 cm', 'Diverging lens of f = 40 cm', 'Converging lens of f = 20 cm', 'Plane glass'],
+      bangla: ['f = ৪০ সেমি অভিসারী লেন্স', 'f = ৪০ সেমি অপসারী লেন্স', 'f = ২০ সেমি অভিসারী লেন্স', 'সমতল কাচ']
+    },
+    correctIndex: 0,
+    explanation: {
+      english: '1/f = 1/20 + 1/(−40) = 1/40. So f = 40 cm converging.',
+      bangla: '১/f = ১/২০ + ১/(−৪০) = ১/৪০। সুতরাং f = ৪০ সেমি অভিসারী।'
+    }
+  },
 
-  { id: 2, exam:'HSC', subject:'Physics', chapter:'Electricity', difficulty:'medium', year:'2022',
-    question: 'Two resistors of 4Ω and 6Ω are connected in parallel. The equivalent resistance is:',
-    options: ['10Ω','2.4Ω','5Ω','1.67Ω'], correctIndex: 1,
-    explanation: '1/R = 1/4 + 1/6 = 5/12. So R = 2.4Ω.' },
+  {
+    id: 2, exam: 'HSC',
+    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
+    chapter: { english: 'Electricity', bangla: 'তড়িৎ বিজ্ঞান' },
+    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
+    year: { english: '2022', bangla: '২০২২' },
+    difficultyLevel: 'medium',
+    question: {
+      english: 'Two resistors of 4Ω and 6Ω are connected in parallel. The equivalent resistance is:',
+      bangla: '৪Ω এবং ৬Ω এর দুটি রোধ সমান্তরালে সংযুক্ত। তুল্য রোধ কত?'
+    },
+    options: {
+      english: ['10Ω', '2.4Ω', '5Ω', '1.67Ω'],
+      bangla: ['১০Ω', '২.৪Ω', '৫Ω', '১.৬৭Ω']
+    },
+    correctIndex: 1,
+    explanation: {
+      english: '1/R = 1/4 + 1/6 = 5/12. So R = 2.4Ω.',
+      bangla: '১/R = ১/৪ + ১/৬ = ৫/১২। সুতরাং R = ২.৪Ω।'
+    }
+  },
 
-  { id: 3, exam:'HSC', subject:'Physics', chapter:'Motion', difficulty:'easy', year:'2021',
-    question: 'A body remains at rest unless acted on by an external force. This is Newton\'s:',
-    options: ['Second Law','Third Law','First Law','Law of Gravitation'], correctIndex: 2,
-    explanation: 'Newton\'s First Law (Inertia) — a body at rest stays at rest unless acted upon by a net external force.' },
+  {
+    id: 3, exam: 'HSC',
+    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
+    chapter: { english: 'Motion', bangla: 'গতিবিদ্যা' },
+    difficulty: { english: 'easy', bangla: 'সহজ' }, 
+    year: { english: '2021', bangla: '২০২১' },
+    difficultyLevel: 'easy',
+    question: {
+      english: "A body remains at rest unless acted on by an external force. This is Newton's:",
+      bangla: 'বাহ্যিক বল প্রযুক্ত না হলে একটি বস্তু স্থিরই থাকে। এটি নিউটনের:'
+    },
+    options: {
+      english: ['Second Law', 'Third Law', 'First Law', 'Law of Gravitation'],
+      bangla: ['দ্বিতীয় সূত্র', 'তৃতীয় সূত্র', 'প্রথম সূত্র', 'মহাকর্ষ সূত্র']
+    },
+    correctIndex: 2,
+    explanation: {
+      english: "Newton's First Law (Inertia) — a body at rest stays at rest unless acted upon by a net external force.",
+      bangla: 'নিউটনের প্রথম সূত্র (জড়তা) — বাহ্যিক বল না লাগলে স্থির বস্তু স্থিরই থাকে।'
+    }
+  },
+  
+  {
+    id: 4, exam: 'HSC', 
+    subject: { english: 'Chemistry', bangla: 'রসায়ন' }, 
+    chapter: { english: 'Electrochemistry', bangla: 'তড়িৎ রসায়ন' },
+    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'hard',
+    question: {
+      english: 'During electrolysis of dilute H₂SO₄, which gas is liberated at the anode?',
+      bangla: 'লঘু H₂SO₄ এর তড়িৎ বিশ্লেষণের সময় অ্যানোডে কোন গ্যাসটি মুক্ত হয়?'
+    },
+    options: {
+      english: ['Hydrogen', 'Oxygen', 'Sulphur dioxide', 'Ozone'],
+      bangla: ['হাইড্রোজেন', 'অক্সিজেন', 'সালফার ডাই অক্সাইড', 'ওজোন']
+    },
+    correctIndex: 1,
+    explanation: {
+      english: 'At the anode (oxidation): 2H₂O → O₂ + 4H⁺ + 4e⁻. Oxygen is liberated.',
+      bangla: 'অ্যানোডে (জারণ): 2H₂O → O₂ + 4H⁺ + 4e⁻। অর্থাৎ অক্সিজেন নির্গত হয়।'
+    }
+  },
 
-  { id: 4, exam:'HSC', subject:'Chemistry', chapter:'Electrochemistry', difficulty:'hard', year:'2023',
-    question: 'During electrolysis of dilute H₂SO₄, which gas is liberated at the anode?',
-    options: ['Hydrogen','Oxygen','Sulphur dioxide','Ozone'], correctIndex: 1,
-    explanation: 'At the anode (oxidation): 2H₂O → O₂ + 4H⁺ + 4e⁻. Oxygen is liberated.' },
+  {
+    id: 5, exam: 'HSC', 
+    subject: { english: 'Chemistry', bangla: 'রসায়ন' }, 
+    chapter: { english: 'Periodic Table', bangla: 'পর্যায় সারণি' },
+    difficulty: { english: 'easy', bangla: 'সহজ' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'easy',
+    question: {
+      english: 'Which element has the highest electronegativity?',
+      bangla: 'কোন মৌলটির তড়িৎ ঋণাত্মকতা সবচেয়ে বেশি?'
+    },
+    options: {
+      english: ['Chlorine', 'Fluorine', 'Oxygen', 'Nitrogen'],
+      bangla: ['ক্লোরিন', 'ফ্লোরিন', 'অক্সিজেন', 'নাইট্রোজেন']
+    },
+    correctIndex: 1,
+    explanation: {
+      english: 'Fluorine (3.98 Pauling scale) has the highest electronegativity of all elements.',
+      bangla: 'ফ্লোরিন (পাউলিং স্কেলে ৩.৯৮) সকল মৌলের মধ্যে সর্বোচ্চ তড়িৎ ঋণাত্মকতা সম্পন্ন।'
+    }
+  },
 
-  { id: 5, exam:'HSC', subject:'Chemistry', chapter:'Periodic Table', difficulty:'easy',
-    question: 'Which element has the highest electronegativity?',
-    options: ['Chlorine','Fluorine','Oxygen','Nitrogen'], correctIndex: 1,
-    explanation: 'Fluorine (3.98 Pauling scale) has the highest electronegativity of all elements.' },
+  {
+    id: 6, exam: 'HSC', 
+    subject: { english: 'Math', bangla: 'গণিত' }, 
+    chapter: { english: 'Integration', bangla: 'যোগজীকরণ' },
+    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
+    year: { english: '2022', bangla: '২০২২' },
+    difficultyLevel: 'hard',
+    question: {
+      english: 'Evaluate ∫(x² + 3x + 2)dx from 0 to 1:',
+      bangla: '∫(x² + 3x + 2)dx এর মান ০ থেকে ১ সীমার মধ্যে নির্ণয় করো:'
+    },
+    options: {
+      english: ['23/6', '11/6', '5/2', '7/3'],
+      bangla: ['২৩/৬', '১১/৬', '৫/২', '৭/৩']
+    },
+    correctIndex: 0,
+    explanation: {
+      english: '[x³/3 + 3x²/2 + 2x] from 0 to 1 = 23/6.',
+      bangla: '[x³/3 + 3x²/2 + 2x] (সীমা ০ থেকে ১) = ২৩/৬।'
+    }
+  },
 
-  { id: 6, exam:'HSC', subject:'Math', chapter:'Integration', difficulty:'hard', year:'2022',
-    question: 'Evaluate ∫(x² + 3x + 2)dx from 0 to 1:',
-    options: ['23/6','11/6','5/2','7/3'], correctIndex: 0,
-    explanation: '[x³/3 + 3x²/2 + 2x] from 0 to 1 = 1/3 + 3/2 + 2 = 2/6 + 9/6 + 12/6 = 23/6.' },
+  {
+    id: 7, exam: 'HSC', 
+    subject: { english: 'Math', bangla: 'গণিত' }, 
+    chapter: { english: 'Trigonometry', bangla: 'ত্রিকোণমিতি' },
+    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'medium',
+    question: {
+      english: 'If sin θ = 3/5, what is cos θ (first quadrant)?',
+      bangla: 'যদি sin θ = ৩/৫ হয়, তবে cos θ এর মান কত? (প্রথম চতুর্ভাগ)'
+    },
+    options: {
+      english: ['4/5', '3/4', '5/4', '1/2'],
+      bangla: ['৪/৫', '৩/৪', '৫/৪', '১/২']
+    },
+    correctIndex: 0,
+    explanation: {
+      english: 'cos²θ = 1 − 9/25 = 16/25, so cosθ = 4/5.',
+      bangla: 'cos²θ = ১ − ৯/২৫ = ১৬/২৫, সুতরাং cosθ = ৪/৫।'
+    }
+  },
 
-  { id: 7, exam:'HSC', subject:'Math', chapter:'Trigonometry', difficulty:'medium',
-    question: 'If sin θ = 3/5, what is cos θ (first quadrant)?',
-    options: ['4/5','3/4','5/4','1/2'], correctIndex: 0,
-    explanation: 'cos²θ = 1 − 9/25 = 16/25, so cosθ = 4/5.' },
+  {
+    id: 8, exam: 'HSC', 
+    subject: { english: 'Biology', bangla: 'জীববিজ্ঞান' }, 
+    chapter: { english: 'Cell Biology', bangla: 'কোষ জীববিজ্ঞান' },
+    difficulty: { english: 'easy', bangla: 'সহজ' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'easy',
+    question: {
+      english: 'The "powerhouse" of the cell that produces ATP is:',
+      bangla: 'কোষের "পাওয়ার হাউস" বা শক্তিঘর কোনটি যা ATP তৈরি করে?'
+    },
+    options: {
+      english: ['Ribosome', 'Mitochondria', 'Chloroplast', 'Golgi apparatus'],
+      bangla: ['রাইবোসোম', 'মাইটোকন্ড্রিয়া', 'ক্লোরোপ্লাস্ট', 'গলজি বডি']
+    },
+    correctIndex: 1,
+    explanation: {
+      english: 'Mitochondria perform aerobic respiration and produce ATP.',
+      bangla: 'মাইটোকন্ড্রিয়া সবাত শ্বসন প্রক্রিয়া সম্পন্ন করে এবং ATP তৈরি করে।'
+    }
+  },
 
-  { id: 8, exam:'HSC', subject:'Biology', chapter:'Cell Biology', difficulty:'easy',
-    question: 'The "powerhouse" of the cell that produces ATP is:',
-    options: ['Ribosome','Mitochondria','Chloroplast','Golgi apparatus'], correctIndex: 1,
-    explanation: 'Mitochondria perform aerobic respiration and produce ATP via oxidative phosphorylation.' },
+  {
+    id: 9, exam: 'BCS', 
+    subject: { english: 'Bangladesh Affairs', bangla: 'বাংলাদেশ বিষয়াবলী' }, 
+    chapter: { english: 'Liberation War', bangla: 'মুক্তিযুদ্ধ' },
+    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'medium',
+    question: {
+      english: 'Which country first recognized Bangladesh as independent?',
+      bangla: 'কোন দেশ প্রথম বাংলাদেশকে স্বাধীন রাষ্ট্র হিসেবে স্বীকৃতি দেয়?'
+    },
+    options: {
+      english: ['India', 'Soviet Union', 'Bhutan', 'Nepal'],
+      bangla: ['ভারত', 'সোভিয়েত ইউনিয়ন', 'ভুটান', 'নেপাল']
+    },
+    correctIndex: 2,
+    explanation: {
+      english: 'Bhutan recognized Bangladesh on December 6, 1971.',
+      bangla: '৬ ডিসেম্বর, ১৯৭১ সালে ভুটান প্রথম দেশ হিসেবে বাংলাদেশকে স্বীকৃতি দেয়।'
+    }
+  },
 
-  { id: 9, exam:'BCS', subject:'Bangladesh Affairs', chapter:'Liberation War', difficulty:'medium', year:'2023',
-    question: 'Which country first recognized Bangladesh as independent?',
-    options: ['India','Soviet Union','Bhutan','Nepal'], correctIndex: 2,
-    explanation: 'Bhutan recognized Bangladesh on December 6, 1971 — the first country to do so.' },
+  {
+    id: 10, exam: 'BCS', 
+    subject: { english: 'English', bangla: 'ইংরেজি' }, 
+    chapter: { english: 'Grammar', bangla: 'ব্যাকরণ' },
+    difficulty: { english: 'easy', bangla: 'সহজ' }, 
+    year: { english: '2022', bangla: '২০২২' },
+    difficultyLevel: 'easy',
+    question: {
+      english: 'Choose the correct sentence:',
+      bangla: 'সঠিক বাক্যটি নির্বাচন করুন:'
+    },
+    options: {
+      english: [
+        'Neither the students nor the teacher were present.',
+        'Neither the students nor the teacher was present.',
+        'Neither the students nor the teacher are present.',
+        'Neither the students nor the teacher be present.'
+      ],
+      bangla: [
+        'Neither the students nor the teacher were present.',
+        'Neither the students nor the teacher was present.',
+        'Neither the students nor the teacher are present.',
+        'Neither the students nor the teacher be present.'
+      ]
+    },
+    correctIndex: 1,
+    explanation: {
+      english: 'With "neither…nor", the verb agrees with the nearest subject.',
+      bangla: '"Neither…nor" যুক্ত বাক্যে verb নিকটবর্তী subject অনুযায়ী হয়।'
+    }
+  },
 
-  { id: 10, exam:'BCS', subject:'English', chapter:'Grammar', difficulty:'easy', year:'2022',
-    question: 'Choose the correct sentence:',
-    options: [
-      'Neither the students nor the teacher were present.',
-      'Neither the students nor the teacher was present.',
-      'Neither the students nor the teacher are present.',
-      'Neither the students nor the teacher be present.'
-    ], correctIndex: 1,
-    explanation: 'With "neither…nor", the verb agrees with the nearest subject. "Teacher" is singular → "was".' },
+  {
+    id: 11, exam: 'HSC', 
+    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
+    chapter: { english: 'Waves', bangla: 'তরঙ্গ' },
+    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'medium',
+    question: {
+      english: 'The speed of sound in air at 0°C is approximately:',
+      bangla: '০°C তাপমাত্রায় বায়ুতে শব্দের বেগ প্রায় কত?'
+    },
+    options: {
+      english: ['300 m/s', '331 m/s', '343 m/s', '360 m/s'],
+      bangla: ['৩০০ m/s', '৩৩১ m/s', '৩৪৩ m/s', '৩৬০ m/s']
+    },
+    correctIndex: 1,
+    explanation: {
+      english: 'Speed of sound in air at 0°C is approximately 331 m/s.',
+      bangla: '০°C তাপমাত্রায় বায়ুতে শব্দের বেগ প্রায় ৩৩১ m/s।'
+    }
+  },
 
-  { id: 11, exam:'HSC', subject:'Physics', chapter:'Waves', difficulty:'medium',
-    question: 'The speed of sound in air at 0°C is approximately:',
-    options: ['300 m/s','331 m/s','343 m/s','360 m/s'], correctIndex: 1,
-    explanation: 'Speed of sound in air at 0°C is approximately 331 m/s. At 20°C it is ~343 m/s.' },
+  {
+    id: 12, exam: 'HSC', 
+    subject: { english: 'Chemistry', bangla: 'রসায়ন' }, 
+    chapter: { english: 'Organic Chemistry', bangla: 'জৈব রসায়ন' },
+    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'medium',
+    question: {
+      english: 'Which functional group is present in ethanol?',
+      bangla: 'ইথানলে কোন কার্যকরী মূলক উপস্থিত থাকে?'
+    },
+    options: {
+      english: ['Aldehyde –CHO', 'Carboxyl –COOH', 'Hydroxyl –OH', 'Ketone C=O'],
+      bangla: ['অ্যালডিহাইড –CHO', 'কার্বক্সিল –COOH', 'হাইড্রোক্সিল –OH', 'কিটোন C=O']
+    },
+    correctIndex: 2,
+    explanation: {
+      english: 'Ethanol (C₂H₅OH) contains the hydroxyl (–OH) group.',
+      bangla: 'ইথানল (C₂H₅OH) একটি অ্যালকোহল যাতে হাইড্রোক্সিল (–OH) মূলক থাকে।'
+    }
+  },
 
-  { id: 12, exam:'HSC', subject:'Chemistry', chapter:'Organic Chemistry', difficulty:'medium',
-    question: 'Which functional group is present in ethanol?',
-    options: ['Aldehyde –CHO','Carboxyl –COOH','Hydroxyl –OH','Ketone C=O'], correctIndex: 2,
-    explanation: 'Ethanol (C₂H₅OH) is an alcohol containing the hydroxyl (–OH) functional group.' },
+  {
+    id: 13, exam: 'BCS', 
+    subject: { english: 'Math', bangla: 'গণিত' }, 
+    chapter: { english: 'Percentage', bangla: 'শতকরা' },
+    difficulty: { english: 'easy', bangla: 'সহজ' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'easy',
+    question: {
+      english: 'A product sold at 20% profit. Cost price = Tk. 500. Selling price?',
+      bangla: 'একটি পণ্য ২০% লাভে বিক্রি করা হলো। ক্রয়মূল্য ৫০০ টাকা হলে, বিক্রয়মূল্য কত?'
+    },
+    options: {
+      english: ['Tk. 580', 'Tk. 600', 'Tk. 520', 'Tk. 620'],
+      bangla: ['৫৮০ টাকা', '৬০০ টাকা', '৫২০ টাকা', '৬২০ টাকা']
+    },
+    correctIndex: 1,
+    explanation: {
+      english: 'SP = 500 × 1.20 = 600.',
+      bangla: 'বিক্রয়মূল্য = ৫০০ × ১.২০ = ৬০০ টাকা।'
+    }
+  },
 
-  { id: 13, exam:'BCS', subject:'Math', chapter:'Percentage', difficulty:'easy',
-    question: 'A product sold at 20% profit. Cost price = Tk. 500. Selling price?',
-    options: ['Tk. 580','Tk. 600','Tk. 520','Tk. 620'], correctIndex: 1,
-    explanation: 'SP = 500 × 1.20 = 600.' },
+  {
+    id: 14, exam: 'HSC', 
+    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
+    chapter: { english: 'Thermodynamics', bangla: 'তাপগতিবিদ্যা' },
+    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'hard',
+    question: {
+      english: 'In an adiabatic process for an ideal gas, which quantity remains constant?',
+      bangla: 'আদর্শ গ্যাসের রুদ্ধতাপীয় প্রক্রিয়ায় কোন রাশিটি স্থির থাকে?'
+    },
+    options: {
+      english: ['Temperature', 'Pressure', 'Volume', 'PVγ'],
+      bangla: ['তাপমাত্রা', 'চাপ', 'আয়তন', 'PVγ']
+    },
+    correctIndex: 3,
+    explanation: {
+      english: 'In an adiabatic process PVγ = constant.',
+      bangla: 'রুদ্ধতাপীয় প্রক্রিয়ায় PVγ = ধ্রুবক থাকে।'
+    }
+  },
 
-  { id: 14, exam:'HSC', subject:'Physics', chapter:'Thermodynamics', difficulty:'hard',
-    question: 'In an adiabatic process for an ideal gas, which quantity remains constant?',
-    options: ['Temperature','Pressure','Volume','PVγ'], correctIndex: 3,
-    explanation: 'In an adiabatic process Q = 0. The relation PVγ = constant holds.' },
-
-  { id: 15, exam:'HSC', subject:'Math', chapter:'Complex Numbers', difficulty:'hard',
-    question: 'The modulus of (1 + i)⁸ is:',
-    options: ['4','8','16','32'], correctIndex: 2,
-    explanation: '|1+i| = √2, so |(1+i)⁸| = (√2)⁸ = 2⁴ = 16.' },
+  {
+    id: 15, exam: 'HSC', 
+    subject: { english: 'Math', bangla: 'গণিত' }, 
+    chapter: { english: 'Complex Numbers', bangla: 'জটিল সংখ্যা' },
+    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'hard',
+    question: {
+      english: 'The modulus of (1 + i)⁸ is:',
+      bangla: '(1 + i)⁸ এর পরম মান (modulus) কত?'
+    },
+    options: {
+      english: ['4', '8', '16', '32'],
+      bangla: ['৪', '৮', '১৬', '৩২']
+    },
+    correctIndex: 2,
+    explanation: {
+      english: '|1+i| = √2, so |(1+i)⁸| = (√2)⁸ = 16.',
+      bangla: '|1+i| = √২, সুতরাং |(1+i)⁸| = ১৬।'
+    }
+  }
 ]
 
 // ── State ──────────────────────────────────────────────────
@@ -801,8 +1068,8 @@ const diffBreakdown = computed(() => {
     easy: { correct: 0, total: 0 }, medium: { correct: 0, total: 0 }, hard: { correct: 0, total: 0 },
   }
   questions.value.forEach(q => {
-    diffs[q.difficulty].total++
-    if (answers.value[q.id] === q.correctIndex) diffs[q.difficulty].correct++
+    diffs[q.difficultyLevel].total++
+    if (answers.value[q.id] === q.correctIndex) diffs[q.difficultyLevel].correct++
   })
   return [
     { label: 'Easy',   cls: 'easy',   ...diffs.easy },
