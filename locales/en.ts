@@ -323,6 +323,16 @@ export default {
     weakTopics: 'Weak Topics',
     noResults: 'No questions match your filters.',
     clearFilters: 'Clear Filters',
+    subjectMap: {
+      //All: ['All'],
+      HSC: ['Physics', 'Chemistry', 'Math', 'Biology', 'English', 'ICT'],
+      SSC: ['Science', 'Math', 'English', 'Bangla', 'Social Studies'],
+      BUET: ['Physics', 'Chemistry', 'Higher Math'],
+      Medical: ['Biology', 'Chemistry', 'Physics', 'English'],
+      DU: ['Bangla', 'English', 'General Knowledge', 'Math'],
+      BCS: ['Bangla', 'English', 'Math', 'Bangladesh Affairs', 'General Knowledge', 'Science'],
+      Bank: ['English', 'Math', 'General Knowledge', 'Computer'],
+    },
   },
 
   // ── Mock Exam page

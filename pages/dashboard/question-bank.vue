@@ -179,6 +179,7 @@
             v-for="(q, i) in paginatedQuestions"
             :key="q.id"
             class="question-card"
+            :id="`q-${q.id}`"
             :class="{ expanded: expandedId === q.id, solved: solvedIds.has(q.id) }"
             :style="{ animationDelay: i * 0.04 + 's' }"
           >
@@ -186,10 +187,10 @@
             <div class="qcard-header" @click="toggleExpand(q.id)">
               <div class="qcard-meta">
                 <span class="q-index">#{{ (currentPage - 1) * pageSize + i + 1 }}</span>
-                <span class="q-diff-badge" :class="q.difficulty">{{ q.difficulty }}</span>
-                <span class="q-subject-tag">{{ q.subject }}</span>
-                <span class="q-chapter-tag">{{ q.chapter }}</span>
-                <span v-if="q.year" class="q-year-tag">{{ q.year }}</span>
+                <span class="q-diff-badge" :class="q.difficultyLevel">{{ q.difficulty[selectedLang] }}</span>
+                <span class="q-subject-tag">{{ q.subject[selectedLang] }}</span>
+                <span class="q-chapter-tag">{{ q.chapter[selectedLang] }}</span>
+                <span v-if="q.year" class="q-year-tag">{{ q.year[selectedLang] }}</span>
               </div>
               <div class="qcard-actions">
                 <span v-if="solvedIds.has(q.id)" class="solved-badge">✓ Solved</span>
@@ -208,16 +209,16 @@
 
             <!-- Question text -->
             <div class="qcard-body" @click="toggleExpand(q.id)">
-              <p class="q-text">{{ q.question }}</p>
+              <p class="q-text">{{ q.question[selectedLang] }}</p>
             </div>
 
             <!-- Expanded: options + answer -->
             <Transition name="expand">
               <div v-if="expandedId === q.id" class="qcard-expanded">
                 <!-- MCQ options -->
-                <div v-if="q.options" class="options-list">
+                <div v-if="q.options[selectedLang]" class="options-list">
                   <button
-                    v-for="(opt, oi) in q.options"
+                    v-for="(opt, oi) in q.options[selectedLang]"
                     :key="oi"
                     class="option-btn"
                     :class="{
@@ -241,14 +242,14 @@
                     <button
                       v-if="!showAnswer[q.id]"
                       class="iso-btn iso-btn--fill reveal-btn"
-                      :disabled="selectedAnswers[q.id] === undefined && !!q.options"
+                      :disabled="selectedAnswers[q.id] === undefined && !!q.options[selectedLang]"
                       @click.stop="revealAnswer(q.id)"
                     >
-                      {{ q.options ? 'Check Answer' : 'Show Answer' }}
+                      {{ q.options[selectedLang] ? 'Check Answer' : 'Show Answer' }}
                     </button>
                     <div v-if="showAnswer[q.id]" class="explanation-block">
                       <span class="exp-label">EXPLANATION</span>
-                      <p class="exp-text">{{ q.explanation }}</p>
+                      <p class="exp-text">{{ q.explanation[selectedLang] }}</p>
                     </div>
                   </div>
                   <div class="footer-right">
@@ -362,7 +363,7 @@
               @click="jumpToQuestion(id)"
             >
               <span class="bm-hash">#{{ allQuestions.findIndex(q => q.id === id) + 1 }}</span>
-              <span class="bm-text">{{ allQuestions.find(q => q.id === id)?.question.slice(0, 55) }}…</span>
+              <span class="bm-text">{{ allQuestions.find(q => q.id === id)?.question[selectedLang].slice(0, 55) }}…</span>
             </div>
             <span v-if="bookmarkedIds.size > 5" class="bm-more">+{{ bookmarkedIds.size - 5 }} more</span>
           </div>
@@ -425,32 +426,30 @@ definePageMeta({ middleware: 'auth', layout: 'dashboard' })
 // ── Types ──────────────────────────────────────────────────
 interface Question {
   id: number
-  question: string
-  options?: string[]
-  correctIndex?: number
-  explanation: string
-  subject: string
-  chapter: string
+  question: string | { english: string; bangla: string }
+  options?: string[] | { english: string[]; bangla: string[] }
+  correctIndex?: number  // unchanged — index is language-agnostic
+  explanation: string | { english: string; bangla: string }
+  subject: string | { english: string; bangla: string }
+  chapter: string | { english: string; bangla: string }
   exam: string
-  difficulty: 'easy' | 'medium' | 'hard'
-  year?: string
+  difficulty: string | { english: string; bangla: string }
+  difficultyLevel: 'easy' | 'medium' | 'hard'
+  year?: string | { english: string; bangla: string }
+  yearEn?: number
 }
+
+const { tm, isBn } = useI18n()
+let selectedLang = computed(() => isBn.value ? 'bangla' : 'english')
 
 // ── Constants ──────────────────────────────────────────────
 const optLetters = ['A', 'B', 'C', 'D', 'E']
 
 const examStreams = ['All', 'HSC', 'SSC', 'BUET', 'Medical', 'DU', 'BCS', 'Bank']
 
-const subjectMap: Record<string, string[]> = {
-  All:     ['All'],
-  HSC:     ['All', 'Physics', 'Chemistry', 'Math', 'Biology', 'English', 'ICT'],
-  SSC:     ['All', 'Science', 'Math', 'English', 'Bangla', 'Social Studies'],
-  BUET:    ['All', 'Physics', 'Chemistry', 'Higher Math'],
-  Medical: ['All', 'Biology', 'Chemistry', 'Physics', 'English'],
-  DU:      ['All', 'Bangla', 'English', 'General Knowledge', 'Math'],
-  BCS:     ['All', 'Bangla', 'English', 'Math', 'Bangladesh Affairs', 'General Knowledge', 'Science'],
-  Bank:    ['All', 'English', 'Math', 'General Knowledge', 'Computer'],
-}
+const subjectMap = computed<Record<string, string[]>>(
+  () => tm('qBank.subjectMap') as Record<string, string[]>
+)
 
 const difficulties = [
   { val: 'all',   label: 'All',    cls: '' },
@@ -496,148 +495,493 @@ const allQuestions = ref<Question[]>([])
 
 const demoQuestions: Question[] = [
   // HSC Physics
-  { id: 1, exam:'HSC', subject:'Physics', chapter:'Optics & Wave', difficulty:'hard', year:'2023',
-    question: 'A convex lens of focal length 20 cm is placed coaxially with a concave lens of focal length 40 cm. The combination behaves as:',
-    options: ['Converging lens of f = 40 cm','Diverging lens of f = 40 cm','Converging lens of f = 20 cm','Plane glass'],
+  {
+    id: 1, exam: 'HSC', 
+    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
+    chapter: { english: 'Optics & Wave', bangla: 'আলোকবিজ্ঞান ও তরঙ্গ' }, 
+    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'hard',
+    yearEn: 2023,
+    question: {
+      english: 'A convex lens of focal length 20 cm is placed coaxially with a concave lens of focal length 40 cm. The combination behaves as:',
+      bangla: '২০ সেমি ফোকাস দূরত্বের একটি উত্তল লেন্স ৪০ সেমি ফোকাস দূরত্বের একটি অবতল লেন্সের সাথে সমাক্ষীয়ভাবে স্থাপিত। সমন্বয়টি কাজ করে:'
+    },
+    options: {
+      english: ['Converging lens of f = 40 cm', 'Diverging lens of f = 40 cm', 'Converging lens of f = 20 cm', 'Plane glass'],
+      bangla: ['f = ৪০ সেমি অভিসারী লেন্স', 'f = ৪০ সেমি অপসারী লেন্স', 'f = ২০ সেমি অভিসারী লেন্স', 'সমতল কাচ']
+    },
     correctIndex: 0,
-    explanation: 'For combination: 1/f = 1/f₁ + 1/f₂ = 1/20 + 1/(−40) = 2/40 − 1/40 = 1/40. So f = 40 cm converging.' },
+    explanation: {
+      english: 'For combination: 1/f = 1/f₁ + 1/f₂ = 1/20 + 1/(−40) = 1/40. So f = 40 cm converging.',
+      bangla: 'সমন্বয়ের ক্ষেত্রে: ১/f = ১/f₁ + ১/f₂ = ১/২০ + ১/(−৪০) = ১/৪০। সুতরাং f = ৪০ সেমি অভিসারী।'
+    }
+  },
 
-  { id: 2, exam:'HSC', subject:'Physics', chapter:'Electricity', difficulty:'medium', year:'2022',
-    question: 'Two resistors of 4Ω and 6Ω are connected in parallel. The equivalent resistance is:',
-    options: ['10Ω', '2.4Ω', '5Ω', '1.67Ω'],
+  {
+    id: 2, exam: 'HSC', 
+    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
+    chapter: { english: 'Electricity', bangla: 'তড়িৎ' }, 
+    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
+    year: { english: '2022', bangla: '২০২২' },
+    difficultyLevel: 'medium',
+    yearEn: 2022,
+    question: {
+      english: 'Two resistors of 4Ω and 6Ω are connected in parallel. The equivalent resistance is:',
+      bangla: '৪Ω এবং ৬Ω এর দুটি রোধ সমান্তরালে সংযুক্ত। তুল্য রোধ কত?'
+    },
+    options: {
+      english: ['10Ω', '2.4Ω', '5Ω', '1.67Ω'],
+      bangla: ['১০Ω', '২.৪Ω', '৫Ω', '১.৬৭Ω']
+    },
     correctIndex: 1,
-    explanation: '1/R = 1/4 + 1/6 = 3/12 + 2/12 = 5/12. So R = 12/5 = 2.4Ω.' },
+    explanation: {
+      english: '1/R = 1/4 + 1/6 = 5/12. So R = 12/5 = 2.4Ω.',
+      bangla: '১/R = ১/৪ + ১/৬ = ৫/১২। সুতরাং R = ১২/৫ = ২.৪Ω।'
+    }
+  },
 
-  { id: 3, exam:'HSC', subject:'Physics', chapter:'Motion', difficulty:'easy', year:'2021',
-    question: 'A body at rest is said to be in uniform motion with zero acceleration. According to Newton\'s first law, what keeps it in that state?',
-    options: ['Gravity', 'Inertia', 'Friction', 'Net force'],
+  {
+    id: 3, exam: 'HSC', 
+    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
+    chapter: { english: 'Motion', bangla: 'গতি' }, 
+    difficulty: { english: 'easy', bangla: 'সহজ' }, 
+    year: { english: '2021', bangla: '২০২১' },
+    difficultyLevel: 'easy',
+    yearEn: 2021,
+    question: {
+      english: "A body at rest is said to be in uniform motion with zero acceleration. According to Newton's first law, what keeps it in that state?",
+      bangla: "স্থির বস্তু শূন্য ত্বরণে সুষম গতিতে আছে বলা হয়। নিউটনের প্রথম সূত্র অনুসারে, কোন ধর্ম বস্তুটিকে এই অবস্থায় রাখে?"
+    },
+    options: {
+      english: ['Gravity', 'Inertia', 'Friction', 'Net force'],
+      bangla: ['মহাকর্ষ', 'জড়তা', 'ঘর্ষণ', 'নিট বল']
+    },
     correctIndex: 1,
-    explanation: 'Newton\'s first law (law of inertia) states that a body remains at rest or in uniform motion unless acted upon by an external net force. Inertia is the property responsible.' },
+    explanation: {
+      english: "Newton's first law states that a body remains at rest or in uniform motion unless acted upon by an external net force. Inertia is the property responsible.",
+      bangla: "নিউটনের প্রথম সূত্র অনুযায়ী, বাহ্যিক বল প্রয়োগ না করলে বস্তু যে অবস্থায় আছে সে অবস্থাতেই থাকতে চায়। জড়তা হলো সেই ধর্ম।"
+    }
+  },
 
   // HSC Chemistry
-  { id: 4, exam:'HSC', subject:'Chemistry', chapter:'Electrochemistry', difficulty:'hard', year:'2023',
-    question: 'During electrolysis of dilute H₂SO₄, which gas is liberated at the anode?',
-    options: ['Hydrogen', 'Oxygen', 'Sulphur dioxide', 'Ozone'],
+  {
+    id: 4, exam: 'HSC', 
+    subject: { english: 'Chemistry', bangla: 'রসায়ন' }, 
+    chapter: { english: 'Electrochemistry', bangla: 'তড়িৎ রসায়ন' }, 
+    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'hard',
+    yearEn: 2023,
+    question: {
+      english: 'During electrolysis of dilute H₂SO₄, which gas is liberated at the anode?',
+      bangla: 'লঘু H₂SO₄ এর তড়িৎ বিশ্লেষণের সময় অ্যানোডে কোন গ্যাসটি মুক্ত হয়?'
+    },
+    options: {
+      english: ['Hydrogen', 'Oxygen', 'Sulphur dioxide', 'Ozone'],
+      bangla: ['হাইড্রোজেন', 'অক্সিজেন', 'সালফার ডাই অক্সাইড', 'ওজোন']
+    },
     correctIndex: 1,
-    explanation: 'At the anode (oxidation), water is oxidized: 2H₂O → O₂ + 4H⁺ + 4e⁻. Oxygen is liberated at the anode.' },
+    explanation: {
+      english: 'At the anode (oxidation), water is oxidized: 2H₂O → O₂ + 4H⁺ + 4e⁻. Oxygen is liberated.',
+      bangla: 'অ্যানোডে (জারণ) পানি জারিত হয়: 2H₂O → O₂ + 4H⁺ + 4e⁻। ফলে অক্সিজেন মুক্ত হয়।'
+    }
+  },
 
-  { id: 5, exam:'HSC', subject:'Chemistry', chapter:'Periodic Table', difficulty:'easy', year:'2022',
-    question: 'Which of the following has the highest electronegativity?',
-    options: ['Chlorine (Cl)', 'Fluorine (F)', 'Oxygen (O)', 'Nitrogen (N)'],
+  {
+    id: 5, exam: 'HSC', 
+    subject: { english: 'Chemistry', bangla: 'রসায়ন' }, 
+    chapter: { english: 'Periodic Table', bangla: 'পর্যায় সারণি' }, 
+    difficulty: { english: 'easy', bangla: 'সহজ' }, 
+    year: { english: '2022', bangla: '২০২২' },
+    difficultyLevel: 'easy',
+    yearEn: 2022,
+    question: {
+      english: 'Which of the following has the highest electronegativity?',
+      bangla: 'নিচের কোনটির তড়িৎ ঋণাত্মকতা সবচেয়ে বেশি?'
+    },
+    options: {
+      english: ['Chlorine (Cl)', 'Fluorine (F)', 'Oxygen (O)', 'Nitrogen (N)'],
+      bangla: ['ক্লোরিন (Cl)', 'ফ্লোরিন (F)', 'অক্সিজেন (O)', 'নাইট্রোজেন (N)']
+    },
     correctIndex: 1,
-    explanation: 'Fluorine has the highest electronegativity (3.98 on Pauling scale) of all elements. It is at the top right of the periodic table.' },
+    explanation: {
+      english: 'Fluorine has the highest electronegativity (3.98 on Pauling scale) of all elements.',
+      bangla: 'ফ্লোরিন এর তড়িৎ ঋণাত্মকতা সবচেয়ে বেশি (পাউলিং স্কেলে ৩.৯৮)।'
+    }
+  },
 
-  { id: 6, exam:'HSC', subject:'Chemistry', chapter:'Organic Chemistry', difficulty:'medium', year:'2023',
-    question: 'Which functional group is present in ethanol?',
-    options: ['Aldehyde –CHO', 'Carboxyl –COOH', 'Hydroxyl –OH', 'Ketone C=O'],
+  {
+    id: 6, exam: 'HSC', 
+    subject: { english: 'Chemistry', bangla: 'রসায়ন' }, 
+    chapter: { english: 'Organic Chemistry', bangla: 'জৈব রসায়ন' }, 
+    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'medium',
+    yearEn: 2023,
+    question: {
+      english: 'Which functional group is present in ethanol?',
+      bangla: 'ইথানলে কোন কার্যকরী মূলক উপস্থিত থাকে?'
+    },
+    options: {
+      english: ['Aldehyde –CHO', 'Carboxyl –COOH', 'Hydroxyl –OH', 'Ketone C=O'],
+      bangla: ['অ্যালডিহাইড –CHO', 'কার্বক্সিল –COOH', 'হাইড্রোক্সিল –OH', 'কিটোন C=O']
+    },
     correctIndex: 2,
-    explanation: 'Ethanol (C₂H₅OH) is an alcohol. It contains the hydroxyl functional group (–OH).' },
+    explanation: {
+      english: 'Ethanol (C₂H₅OH) is an alcohol. It contains the hydroxyl functional group (–OH).',
+      bangla: 'ইথানল (C₂H₅OH) একটি অ্যালকোহল। এতে হাইড্রোক্সিল (–OH) কার্যকরী মূলক থাকে।'
+    }
+  },
 
   // HSC Math
-  { id: 7, exam:'HSC', subject:'Math', chapter:'Integration', difficulty:'hard', year:'2022',
-    question: 'Evaluate: ∫(x² + 3x + 2)dx from x=0 to x=1',
-    options: ['11/6', '5/2', '7/3', '3/2'],
+  {
+    id: 7, exam: 'HSC', 
+    subject: { english: 'Math', bangla: 'গণিত' }, 
+    chapter: { english: 'Integration', bangla: 'যোগজীকরণ' }, 
+    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
+    year: { english: '2022', bangla: '২০২২' },
+    difficultyLevel: 'hard',
+    yearEn: 2022,
+    question: {
+      english: 'Evaluate: ∫(x² + 3x + 2)dx from x=0 to x=1',
+      bangla: 'মান নির্ণয় করো: ∫(x² + 3x + 2)dx (সীমা x=০ থেকে x=১)'
+    },
+    options: {
+      english: ['23/6', '5/2', '7/3', '3/2'],
+      bangla: ['২৩/৬', '৫/২', '৭/৩', '৩/২']
+    },
     correctIndex: 0,
-    explanation: '∫(x²+3x+2)dx = [x³/3 + 3x²/2 + 2x] from 0 to 1 = (1/3 + 3/2 + 2) − 0 = 2/6 + 9/6 + 12/6 = 23/6... Actually 1/3+3/2+2 = 2/6+9/6+12/6 = 23/6. Wait — answer is 11/6. Let me recheck: [1/3 + 3/2 + 2] = 2/6+9/6+12/6 = 23/6. The correct integral value is 23/6 ≈ 3.83. Answer A represents the correct evaluation.' },
+    explanation: {
+      english: '∫(x²+3x+2)dx = [x³/3 + 3x²/2 + 2x] from 0 to 1 = 1/3 + 3/2 + 2 = 23/6.',
+      bangla: '∫(x²+3x+2)dx = [x³/৩ + ৩x²/২ + ২x] (০ থেকে ১ সীমা) = ১/৩ + ৩/২ + ২ = ২৩/৬।'
+    }
+  },
 
-  { id: 8, exam:'HSC', subject:'Math', chapter:'Trigonometry', difficulty:'medium', year:'2021',
-    question: 'If sin θ = 3/5, what is the value of cos θ (assuming 0 < θ < π/2)?',
-    options: ['4/5', '3/4', '5/4', '1/2'],
+  {
+    id: 8, exam: 'HSC', 
+    subject: { english: 'Math', bangla: 'গণিত' }, 
+    chapter: { english: 'Trigonometry', bangla: 'ত্রিকোণমিতি' }, 
+    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
+    year: { english: '2021', bangla: '২০২১' },
+    difficultyLevel: 'medium',
+    yearEn: 2021,
+    question: {
+      english: 'If sin θ = 3/5, what is the value of cos θ (assuming 0 < θ < π/2)?',
+      bangla: 'যদি sin θ = ৩/৫ হয়, তবে cos θ এর মান কত? (ধরি ০ < θ < π/২)'
+    },
+    options: {
+      english: ['4/5', '3/4', '5/4', '1/2'],
+      bangla: ['৪/৫', '৩/৪', '৫/৪', '১/২']
+    },
     correctIndex: 0,
-    explanation: 'Using sin²θ + cos²θ = 1: cos²θ = 1 − 9/25 = 16/25, so cosθ = 4/5 (positive in first quadrant).' },
+    explanation: {
+      english: 'cos²θ = 1 − 9/25 = 16/25, so cosθ = 4/5.',
+      bangla: 'cos²θ = ১ − ৯/২৫ = ১৬/২৫, সুতরাং cosθ = ৪/৫।'
+    }
+  },
 
   // BUET
-  { id: 9, exam:'BUET', subject:'Higher Math', chapter:'Complex Numbers', difficulty:'hard', year:'2023',
-    question: 'The modulus of the complex number (1 + i)⁸ is:',
-    options: ['4', '8', '16', '32'],
+  {
+    id: 9, exam: 'BUET', 
+    subject: { english: 'Higher Math', bangla: 'উচ্চতর গণিত' }, 
+    chapter: { english: 'Complex Numbers', bangla: 'জটিল সংখ্যা' }, 
+    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'hard',
+    yearEn: 2023,
+    question: {
+      english: 'The modulus of the complex number (1 + i)⁸ is:',
+      bangla: '(1 + i)⁸ জটিল সংখ্যাটির পরম মান (modulus) কত?'
+    },
+    options: {
+      english: ['4', '8', '16', '32'],
+      bangla: ['৪', '৮', '১৬', '৩২']
+    },
     correctIndex: 2,
-    explanation: '|1+i| = √2, so |(1+i)⁸| = (√2)⁸ = 2⁴ = 16.' },
+    explanation: {
+      english: '|1+i| = √2, so |(1+i)⁸| = (√2)⁸ = 2⁴ = 16.',
+      bangla: '|১+i| = √২, সুতরাং |(১+i)⁸| = (√২)⁸ = ২⁴ = ১৬।'
+    }
+  },
 
-  { id: 10, exam:'BUET', subject:'Physics', chapter:'Thermodynamics', difficulty:'hard', year:'2022',
-    question: 'In an adiabatic process for an ideal gas, which quantity remains constant?',
-    options: ['Temperature', 'Pressure', 'Volume', 'PVγ'],
+  {
+    id: 10, exam: 'BUET', 
+    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
+    chapter: { english: 'Thermodynamics', bangla: 'তাপগতিবিদ্যা' }, 
+    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
+    year: { english: '2022', bangla: '২০২২' },
+    difficultyLevel: 'hard',
+    yearEn: 2022,
+    question: {
+      english: 'In an adiabatic process for an ideal gas, which quantity remains constant?',
+      bangla: 'আদর্শ গ্যাসের রুদ্ধতাপীয় প্রক্রিয়ায় কোন রাশিটি স্থির থাকে?'
+    },
+    options: {
+      english: ['Temperature', 'Pressure', 'Volume', 'PVγ'],
+      bangla: ['তাপমাত্রা', 'চাপ', 'আয়তন', 'PVγ']
+    },
     correctIndex: 3,
-    explanation: 'In an adiabatic process, Q = 0. The relation PVγ = constant holds, where γ = Cp/Cv.' },
+    explanation: {
+      english: 'In an adiabatic process, Q = 0. The relation PVγ = constant holds.',
+      bangla: 'রুদ্ধতাপীয় প্রক্রিয়ায় তাপের আদান-প্রদান হয় না (Q = ০)। এখানে PVγ = ধ্রুবক।'
+    }
+  },
 
   // BCS
-  { id: 11, exam:'BCS', subject:'Bangladesh Affairs', chapter:'Liberation War', difficulty:'medium', year:'2023',
-    question: 'Bangladesh was recognized as an independent state by which country first after independence?',
-    options: ['India', 'Soviet Union', 'Bhutan', 'Nepal'],
+  {
+    id: 11, exam: 'BCS', 
+    subject: { english: 'Bangladesh Affairs', bangla: 'বাংলাদেশ বিষয়াবলী' }, 
+    chapter: { english: 'Liberation War', bangla: 'মুক্তিযুদ্ধ' }, 
+    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'medium',
+    yearEn: 2023,
+    question: {
+      english: 'Bangladesh was recognized as an independent state by which country first after independence?',
+      bangla: 'স্বাধীনতার পর কোন দেশ প্রথম বাংলাদেশকে স্বাধীন রাষ্ট্র হিসেবে স্বীকৃতি দেয়?'
+    },
+    options: {
+      english: ['India', 'Soviet Union', 'Bhutan', 'Nepal'],
+      bangla: ['ভারত', 'সোভিয়েত ইউনিয়ন', 'ভুটান', 'নেপাল']
+    },
     correctIndex: 2,
-    explanation: 'Bhutan was the first country to recognize Bangladesh as an independent state on December 6, 1971.' },
+    explanation: {
+      english: 'Bhutan was the first country to recognize Bangladesh on December 6, 1971.',
+      bangla: '৬ ডিসেম্বর, ১৯৭১ সালে ভুটান প্রথম দেশ হিসেবে বাংলাদেশকে স্বীকৃতি দেয়।'
+    }
+  },
 
-  { id: 12, exam:'BCS', subject:'English', chapter:'Grammar', difficulty:'easy', year:'2022',
-    question: 'Choose the correct sentence:',
-    options: [
-      'Neither the students nor the teacher were present.',
-      'Neither the students nor the teacher was present.',
-      'Neither the students nor the teacher are present.',
-      'Neither the students nor the teacher be present.'
-    ],
+  {
+    id: 12, exam: 'BCS', 
+    subject: { english: 'English', bangla: 'ইংরেজি' }, 
+    chapter: { english: 'Grammar', bangla: 'ব্যাকরণ' }, 
+    difficulty: { english: 'easy', bangla: 'সহজ' }, 
+    year: { english: '2022', bangla: '২০২২' },
+    difficultyLevel: 'easy',
+    yearEn: 2022,
+    question: {
+      english: 'Choose the correct sentence:',
+      bangla: 'সঠিক বাক্যটি নির্বাচন করুন:'
+    },
+    options: {
+      english: [
+        'Neither the students nor the teacher were present.',
+        'Neither the students nor the teacher was present.',
+        'Neither the students nor the teacher are present.',
+        'Neither the students nor the teacher be present.'
+      ],
+      bangla: [
+        'Neither the students nor the teacher were present.',
+        'Neither the students nor the teacher was present.',
+        'Neither the students nor the teacher are present.',
+        'Neither the students nor the teacher be present.'
+      ]
+    },
     correctIndex: 1,
-    explanation: 'When "neither…nor" connects two subjects, the verb agrees with the subject closest to it. "Teacher" is singular, so the verb is "was".' },
+    explanation: {
+      english: 'When "neither…nor" connects two subjects, the verb agrees with the subject closest to it.',
+      bangla: '"Neither…nor" দ্বারা দুটি subject যুক্ত হলে verb নিকটবর্তী subject অনুযায়ী হয়।'
+    }
+  },
 
-  { id: 13, exam:'BCS', subject:'Math', chapter:'Percentage', difficulty:'easy', year:'2021',
-    question: 'A product is sold at 20% profit. If the cost price is Tk. 500, what is the selling price?',
-    options: ['Tk. 580', 'Tk. 600', 'Tk. 520', 'Tk. 620'],
+  {
+    id: 13, exam: 'BCS', 
+    subject: { english: 'Math', bangla: 'গণিত' }, 
+    chapter: { english: 'Percentage', bangla: 'শতকরা' }, 
+    difficulty: { english: 'easy', bangla: 'সহজ' }, 
+    year: { english: '2021', bangla: '২০২১' },
+    difficultyLevel: 'easy',
+    yearEn: 2021,
+    question: {
+      english: 'A product is sold at 20% profit. If the cost price is Tk. 500, what is the selling price?',
+      bangla: 'একটি পণ্য ২০% লাভে বিক্রি করা হয়। ক্রয়মূল্য ৫০০ টাকা হলে বিক্রয়মূল্য কত?'
+    },
+    options: {
+      english: ['Tk. 580', 'Tk. 600', 'Tk. 520', 'Tk. 620'],
+      bangla: ['৫৮০ টাকা', '৬০০ টাকা', '৫২০ টাকা', '৬২০ টাকা']
+    },
     correctIndex: 1,
-    explanation: 'Selling price = Cost price × (1 + profit%) = 500 × 1.20 = 600.' },
+    explanation: {
+      english: 'Selling price = 500 × 1.20 = 600.',
+      bangla: 'বিক্রয়মূল্য = ৫০০ এর ১২০% = ৬০০ টাকা।'
+    }
+  },
 
   // Medical
-  { id: 14, exam:'Medical', subject:'Biology', chapter:'Cell Biology', difficulty:'hard', year:'2023',
-    question: 'Which organelle is called the "powerhouse" of the cell and produces ATP?',
-    options: ['Ribosome', 'Mitochondria', 'Chloroplast', 'Golgi apparatus'],
+  {
+    id: 14, exam: 'Medical', 
+    subject: { english: 'Biology', bangla: 'জীববিজ্ঞান' }, 
+    chapter: { english: 'Cell Biology', bangla: 'কোষ জীববিজ্ঞান' }, 
+    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'hard',
+    yearEn: 2023,
+    question: {
+      english: 'Which organelle is called the "powerhouse" of the cell and produces ATP?',
+      bangla: 'কোষের কোন অঙ্গাণুকে "পাওয়ার হাউস" বলা হয় এবং যা ATP তৈরি করে?'
+    },
+    options: {
+      english: ['Ribosome', 'Mitochondria', 'Chloroplast', 'Golgi apparatus'],
+      bangla: ['রাইবোসোম', 'মাইটোকন্ড্রিয়া', 'ক্লোরোপ্লাস্ট', 'গলজি বডি']
+    },
     correctIndex: 1,
-    explanation: 'Mitochondria perform aerobic respiration and produce ATP via oxidative phosphorylation, earning the title "powerhouse of the cell".' },
+    explanation: {
+      english: 'Mitochondria produce ATP via oxidative phosphorylation.',
+      bangla: 'মাইটোকন্ড্রিয়া অক্সিডেটিভ ফসফোরিলেশনের মাধ্যমে ATP তৈরি করে।'
+    }
+  },
 
-  { id: 15, exam:'Medical', subject:'Chemistry', chapter:'Biochemistry', difficulty:'medium', year:'2022',
-    question: 'The pH of human blood is maintained approximately at:',
-    options: ['6.4–6.8', '7.0–7.2', '7.35–7.45', '7.8–8.0'],
+  {
+    id: 15, exam: 'Medical', 
+    subject: { english: 'Chemistry', bangla: 'রসায়ন' }, 
+    chapter: { english: 'Biochemistry', bangla: 'প্রাণরসায়ন' }, 
+    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
+    year: { english: '2022', bangla: '২০২২' },
+    difficultyLevel: 'medium',
+    yearEn: 2022,
+    question: {
+      english: 'The pH of human blood is maintained approximately at:',
+      bangla: 'মানুষের রক্তের pH সাধারণত কত থাকে?'
+    },
+    options: {
+      english: ['6.4–6.8', '7.0–7.2', '7.35–7.45', '7.8–8.0'],
+      bangla: ['৬.৪–৬.৮', '৭.০–৭.২', '৭.৩৫–৭.৪৫', '৭.৮–৮.০']
+    },
     correctIndex: 2,
-    explanation: 'Normal human blood pH is maintained between 7.35 and 7.45 through buffer systems, mainly the bicarbonate buffer system.' },
+    explanation: {
+      english: 'Normal human blood pH is maintained between 7.35 and 7.45.',
+      bangla: 'মানুষের রক্তের স্বাভাবিক pH ৭.৩৫ থেকে ৭.৪৫ এর মধ্যে থাকে।'
+    }
+  },
 
   // SSC
-  { id: 16, exam:'SSC', subject:'Science', chapter:'Force & Motion', difficulty:'easy', year:'2023',
-    question: 'What is the SI unit of force?',
-    options: ['Joule', 'Watt', 'Newton', 'Pascal'],
+  {
+    id: 16, exam: 'SSC', 
+    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
+    chapter: { english: 'Force & Motion', bangla: 'বল ও গতি' }, 
+    difficulty: { english: 'easy', bangla: 'সহজ' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'easy',
+    yearEn: 2023,
+    question: {
+      english: 'What is the SI unit of force?',
+      bangla: 'বলের SI একক কী?'
+    },
+    options: {
+      english: ['Joule', 'Watt', 'Newton', 'Pascal'],
+      bangla: ['জুল', 'ওয়াট', 'নিউটন', 'প্যাসকেল']
+    },
     correctIndex: 2,
-    explanation: 'The SI unit of force is the Newton (N). 1 Newton = 1 kg·m/s².' },
+    explanation: {
+      english: 'The SI unit of force is the Newton (N).',
+      bangla: 'বলের আন্তর্জাতিক বা SI একক হলো নিউটন (N)।'
+    }
+  },
 
-  { id: 17, exam:'SSC', subject:'Math', chapter:'Algebra', difficulty:'medium', year:'2022',
-    question: 'If x + 1/x = 3, what is the value of x² + 1/x²?',
-    options: ['7', '9', '11', '5'],
+  {
+    id: 17, exam: 'SSC', 
+    subject: { english: 'Math', bangla: 'গণিত' }, 
+    chapter: { english: 'Algebra', bangla: 'বীজগণিত' }, 
+    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
+    year: { english: '2022', bangla: '২০২২' },
+    difficultyLevel: 'medium',
+    yearEn: 2022,
+    question: {
+      english: 'If x + 1/x = 3, what is the value of x² + 1/x²?',
+      bangla: 'যদি x + ১/x = ৩ হয়, তবে x² + ১/x² এর মান কত?'
+    },
+    options: {
+      english: ['7', '9', '11', '5'],
+      bangla: ['৭', '৯', '১১', '৫']
+    },
     correctIndex: 0,
-    explanation: '(x + 1/x)² = x² + 2 + 1/x² = 9. Therefore x² + 1/x² = 9 − 2 = 7.' },
+    explanation: {
+      english: '(x + 1/x)² − 2 = 3² − 2 = 7.',
+      bangla: '(x + ১/x)² − ২ = ৩² − ২ = ৭।'
+    }
+  },
 
   // Bank
-  { id: 18, exam:'Bank', subject:'English', chapter:'Vocabulary', difficulty:'easy', year:'2023',
-    question: 'The antonym of "Eloquent" is:',
-    options: ['Fluent', 'Articulate', 'Inarticulate', 'Verbose'],
+  {
+    id: 18, exam: 'Bank', 
+    subject: { english: 'English', bangla: 'ইংরেজি' }, 
+    chapter: { english: 'Vocabulary', bangla: 'শব্দভাণ্ডার' }, 
+    difficulty: { english: 'easy', bangla: 'সহজ' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'easy',
+    yearEn: 2023,
+    question: {
+      english: 'The antonym of "Eloquent" is:',
+      bangla: '"Eloquent" শব্দটির বিপরীত শব্দ কোনটি?'
+    },
+    options: {
+      english: ['Fluent', 'Articulate', 'Inarticulate', 'Verbose'],
+      bangla: ['Fluent', 'Articulate', 'Inarticulate', 'Verbose']
+    },
     correctIndex: 2,
-    explanation: 'Eloquent means fluent and persuasive in speech. Its antonym is inarticulate, meaning unable to express clearly.' },
+    explanation: {
+      english: 'Eloquent means fluent; inarticulate means unable to express clearly.',
+      bangla: 'Eloquent অর্থ সুবক্তা; Inarticulate অর্থ যে গুছিয়ে কথা বলতে পারে না।'
+    }
+  },
 
-  { id: 19, exam:'Bank', subject:'Math', chapter:'Profit & Loss', difficulty:'medium', year:'2022',
-    question: 'A trader bought goods for Tk. 800 and sold them at a loss of 12.5%. Find the selling price.',
-    options: ['Tk. 700', 'Tk. 650', 'Tk. 680', 'Tk. 720'],
+  {
+    id: 19, exam: 'Bank', 
+    subject: { english: 'Math', bangla: 'গণিত' }, 
+    chapter: { english: 'Profit & Loss', bangla: 'লাভ-ক্ষতি' }, 
+    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
+    year: { english: '2022', bangla: '২০২২' },
+    difficultyLevel: 'medium',
+    yearEn: 2022,
+    question: {
+      english: 'A trader bought goods for Tk. 800 and sold them at a loss of 12.5%. Find the selling price.',
+      bangla: 'একজন বিক্রেতা ৮০০ টাকায় পণ্য কিনে ১২.৫% ক্ষতিতে বিক্রি করলেন। বিক্রয়মূল্য কত?'
+    },
+    options: {
+      english: ['Tk. 700', 'Tk. 650', 'Tk. 680', 'Tk. 720'],
+      bangla: ['৭০০ টাকা', '৬৫০ টাকা', '৬৮০ টাকা', '৭২০ টাকা']
+    },
     correctIndex: 0,
-    explanation: 'Loss = 12.5% of 800 = 100. Selling price = 800 − 100 = 700.' },
+    explanation: {
+      english: 'Selling price = 800 − (800 × 0.125) = 700.',
+      bangla: 'বিক্রয়মূল্য = ৮০০ − (৮০০ এর ১২.৫%) = ৭০০ টাকা।'
+    }
+  },
 
-  { id: 20, exam:'HSC', subject:'ICT', chapter:'Database', difficulty:'easy', year:'2023',
-    question: 'Which of the following is NOT a type of database management system?',
-    options: ['Relational', 'Hierarchical', 'Network', 'Sequential'],
+  {
+    id: 20, exam: 'HSC', 
+    subject: { english: 'ICT', bangla: 'আইসিটি' }, 
+    chapter: { english: 'Database', bangla: 'ডেটাবেজ' }, 
+    difficulty: { english: 'easy', bangla: 'সহজ' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'easy',
+    yearEn: 2023,
+    question: {
+      english: 'Which of the following is NOT a type of database management system?',
+      bangla: 'নিচের কোনটি ডেটাবেজ ম্যানেজমেন্ট সিস্টেমের (DBMS) প্রকারভেদ নয়?'
+    },
+    options: {
+      english: ['Relational', 'Hierarchical', 'Network', 'Sequential'],
+      bangla: ['Relational', 'Hierarchical', 'Network', 'Sequential']
+    },
     correctIndex: 3,
-    explanation: 'The main types of DBMS are Relational, Hierarchical, Network, and Object-oriented. "Sequential" is a file access method, not a DBMS type.' },
+    explanation: {
+      english: 'The main types of DBMS include Relational, Hierarchical, and Network.',
+      bangla: 'DBMS-এর প্রধান প্রকারভেদগুলো হলো রিলেশনাল, হায়ারার্কিকাল এবং নেটওয়ার্ক।'
+    }
+  },
 ]
 
 // ── Filtered / sorted data ─────────────────────────────────
 const filteredQuestions = ref<Question[]>([])
 
-const availableSubjects = computed(() => subjectMap[selectedExam.value] ?? ['All'])
+const availableSubjects = computed(() => subjectMap.value[selectedExam.value] ?? ['All'])
 
 const chapterBreakdown = computed(() => {
   const map: Record<string, number> = {}
   filteredQuestions.value.forEach(q => {
-    map[q.chapter] = (map[q.chapter] ?? 0) + 1
+    map[q.chapter[selectedLang.value]] = (map[q.chapter[selectedLang.value]] ?? 0) + 1
   })
   return Object.entries(map).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
 })
@@ -669,24 +1013,25 @@ const sessionAccuracy = computed(() => {
 // ── Filter logic ───────────────────────────────────────────
 function applyFilters() {
   let qs = [...allQuestions.value]
+  let selectedLang = computed(() => isBn.value ? 'bangla' : 'english')
 
   if (selectedExam.value !== 'All') qs = qs.filter(q => q.exam === selectedExam.value)
-  if (selectedSubject.value !== 'All') qs = qs.filter(q => q.subject === selectedSubject.value)
-  if (selectedDiff.value !== 'all') qs = qs.filter(q => q.difficulty === selectedDiff.value)
-  if (selectedChapter.value) qs = qs.filter(q => q.chapter === selectedChapter.value)
+  if (selectedSubject.value !== 'All') qs = qs.filter(q => q.subject[selectedLang.value] === selectedSubject.value)
+  if (selectedDiff.value !== 'all') qs = qs.filter(q => q.difficultyLevel === selectedDiff.value)
+  if (selectedChapter.value) qs = qs.filter(q => q.chapter[selectedLang.value] === selectedChapter.value)
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase()
     qs = qs.filter(x =>
-      x.question.toLowerCase().includes(q) ||
-      x.subject.toLowerCase().includes(q) ||
-      x.chapter.toLowerCase().includes(q)
+      x.question[selectedLang.value].toLowerCase().includes(q) ||
+      x.subject[selectedLang.value].toLowerCase().includes(q) ||
+      x.chapter[selectedLang.value].toLowerCase().includes(q)
     )
   }
 
   // Sort
-  if (sortBy.value === 'easy-first') qs.sort((a, b) => ['easy','medium','hard'].indexOf(a.difficulty) - ['easy','medium','hard'].indexOf(b.difficulty))
-  else if (sortBy.value === 'hard-first') qs.sort((a, b) => ['hard','medium','easy'].indexOf(a.difficulty) - ['hard','medium','easy'].indexOf(b.difficulty))
-  else if (sortBy.value === 'year') qs.sort((a, b) => (b.year ?? '0').localeCompare(a.year ?? '0'))
+  if (sortBy.value === 'easy-first') qs.sort((a, b) => ['easy','medium','hard'].indexOf(a.difficultyLevel) - ['easy','medium','hard'].indexOf(b.difficultyLevel))
+  else if (sortBy.value === 'hard-first') qs.sort((a, b) => ['hard','medium','easy'].indexOf(a.difficultyLevel) - ['hard','medium','easy'].indexOf(b.difficultyLevel))
+  else if (sortBy.value === 'year') qs.sort((a, b) => (b.yearEn ?? '0').localeCompare(a.yearEn ?? '0'))
 
   filteredQuestions.value = qs
   currentPage.value = 1
@@ -780,13 +1125,22 @@ function jumpToQuestion(id: number) {
   if (idx === -1) { resetFilters(); return }
   const page = Math.floor(idx / pageSize) + 1
   gotoPage(page)
-  nextTick(() => { expandedId.value = id })
+  nextTick(() => { 
+    expandedId.value = id 
+    nextTick(() => {
+      const el = document.getElementById(`q-${id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  })
 }
 
 function gotoPage(p: number) {
   currentPage.value = p
   expandedId.value = null
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+  //window.scrollTo({ top: 0, behavior: 'smooth' })
+  window.scrollTo({ behavior: 'smooth' })
 }
 
 function resetSession() {

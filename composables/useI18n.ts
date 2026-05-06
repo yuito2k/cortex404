@@ -33,6 +33,12 @@ export function useI18n() {
     return Array.isArray(val) ? val : []
   }
 
+  /** tm('features.items') → object or nested structure */
+  function tm(key: string): any {
+    const src = locale.value === 'bn' ? bn : en
+    return deepGet(src as Record<string, any>, key) ?? {}
+  }
+
   function setLocale(loc: Locale) {
     locale.value = loc
     if (import.meta.client) localStorage.setItem(STORAGE_KEY, loc)
@@ -44,5 +50,5 @@ export function useI18n() {
 
   const isBn = computed(() => locale.value === 'bn')
 
-  return { locale: readonly(locale), t, ta, setLocale, toggleLocale, isBn }
+  return { locale: readonly(locale), t, ta, tm, setLocale, toggleLocale, isBn }
 }
