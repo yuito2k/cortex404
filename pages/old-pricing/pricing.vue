@@ -224,57 +224,22 @@
       </div>
     </section>
 
-    <!-- Accepted Payments -->
-    <section class="payment-section">
-      <div class="section-label-row">
-        <span class="section-pill">ACCEPTED PAYMENTS</span>
-        <div class="section-line" />
-      </div>
-      <div class="payment-methods">
-        <div class="payment-method">
-          <div class="pm-icon pm-bkash">bK</div>
-          <span>bKash</span>
-        </div>
-        <div class="payment-method">
-          <div class="pm-icon pm-nagad">N</div>
-          <span>Nagad</span>
-        </div>
-        <div class="payment-method">
-          <div class="pm-icon pm-rocket">R</div>
-          <span>Rocket</span>
-        </div>
-        <div class="payment-method">
-          <div class="pm-icon pm-card">VISA</div>
-          <span>Visa / MC</span>
-        </div>
-        <div class="payment-method">
-          <div class="pm-icon pm-bank">🏦</div>
-          <span>Net Banking</span>
-        </div>
-      </div>
-    </section>
-
     <!-- FAQ -->
     <section class="faq-section">
-      <div class="section-label-row">
-        <span class="section-pill">FAQ</span>
-        <div class="section-line" />
+      <div class="section-header">
+        <div class="page-chip">
+          <span class="chip-dot" aria-hidden="true" />
+          FAQ
+        </div>
+        <h2 class="section-title">Common questions.</h2>
       </div>
-      <div class="faq-list">
-        <div
-          v-for="(item, i) in faqItems"
-          :key="i"
-          class="faq-item"
-          :class="{ 'faq-item--open': item.open }"
-          @click="toggleFaq(i)"
-        >
-          <div class="faq-q">
-            <span class="faq-q-text">{{ item.q }}</span>
-            <span class="faq-chevron" aria-hidden="true">{{ item.open ? '−' : '+' }}</span>
+      <div class="faq-grid">
+        <div v-for="(item, i) in faqs" :key="i" class="faq-item" :class="{ 'faq-item--open': openFaq === i }" @click="openFaq = openFaq === i ? null : i">
+          <div class="faq-question">
+            <span>{{ item.q }}</span>
+            <span class="faq-chevron" aria-hidden="true">{{ openFaq === i ? '−' : '+' }}</span>
           </div>
-          <transition name="faq-expand">
-            <div v-if="item.open" class="faq-a">{{ item.a }}</div>
-          </transition>
+          <div v-if="openFaq === i" class="faq-answer">{{ item.a }}</div>
         </div>
       </div>
     </section>
@@ -412,18 +377,32 @@ const socialStats = [
   { value: '82%', label: 'Pass Rate Improvement' },
 ]
 
-const faqItems = ref([
-  { q: 'Can I switch between monthly and yearly billing?', a: 'Yes — you can switch at any time from your account settings. Upgrading to yearly will prorate the difference automatically.', open: false },
-  { q: 'Is there a refund policy?', a: 'We offer a 7-day full refund, no questions asked. If you are not satisfied within 7 days of purchase, contact us at support@cortex404.com.', open: false },
-  { q: 'What payment methods are accepted?', a: 'We accept bKash, Nagad, Rocket, Visa/Mastercard and internet banking. All payments are secured and encrypted.', open: false },
-  { q: 'Can I use Cortex404 for free forever?', a: 'Yes. The Free tier never expires. You can practice MCQs, track basic progress and access the leaderboard indefinitely with no credit card required.', open: false },
-  { q: 'What exams does Pro cover?', a: 'Pro covers HSC (Science, Arts, Commerce), SSC (Science, Arts, Commerce), University Admission (BUET, DU Medical, and major varsities), BCS, and Bank/Govt job prep — with full MCQ + Written sections where applicable.', open: false },
-  { q: 'When is Elite launching?', a: 'Elite is currently in development. Join the waitlist to get early access at a discounted rate and be first to try AI-powered personalised study plans.', open: false },
-])
-
-function toggleFaq(i) {
-  faqItems.value[i].open = !faqItems.value[i].open
-}
+const faqs = [
+  {
+    q: 'Can I switch plans at any time?',
+    a: 'Yes. You can upgrade or downgrade your plan at any time. Upgrades take effect immediately. Downgrades apply at the start of your next billing cycle, so you keep your current features until then.'
+  },
+  {
+    q: 'Is there really a 7-day free trial on Pro and Elite?',
+    a: 'Absolutely. No credit card is required to start the trial. You get full access to all features of your chosen plan for 7 days. After that, you can subscribe or drop to the Free plan — no pressure.'
+  },
+  {
+    q: 'What payment methods are accepted?',
+    a: 'We accept bKash, Nagad, Rocket, and all major credit/debit cards (Visa, Mastercard). Bank transfer is also available for yearly plans.'
+  },
+  {
+    q: 'Are the questions updated regularly?',
+    a: 'Yes. Our question bank is updated after every major exam with new questions sourced from official question papers. We also add new questions every week across all streams.'
+  },
+  {
+    q: 'Does the Free plan ever expire?',
+    a: 'No. The Free plan is yours forever with no expiry. You can use it as long as you like and upgrade whenever you\'re ready.'
+  },
+  {
+    q: 'Can I use Cortex404 on my phone?',
+    a: 'Cortex404 is fully responsive and works great in any mobile browser. Elite plan users also get offline access so you can practice without internet.'
+  },
+]
 </script>
 
 <style scoped>
@@ -1115,154 +1094,69 @@ function toggleFaq(i) {
   color: var(--gray);
 }
 
-/* ─── Section label row ─────────────────────────────────────── */
-.section-label-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.section-pill {
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.14em;
-  color: var(--dim);
-  border: 1px solid var(--border);
-  padding: 4px 12px;
-  white-space: nowrap;
-}
-
-.section-line {
-  flex: 1;
-  height: 1px;
-  background: var(--border);
-}
-
-/* ─── Payment Methods ───────────────────────────────────────── */
-.payment-section {
-  padding: 0 40px 52px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.payment-methods {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.payment-method {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-
-.payment-method span {
-  font-family: var(--font-mono);
-  font-size: 0.56rem;
-  letter-spacing: 0.08em;
-  color: var(--dim);
-}
-
-.pm-icon {
-  width: 56px;
-  height: 36px;
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  background: rgba(240,240,234,0.02);
-  transition: border-color 0.2s, background 0.2s;
-}
-
-.pm-icon:hover {
-  border-color: var(--border-bright);
-  background: rgba(240,240,234,0.04);
-}
-
-.pm-bkash { color: rgba(220,80,80,0.9); }
-.pm-nagad  { color: rgba(255,130,40,0.9); }
-.pm-rocket { color: rgba(100,180,255,0.9); }
-.pm-card   { color: var(--white); font-size: 0.6rem; }
-.pm-bank   { font-size: 1.1rem; }
-
 /* ─── FAQ ───────────────────────────────────────────────────── */
 .faq-section {
-  padding: 0 40px 56px;
+  padding: 60px 40px;
   max-width: 1200px;
   margin: 0 auto;
+  border-top: 1px solid var(--border);
 }
 
-.faq-list {
+.faq-grid {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  background: var(--border);
+  border: 1px solid var(--border);
+  box-shadow: 4px 4px 0 0 rgba(240,240,234,0.04);
 }
 
 .faq-item {
-  background: var(--black);
-  padding: 0;
+  border-bottom: 1px solid var(--border);
   cursor: pointer;
-  border-left: 3px solid transparent;
-  transition: border-color 0.2s, background 0.15s;
+  transition: background 0.15s;
+}
+
+.faq-item:last-child {
+  border-bottom: none;
 }
 
 .faq-item:hover {
-  background: rgba(240,240,234,0.015);
-  border-left-color: var(--border-bright);
-}
-
-.faq-item--open {
-  border-left-color: var(--white);
   background: rgba(240,240,234,0.02);
 }
 
-.faq-q {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px 20px;
+.faq-item--open {
+  background: rgba(240,240,234,0.025);
+  border-left: 2px solid var(--border-bright);
 }
 
-.faq-q-text {
-  font-family: var(--font-sans);
-  font-size: 0.9rem;
+.faq-question {
+  padding: 20px 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  font-size: 0.92rem;
   color: var(--white);
-  line-height: 1.4;
+  font-family: var(--font-sans);
+  font-weight: 500;
 }
 
 .faq-chevron {
   font-family: var(--font-mono);
-  font-size: 1rem;
-  color: var(--dim);
-  flex-shrink: 0;
-  width: 20px;
-  text-align: center;
-}
-
-.faq-item--open .faq-chevron { color: var(--white); }
-
-.faq-a {
-  font-family: var(--font-sans);
-  font-size: 0.85rem;
+  font-size: 1.1rem;
   color: var(--gray);
-  padding: 0 20px 18px 20px;
-  line-height: 1.65;
+  min-width: 16px;
+  text-align: center;
+  transition: transform 0.15s;
 }
 
-.faq-expand-enter-active,
-.faq-expand-leave-active { transition: all 0.25s ease; }
-.faq-expand-enter-from,
-.faq-expand-leave-to { opacity: 0; transform: translateY(-6px); }
+.faq-answer {
+  padding: 0 28px 20px;
+  font-size: 0.88rem;
+  color: var(--gray);
+  line-height: 1.7;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
 
 /* ─── CTA Section ───────────────────────────────────────────── */
 .cta-section {
@@ -1342,7 +1236,6 @@ function toggleFaq(i) {
   .compare-section,
   .streams-section,
   .faq-section,
-  .payment-section,
   .cta-section {
     padding-left: 20px;
     padding-right: 20px;
@@ -1363,12 +1256,6 @@ function toggleFaq(i) {
   .social-stats-row {
     grid-template-columns: repeat(2, 1fr);
   }
-
-  .payment-methods { gap: 8px; }
-  .pm-icon { width: 46px; height: 30px; font-size: 0.58rem; }
-
-  .faq-q-text { font-size: 0.84rem; }
-  .faq-a { font-size: 0.8rem; }
 
   .cta-actions {
     flex-direction: column;
