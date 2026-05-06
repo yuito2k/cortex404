@@ -121,20 +121,8 @@ const examConfigs = {
       {
         key: 'ka', label: 'Ka Unit', sublabel: 'Science',
         totalQuestions: 100,
-        requiresOptionals: true,
-        optionalCount: 2,
-        compulsory: { physics: 30, chemistry: 25 },
-        compulsoryLabels: { physics: 'Physics', chemistry: 'Chemistry' },
-        optionalSubjects: [
-          { key: 'math',    label: 'Math',    questions: 25, description: 'Higher Mathematics' },
-          { key: 'biology', label: 'Biology', questions: 25, description: 'Zoology & Botany' },
-          { key: 'english', label: 'English', questions: 10, description: 'English Language' },
-          { key: 'bangla',  label: 'বাংলা',   questions: 10, description: 'Bengali Language' },
-        ],
-        // subjects/subjectLabels/totalQuestions are computed dynamically based on optional picks
-        subjects: { physics: 30, chemistry: 25, math: 25, biology: 20 }, // fallback display
-        subjectLabels: { physics: 'Physics', chemistry: 'Chemistry', math: 'Math', biology: 'Biology', english: 'English', bangla: 'বাংলা' },
-        totalQuestions: 100,
+        subjects: { physics: 30, chemistry: 25, math: 25, biology: 10, english: 10 },
+        subjectLabels: { physics: 'Physics', chemistry: 'Chemistry', math: 'Math', biology: 'Biology', english: 'English' },
       },
       {
         key: 'kha', label: 'Kha Unit', sublabel: 'Humanities',
@@ -206,7 +194,6 @@ const examConfigs = {
 const phase = ref('setup')           // 'setup' | 'exam' | 'results'
 const selectedExam = ref(null)       // key of examConfigs
 const selectedUnit = ref('')
-const kaOptionalSubjects = ref([])   // up to 2 optional subject keys for Ka unit
 const questions = ref([])
 const answers = ref({})              // { questionId: optionIndex }
 const flagged = ref(new Set())
@@ -226,46 +213,24 @@ const activeUnitConfig = computed(() => {
   return config.value.units.find(u => u.key === selectedUnit.value) || null
 })
 
-// Subjects/labels/total to actually use — reactive to unit + optional selection
+// Subjects/labels/total to actually use — reactive to unit selection
 const activeSubjects = computed(() => {
-  if (!activeUnitConfig.value) return config.value?.subjects || {}
-  const u = activeUnitConfig.value
-  if (u.requiresOptionals) {
-    // Build from compulsory + chosen optionals
-    const result = { ...u.compulsory }
-    kaOptionalSubjects.value.forEach(key => {
-      const opt = u.optionalSubjects.find(o => o.key === key)
-      if (opt) result[key] = opt.questions
-    })
-    return result
-  }
-  return u.subjects
+  if (activeUnitConfig.value) return activeUnitConfig.value.subjects
+  return config.value?.subjects || {}
 })
 const activeSubjectLabels = computed(() => {
   if (activeUnitConfig.value) return activeUnitConfig.value.subjectLabels
   return config.value?.subjectLabels || {}
 })
 const activeTotalQuestions = computed(() => {
-  if (!activeUnitConfig.value) return config.value?.totalQuestions || 0
-  const u = activeUnitConfig.value
-  if (u.requiresOptionals) {
-    const compTotal = Object.values(u.compulsory).reduce((a, b) => a + b, 0)
-    const optTotal = kaOptionalSubjects.value.reduce((sum, key) => {
-      const opt = u.optionalSubjects.find(o => o.key === key)
-      return sum + (opt ? opt.questions : 0)
-    }, 0)
-    return compTotal + optTotal
-  }
-  return u.totalQuestions
+  if (activeUnitConfig.value) return activeUnitConfig.value.totalQuestions
+  return config.value?.totalQuestions || 0
 })
 
-// Can the user start?
+// Can the user start? DU requires a unit to be picked first
 const canStart = computed(() => {
   if (!selectedExam.value) return false
   if (config.value?.requiresUnit && !selectedUnit.value) return false
-  if (activeUnitConfig.value?.requiresOptionals) {
-    if (kaOptionalSubjects.value.length < activeUnitConfig.value.optionalCount) return false
-  }
   return true
 })
 
@@ -337,25 +302,6 @@ const subjectBreakdown = computed(() => {
 function selectExam(key) {
   selectedExam.value = key
   selectedUnit.value = ''
-  kaOptionalSubjects.value = []
-}
-
-function selectUnit(key) {
-  selectedUnit.value = key
-  kaOptionalSubjects.value = []   // reset optionals whenever unit changes
-}
-
-function toggleKaOptional(key) {
-  const idx = kaOptionalSubjects.value.indexOf(key)
-  if (idx !== -1) {
-    // deselect
-    kaOptionalSubjects.value = kaOptionalSubjects.value.filter(k => k !== key)
-  } else {
-    const max = activeUnitConfig.value?.optionalCount || 2
-    if (kaOptionalSubjects.value.length < max) {
-      kaOptionalSubjects.value = [...kaOptionalSubjects.value, key]
-    }
-  }
 }
 
 function buildQuestions() {
@@ -436,7 +382,6 @@ function resetToSetup() {
   phase.value = 'setup'
   selectedExam.value = null
   selectedUnit.value = ''
-  kaOptionalSubjects.value = []
   questions.value = []
   answers.value = {}
   flagged.value = new Set()
@@ -588,7 +533,7 @@ const pct = (v) => `${v}%`
                   :key="u.key"
                   class="unit-pill"
                   :class="{ active: selectedUnit === u.key }"
-                  @click.stop="selectUnit(u.key)"
+                  @click.stop="selectedUnit = u.key"
                 >
                   <span class="unit-pill-label">{{ u.label }}</span>
                   <span class="unit-pill-sub">{{ u.sublabel }}</span>
@@ -597,60 +542,6 @@ const pct = (v) => `${v}%`
               <!-- Unit not selected warning -->
               <div v-if="!selectedUnit" class="unit-warning">
                 ⚠ Please select a unit to continue
-              </div>
-
-              <!-- Ka Unit optional subject picker -->
-              <div v-if="selectedUnit && activeUnitConfig?.requiresOptionals" class="optional-picker">
-                <div class="optional-picker-header">
-                  <div class="optional-label">
-                    CHOOSE {{ activeUnitConfig.optionalCount }} OPTIONAL SUBJECTS
-                    <span class="optional-required">*required</span>
-                  </div>
-                  <div class="optional-progress">
-                    <span
-                      v-for="n in activeUnitConfig.optionalCount"
-                      :key="n"
-                      class="opt-progress-dot"
-                      :class="{ filled: n <= kaOptionalSubjects.length }"
-                    ></span>
-                    <span class="opt-progress-text">{{ kaOptionalSubjects.length }} / {{ activeUnitConfig.optionalCount }} selected</span>
-                  </div>
-                </div>
-
-                <div class="optional-compulsory-note">
-                  <span class="comp-tag">COMPULSORY</span>
-                  <span v-for="(count, subj) in activeUnitConfig.compulsory" :key="subj" class="comp-subj">
-                    {{ activeUnitConfig.compulsoryLabels[subj] }} ({{ count }}Q)
-                  </span>
-                </div>
-
-                <div class="optional-subjects-grid">
-                  <button
-                    v-for="opt in activeUnitConfig.optionalSubjects"
-                    :key="opt.key"
-                    class="opt-subj-card"
-                    :class="{
-                      'opt-selected': kaOptionalSubjects.includes(opt.key),
-                      'opt-disabled': !kaOptionalSubjects.includes(opt.key) && kaOptionalSubjects.length >= activeUnitConfig.optionalCount
-                    }"
-                    :disabled="!kaOptionalSubjects.includes(opt.key) && kaOptionalSubjects.length >= activeUnitConfig.optionalCount"
-                    @click.stop="toggleKaOptional(opt.key)"
-                  >
-                    <div class="opt-subj-top">
-                      <span class="opt-subj-name">{{ opt.label }}</span>
-                      <span class="opt-subj-check">{{ kaOptionalSubjects.includes(opt.key) ? '✓' : '+' }}</span>
-                    </div>
-                    <div class="opt-subj-desc">{{ opt.description }}</div>
-                    <div class="opt-subj-count">{{ opt.questions }}Q</div>
-                  </button>
-                </div>
-
-                <div v-if="kaOptionalSubjects.length < activeUnitConfig.optionalCount" class="optional-warning">
-                  ⚠ Select {{ activeUnitConfig.optionalCount - kaOptionalSubjects.length }} more optional subject{{ activeUnitConfig.optionalCount - kaOptionalSubjects.length > 1 ? 's' : '' }} to continue
-                </div>
-                <div v-else class="optional-confirmed">
-                  ✓ Optional subjects confirmed — Physics + Chemistry + {{ kaOptionalSubjects.map(k => activeUnitConfig.optionalSubjects.find(o => o.key === k)?.label).join(' + ') }}
-                </div>
               </div>
             </div>
 
@@ -668,51 +559,18 @@ const pct = (v) => `${v}%`
               <template v-if="selectedExam === key && examConfigs[key].requiresUnit">
                 <!-- DU selected: show unit subjects if unit picked, else a placeholder -->
                 <template v-if="activeUnitConfig">
-                  <template v-if="activeUnitConfig.requiresOptionals">
-                    <!-- Compulsory subjects always shown -->
-                    <div
-                      v-for="(count, subj) in activeUnitConfig.compulsory"
-                      :key="'comp-'+subj"
-                      class="subj-bar-wrap"
-                    >
-                      <div class="subj-bar-label">{{ activeUnitConfig.compulsoryLabels[subj] }}</div>
-                      <div class="subj-bar-track">
-                        <div class="subj-bar-fill varsity-fill compulsory-fill" :style="{ width: (count / activeTotalQuestions * 100) + '%' }"></div>
-                      </div>
-                      <div class="subj-bar-count">{{ count }}</div>
+                  <div
+                    v-for="(count, subj) in activeUnitConfig.subjects"
+                    :key="subj"
+                    class="subj-bar-wrap"
+                    :title="`${activeUnitConfig.subjectLabels[subj]}: ${count}Q`"
+                  >
+                    <div class="subj-bar-label">{{ activeUnitConfig.subjectLabels[subj] }}</div>
+                    <div class="subj-bar-track">
+                      <div class="subj-bar-fill varsity-fill" :style="{ width: (count / activeUnitConfig.totalQuestions * 100) + '%' }"></div>
                     </div>
-                    <!-- Optional subjects: chosen ones shown, unchosen as placeholder -->
-                    <div
-                      v-for="opt in activeUnitConfig.optionalSubjects"
-                      :key="'opt-'+opt.key"
-                      class="subj-bar-wrap"
-                      :class="{ 'bar-optional-inactive': !kaOptionalSubjects.includes(opt.key) }"
-                    >
-                      <div class="subj-bar-label">{{ opt.label }}</div>
-                      <div class="subj-bar-track">
-                        <div
-                          class="subj-bar-fill varsity-fill"
-                          :class="{ 'optional-fill': kaOptionalSubjects.includes(opt.key), 'placeholder-fill': !kaOptionalSubjects.includes(opt.key) }"
-                          :style="{ width: kaOptionalSubjects.includes(opt.key) ? (opt.questions / activeTotalQuestions * 100) + '%' : '8%' }"
-                        ></div>
-                      </div>
-                      <div class="subj-bar-count">{{ kaOptionalSubjects.includes(opt.key) ? opt.questions : '?' }}</div>
-                    </div>
-                  </template>
-                  <template v-else>
-                    <div
-                      v-for="(count, subj) in activeUnitConfig.subjects"
-                      :key="subj"
-                      class="subj-bar-wrap"
-                      :title="`${activeUnitConfig.subjectLabels[subj]}: ${count}Q`"
-                    >
-                      <div class="subj-bar-label">{{ activeUnitConfig.subjectLabels[subj] }}</div>
-                      <div class="subj-bar-track">
-                        <div class="subj-bar-fill varsity-fill" :style="{ width: (count / activeUnitConfig.totalQuestions * 100) + '%' }"></div>
-                      </div>
-                      <div class="subj-bar-count">{{ count }}</div>
-                    </div>
-                  </template>
+                    <div class="subj-bar-count">{{ count }}</div>
+                  </div>
                 </template>
                 <template v-else>
                   <!-- No unit selected yet: show greyed placeholder bars -->
@@ -770,14 +628,6 @@ const pct = (v) => `${v}%`
               <span>·</span>
               <span class="unit-missing-warn">⚠ No unit selected</span>
             </template>
-            <template v-else-if="activeUnitConfig?.requiresOptionals && kaOptionalSubjects.length < activeUnitConfig.optionalCount">
-              <span>·</span>
-              <span class="unit-missing-warn">⚠ Choose {{ activeUnitConfig.optionalCount - kaOptionalSubjects.length }} more optional subject{{ activeUnitConfig.optionalCount - kaOptionalSubjects.length > 1 ? 's' : '' }}</span>
-            </template>
-            <template v-else-if="activeUnitConfig?.requiresOptionals">
-              <span>·</span>
-              <span class="optionals-confirmed">✓ {{ kaOptionalSubjects.map(k => activeUnitConfig.optionalSubjects.find(o => o.key === k)?.label).join(' + ') }}</span>
-            </template>
           </div>
         </div>
         <div class="cta-bar-right">
@@ -787,11 +637,9 @@ const pct = (v) => `${v}%`
             :class="{ 'btn-disabled': !canStart }"
             :disabled="!canStart"
             @click="canStart && (showNegativeWarning = true)"
+            :title="!canStart ? 'Please select a unit first' : ''"
           >
             <span v-if="config.requiresUnit && !selectedUnit">Select Unit First</span>
-            <span v-else-if="activeUnitConfig?.requiresOptionals && kaOptionalSubjects.length < activeUnitConfig.optionalCount">
-              Choose {{ activeUnitConfig.optionalCount - kaOptionalSubjects.length }} More Subject{{ activeUnitConfig.optionalCount - kaOptionalSubjects.length > 1 ? 's' : '' }}
-            </span>
             <span v-else>Start Exam →</span>
           </button>
         </div>
@@ -1958,174 +1806,6 @@ const pct = (v) => `${v}%`
   line-height: 1.65;
 }
 
-/* ─── OPTIONAL SUBJECT PICKER ────────────────────────────────────────────── */
-.optional-picker {
-  margin-top: 10px;
-  border: 1px solid rgba(255,200,80,0.25);
-  background: rgba(255,200,80,0.03);
-  padding: 12px;
-  animation: slideDown 0.2s ease;
-}
-@keyframes slideDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
-
-.optional-picker-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 10px;
-}
-.optional-label {
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  letter-spacing: 0.12em;
-  color: rgba(255,200,80,0.9);
-}
-.optional-required {
-  color: rgba(255,100,100,0.7);
-  margin-left: 5px;
-}
-.optional-progress {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.opt-progress-dot {
-  width: 8px; height: 8px;
-  border: 1px solid rgba(255,200,80,0.4);
-  background: transparent;
-  transition: background 0.2s;
-}
-.opt-progress-dot.filled {
-  background: rgba(255,200,80,0.8);
-  border-color: rgba(255,200,80,0.8);
-}
-.opt-progress-text {
-  font-family: var(--font-mono);
-  font-size: 0.54rem;
-  color: var(--dim);
-  letter-spacing: 0.06em;
-}
-
-.optional-compulsory-note {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 6px 8px;
-  background: rgba(240,240,234,0.03);
-  border: 1px solid var(--border);
-  margin-bottom: 8px;
-}
-.comp-tag {
-  font-family: var(--font-mono);
-  font-size: 0.52rem;
-  letter-spacing: 0.1em;
-  color: var(--dim);
-  border: 1px solid var(--border);
-  padding: 1px 6px;
-}
-.comp-subj {
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  color: var(--white);
-  padding: 1px 6px;
-  border: 1px solid rgba(240,240,234,0.15);
-  background: rgba(240,240,234,0.04);
-}
-
-.optional-subjects-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5px;
-  margin-bottom: 8px;
-}
-.opt-subj-card {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 9px 10px;
-  border: 1px solid var(--border);
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  transition: all 0.15s;
-  position: relative;
-}
-.opt-subj-card:hover:not(:disabled) {
-  border-color: rgba(255,200,80,0.4);
-  background: rgba(255,200,80,0.04);
-}
-.opt-subj-card.opt-selected {
-  border-color: rgba(255,200,80,0.7);
-  background: rgba(255,200,80,0.08);
-}
-.opt-subj-card.opt-disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-.opt-subj-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.opt-subj-name {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: var(--white);
-  letter-spacing: 0.04em;
-}
-.opt-subj-check {
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  color: var(--dim);
-  transition: color 0.15s;
-}
-.opt-subj-card.opt-selected .opt-subj-check { color: rgba(255,200,80,0.9); }
-.opt-subj-card.opt-selected .opt-subj-name { color: rgba(255,200,80,0.95); }
-.opt-subj-desc {
-  font-family: var(--font-sans);
-  font-size: 0.62rem;
-  color: var(--dim);
-}
-.opt-subj-count {
-  font-family: var(--font-mono);
-  font-size: 0.55rem;
-  color: var(--dim);
-  letter-spacing: 0.06em;
-}
-.opt-subj-card.opt-selected .opt-subj-count { color: rgba(255,200,80,0.6); }
-
-.optional-warning {
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  letter-spacing: 0.06em;
-  color: rgba(255,200,80,0.7);
-  padding: 5px 0;
-}
-.optional-confirmed {
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  letter-spacing: 0.06em;
-  color: rgba(120,220,120,0.8);
-  padding: 5px 0;
-}
-
-/* Bar styles for Ka unit */
-.compulsory-fill { background: rgba(200,200,234,0.5); }
-.optional-fill   { background: rgba(255,200,80,0.5); }
-.bar-optional-inactive .subj-bar-label { color: var(--dim); opacity: 0.5; }
-.bar-optional-inactive .subj-bar-count { opacity: 0.4; }
-
-/* CTA optionals confirmed text */
-.optionals-confirmed {
-  color: rgba(120,220,120,0.8);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-}
-
 /* ─── RESPONSIVE ─────────────────────────────────────────────────────────── */
 
 /* ── Tablet (≤ 900px) ── */
@@ -2291,12 +1971,5 @@ const pct = (v) => `${v}%`
   .neg-formula-eq { font-size: 0.74rem; }
   .neg-modal-actions { flex-direction: column; gap: 8px; }
   .neg-modal-actions .iso-btn { width: 100%; justify-content: center; }
-
-  /* Optional subject picker */
-  .optional-subjects-grid { grid-template-columns: 1fr 1fr; gap: 4px; }
-  .opt-subj-card { padding: 8px; }
-  .opt-subj-name { font-size: 0.6rem; }
-  .optional-picker-header { flex-direction: column; align-items: flex-start; gap: 5px; }
-  .optional-compulsory-note { flex-wrap: wrap; gap: 5px; }
 }
 </style>
