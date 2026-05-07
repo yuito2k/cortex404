@@ -215,7 +215,8 @@ const timeLeft = ref(0)
 const timerInterval = ref(null)
 const showEndModal = ref(false)
 const showNegativeWarning = ref(false)
-const filterTab = ref('all')         // results filter
+const filterTab = ref('all')         // results filter: all | correct | wrong | skipped
+const subjectFilter = ref('all')     // results subject filter: 'all' | subject key
 
 // ─── COMPUTED ────────────────────────────────────────────────────────────────
 const config = computed(() => selectedExam.value ? examConfigs[selectedExam.value] : null)
@@ -313,10 +314,27 @@ const gradeInfo = computed(() => {
 })
 
 const filteredReview = computed(() => {
-  if (filterTab.value === 'correct') return questions.value.filter(q => answers.value[q.id] === q.answer)
-  if (filterTab.value === 'wrong') return questions.value.filter(q => answers.value[q.id] !== undefined && answers.value[q.id] !== q.answer)
-  if (filterTab.value === 'skipped') return questions.value.filter(q => answers.value[q.id] === undefined)
-  return questions.value
+  let list = questions.value
+  // subject filter
+  if (subjectFilter.value !== 'all') list = list.filter(q => q.subject === subjectFilter.value)
+  // result filter
+  if (filterTab.value === 'correct') return list.filter(q => answers.value[q.id] === q.answer)
+  if (filterTab.value === 'wrong')   return list.filter(q => answers.value[q.id] !== undefined && answers.value[q.id] !== q.answer)
+  if (filterTab.value === 'skipped') return list.filter(q => answers.value[q.id] === undefined)
+  return list
+})
+
+// Tab badge counts — scoped to subjectFilter only, never to filterTab
+// So switching tabs doesn't change the counts shown on other tabs
+const filteredCounts = computed(() => {
+  let pool = questions.value
+  if (subjectFilter.value !== 'all') pool = pool.filter(q => q.subject === subjectFilter.value)
+  return {
+    all:     pool.length,
+    correct: pool.filter(q => answers.value[q.id] === q.answer).length,
+    wrong:   pool.filter(q => answers.value[q.id] !== undefined && answers.value[q.id] !== q.answer).length,
+    skipped: pool.filter(q => answers.value[q.id] === undefined).length,
+  }
 })
 
 // Subject breakdown for results
@@ -327,9 +345,15 @@ const subjectBreakdown = computed(() => {
     const qs = questions.value.filter(q => q.subject === subj)
     const correct = qs.filter(q => answers.value[q.id] === q.answer).length
     const wrong = qs.filter(q => answers.value[q.id] !== undefined && answers.value[q.id] !== q.answer).length
+    const skipped = qs.filter(q => answers.value[q.id] === undefined).length
     const total = qs.length
     const pct = total ? ((correct - wrong * 0.25) / total * 100).toFixed(1) : 0
-    return { subj, label: labels[subj] || subj, correct, wrong, skipped: total - correct - wrong, total, pct }
+    // count relevant to current filterTab, for the badge on card
+    const tabCount = filterTab.value === 'correct' ? correct
+      : filterTab.value === 'wrong' ? wrong
+      : filterTab.value === 'skipped' ? skipped
+      : total
+    return { subj, label: labels[subj] || subj, correct, wrong, skipped, total, pct, tabCount }
   })
 })
 
@@ -400,6 +424,7 @@ function submitExam() {
   showEndModal.value = false
   phase.value = 'results'
   filterTab.value = 'all'
+  subjectFilter.value = 'all'
 }
 
 function toggleFlag(id) {
@@ -1024,10 +1049,35 @@ const pct = (v) => `${v}%`
       </div>
 
       <!-- Subject Breakdown -->
-      <div class="result-section-title">SUBJECT BREAKDOWN</div>
+      <div class="sb-section-header">
+        <div class="result-section-title">SUBJECT BREAKDOWN</div>
+        <div class="sb-filter-hint">
+          <span v-if="subjectFilter === 'all'">↓ Click a subject to filter the review below</span>
+          <span v-else class="sb-filter-active-hint">Showing questions for <strong>{{ activeSubjectLabels[subjectFilter] }}</strong> only</span>
+        </div>
+      </div>
       <div class="subject-breakdown-grid">
-        <div v-for="sb in subjectBreakdown" :key="sb.subj" class="sb-card">
-          <div class="sb-name">{{ sb.label }}</div>
+        <div
+          v-for="sb in subjectBreakdown"
+          :key="sb.subj"
+          class="sb-card"
+          :class="{
+            'sb-card--active': subjectFilter === sb.subj,
+            'sb-card--dim': subjectFilter !== 'all' && subjectFilter !== sb.subj
+          }"
+          @click="subjectFilter = subjectFilter === sb.subj ? 'all' : sb.subj"
+        >
+          <div class="sb-card-top">
+            <div class="sb-name">{{ sb.label }}</div>
+            <div class="sb-tab-count" :class="{
+              'sb-tab-correct': filterTab === 'correct',
+              'sb-tab-wrong':   filterTab === 'wrong',
+              'sb-tab-skipped': filterTab === 'skipped',
+            }">
+              {{ sb.tabCount }}
+              <span class="sb-tab-label">{{ filterTab === 'all' ? 'total' : filterTab }}</span>
+            </div>
+          </div>
           <div class="sb-stats">
             <span class="sb-correct">✓ {{ sb.correct }}</span>
             <span class="sb-wrong">✗ {{ sb.wrong }}</span>
@@ -1040,19 +1090,31 @@ const pct = (v) => `${v}%`
               :style="{ width: Math.max(0, parseFloat(sb.pct)) + '%' }"
             ></div>
           </div>
-          <div class="sb-pct" :class="parseFloat(sb.pct) >= 60 ? 'sb-high' : parseFloat(sb.pct) >= 40 ? 'sb-mid' : 'sb-low'">{{ sb.pct }}%</div>
+          <div class="sb-card-footer">
+            <div class="sb-pct" :class="parseFloat(sb.pct) >= 60 ? 'sb-high' : parseFloat(sb.pct) >= 40 ? 'sb-mid' : 'sb-low'">{{ sb.pct }}%</div>
+            <div class="sb-filter-cta">{{ subjectFilter === sb.subj ? '✕ clear' : 'filter →' }}</div>
+          </div>
         </div>
       </div>
 
       <!-- Question Review -->
       <div class="review-header">
-        <div class="result-section-title">QUESTION REVIEW</div>
+        <div class="result-section-title">QUESTION REVIEW
+          <span v-if="subjectFilter !== 'all'" class="review-subject-chip">
+            {{ activeSubjectLabels[subjectFilter] }}
+            <button class="clear-subject-filter" @click="subjectFilter = 'all'">×</button>
+          </span>
+        </div>
         <div class="review-filter-tabs">
-          <button v-for="t in ['all','correct','wrong','skipped']" :key="t" class="rev-tab" :class="{ active: filterTab === t }" @click="filterTab = t">
+          <button
+            v-for="t in ['all','correct','wrong','skipped']"
+            :key="t"
+            class="rev-tab"
+            :class="{ active: filterTab === t }"
+            @click="filterTab = t"
+          >
             {{ t.toUpperCase() }}
-            <span class="rev-tab-count">
-              {{ t === 'all' ? questions.length : t === 'correct' ? scoreData.correct : t === 'wrong' ? scoreData.wrong : scoreData.skipped }}
-            </span>
+            <span class="rev-tab-count">{{ filteredCounts[t] }}</span>
           </button>
         </div>
       </div>
@@ -1830,21 +1892,98 @@ const pct = (v) => `${v}%`
   font-family: var(--font-mono); font-size: 0.62rem;
   letter-spacing: 0.14em; color: var(--dim);
   border-bottom: 1px solid var(--border);
-  padding-bottom: 8px; margin-bottom: 16px;
+  padding-bottom: 8px;
 }
-.subject-breakdown-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(200px,1fr)); gap: 1px; background: var(--border); margin-bottom: 32px; }
-.sb-card { background: var(--black); padding: 16px; }
-.sb-name { font-family: var(--font-mono); font-size: 0.68rem; color: var(--white); margin-bottom: 8px; }
+.sb-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.sb-filter-hint {
+  font-family: var(--font-mono);
+  font-size: 0.57rem;
+  letter-spacing: 0.05em;
+  color: var(--dim);
+}
+.sb-filter-active-hint { color: rgba(255,200,80,0.8); }
+.sb-filter-active-hint strong { color: rgba(255,200,80,0.95); }
+
+.subject-breakdown-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); gap: 1px; background: var(--border); margin-bottom: 32px; }
+
+.sb-card {
+  background: var(--black);
+  padding: 14px 16px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-left: 2px solid transparent;
+  transition: all 0.15s;
+}
+.sb-card:hover { border-left-color: var(--border-bright); background: rgba(240,240,234,0.02); }
+.sb-card--active { border-left-color: rgba(255,200,80,0.8) !important; background: rgba(255,200,80,0.04) !important; }
+.sb-card--dim { opacity: 0.38; }
+
+.sb-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
+.sb-name { font-family: var(--font-mono); font-size: 0.68rem; color: var(--white); }
+.sb-card--active .sb-name { color: rgba(255,200,80,0.95); }
+
+.sb-tab-count {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--white);
+  text-align: right;
+  line-height: 1;
+}
+.sb-tab-label {
+  display: block;
+  font-size: 0.48rem;
+  color: var(--dim);
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-align: right;
+  margin-top: 2px;
+}
+.sb-tab-correct .sb-tab-count { color: rgba(120,220,120,0.9); }
+.sb-tab-wrong   .sb-tab-count { color: rgba(255,100,100,0.9); }
+.sb-tab-skipped .sb-tab-count { color: var(--gray); }
+
 .sb-stats { display: flex; gap: 8px; margin-bottom: 8px; }
 .sb-correct { font-family: var(--font-mono); font-size: 0.6rem; color: rgba(120,220,120,0.8); }
 .sb-wrong   { font-family: var(--font-mono); font-size: 0.6rem; color: rgba(255,100,100,0.8); }
 .sb-skipped { font-family: var(--font-mono); font-size: 0.6rem; color: var(--dim); }
-.sb-bar-track { height: 3px; background: rgba(240,240,234,0.06); margin-bottom: 6px; }
+.sb-bar-track { height: 3px; background: rgba(240,240,234,0.06); margin-bottom: 8px; }
 .sb-bar-fill { height: 100%; transition: width 0.5s; }
 .sb-high { background: rgba(120,220,120,0.5); color: rgba(120,220,120,0.9); }
 .sb-mid  { background: rgba(255,200,80,0.5);  color: rgba(255,200,80,0.9); }
 .sb-low  { background: rgba(255,100,100,0.5); color: rgba(255,100,100,0.9); }
-.sb-pct  { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; }
+
+.sb-card-footer { display: flex; align-items: center; justify-content: space-between; }
+.sb-pct { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; }
+.sb-filter-cta {
+  font-family: var(--font-mono); font-size: 0.52rem;
+  letter-spacing: 0.08em; color: var(--dim); transition: color 0.15s;
+}
+.sb-card:hover .sb-filter-cta { color: var(--border-bright); }
+.sb-card--active .sb-filter-cta { color: rgba(255,200,80,0.7); }
+
+/* Review subject active chip */
+.review-subject-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 0.57rem; letter-spacing: 0.08em;
+  color: rgba(255,200,80,0.9);
+  border: 1px solid rgba(255,200,80,0.35);
+  background: rgba(255,200,80,0.06);
+  padding: 2px 8px; margin-left: 10px; vertical-align: middle;
+}
+.clear-subject-filter {
+  background: none; border: none;
+  color: rgba(255,200,80,0.7); cursor: pointer;
+  font-size: 0.75rem; padding: 0; line-height: 1; transition: color 0.15s;
+}
+.clear-subject-filter:hover { color: rgba(255,100,100,0.8); }
 
 /* Review */
 .review-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }

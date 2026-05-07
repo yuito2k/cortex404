@@ -270,7 +270,7 @@ const timerInterval = ref(null)
 const showEndModal = ref(false)
 const showStartModal = ref(false)
 const filterTab = ref('all')
-const subjectFilter = ref('all')     // 'all' | subject key — filters the review list
+const activeSubjectFilter = ref('all') // 'all' or a subject key like 'physics'
 
 // Written section state
 const writtenAnswers = ref({})
@@ -330,21 +330,27 @@ const gradeInfo = computed(() => {
 
 const filteredReview = computed(() => {
   let pool = questions.value
-  if (subjectFilter.value !== 'all') pool = pool.filter(q => q.subject === subjectFilter.value)
+  // Filter by subject
+  if (activeSubjectFilter.value !== 'all') {
+    pool = pool.filter(q => q.subject === activeSubjectFilter.value)
+  }
+  // Filter by result type
   if (filterTab.value === 'correct') return pool.filter(q => answers.value[q.id] === q.answer)
   if (filterTab.value === 'wrong')   return pool.filter(q => answers.value[q.id] !== undefined && answers.value[q.id] !== q.answer)
   if (filterTab.value === 'skipped') return pool.filter(q => answers.value[q.id] === undefined)
   return pool
 })
 
-// Counts scoped to current subjectFilter — used by review tab badges
+// Counts for the active subject filter
 const filteredCounts = computed(() => {
   let pool = questions.value
-  if (subjectFilter.value !== 'all') pool = pool.filter(q => q.subject === subjectFilter.value)
+  if (activeSubjectFilter.value !== 'all') {
+    pool = pool.filter(q => q.subject === activeSubjectFilter.value)
+  }
   return {
-    all:     pool.length,
+    all: pool.length,
     correct: pool.filter(q => answers.value[q.id] === q.answer).length,
-    wrong:   pool.filter(q => answers.value[q.id] !== undefined && answers.value[q.id] !== q.answer).length,
+    wrong: pool.filter(q => answers.value[q.id] !== undefined && answers.value[q.id] !== q.answer).length,
     skipped: pool.filter(q => answers.value[q.id] === undefined).length,
   }
 })
@@ -355,14 +361,9 @@ const subjectBreakdown = computed(() => {
     const qs = questions.value.filter(q => q.subject === subj)
     const correct = qs.filter(q => answers.value[q.id] === q.answer).length
     const wrong = qs.filter(q => answers.value[q.id] !== undefined && answers.value[q.id] !== q.answer).length
-    const skipped = qs.filter(q => answers.value[q.id] === undefined).length
     const total = qs.length
     const pct = total ? (correct / total * 100).toFixed(1) : '0.0'
-    const tabCount = filterTab.value === 'correct' ? correct
-      : filterTab.value === 'wrong' ? wrong
-      : filterTab.value === 'skipped' ? skipped
-      : total
-    return { subj, label: subjectLabels[subj] || subj, correct, wrong, skipped, total, pct, tabCount }
+    return { subj, label: subjectLabels[subj] || subj, correct, wrong, skipped: total - correct - wrong, total, pct }
   }).filter(s => s.total > 0)
 })
 
@@ -421,7 +422,6 @@ function submitMcq() {
   } else {
     phase.value = 'results'
     filterTab.value = 'all'
-    subjectFilter.value = 'all'
   }
 }
 
@@ -443,7 +443,6 @@ function submitWritten() {
   clearInterval(writtenTimerInterval.value)
   phase.value = 'results'
   filterTab.value = 'all'
-  subjectFilter.value = 'all'
 }
 
 function toggleFlag(id) {
@@ -496,7 +495,7 @@ function resetToSetup() {
   writtenAnswers.value = {}
   writtenQuestionsList.value = []
   filterTab.value = 'all'
-  subjectFilter.value = 'all'
+  activeSubjectFilter.value = 'all'
 }
 
 let observer = null
@@ -1009,51 +1008,59 @@ function reviewOptClass(q, idx) {
         </div>
       </div>
 
-      <!-- Subject Breakdown — filterable, matches admission-exam.vue -->
-      <div class="sb-section-header">
-        <div class="section-title-label">SUBJECT-WISE PERFORMANCE</div>
-        <div class="sb-filter-hint">
-          <span v-if="subjectFilter === 'all'">↓ Click a subject to filter the review below</span>
-          <span v-else class="sb-filter-active-hint">Showing questions for <strong>{{ subjectLabels[subjectFilter] || subjectFilter }}</strong> only</span>
+      <!-- Subject-wise Performance — always expanded, cards are clickable filters -->
+      <div class="subject-perf-section">
+        <div class="subject-perf-title-row">
+          <span class="section-title-label">SUBJECT-WISE PERFORMANCE</span>
+          <span class="subject-perf-hint">Click a subject to filter the review below</span>
         </div>
-      </div>
-      <div class="subject-breakdown-grid">
-        <div
-          v-for="sb in subjectBreakdown"
-          :key="sb.subj"
-          class="sb-card"
-          :class="{
-            'sb-card--active': subjectFilter === sb.subj,
-            'sb-card--dim':    subjectFilter !== 'all' && subjectFilter !== sb.subj
-          }"
-          @click="subjectFilter = subjectFilter === sb.subj ? 'all' : sb.subj"
-        >
-          <div class="sb-card-top">
-            <div class="sb-name">{{ sb.label }}</div>
-            <div class="sb-tab-count" :class="{
-              'sb-tab-correct': filterTab === 'correct',
-              'sb-tab-wrong':   filterTab === 'wrong',
-              'sb-tab-skipped': filterTab === 'skipped',
-            }">
-              {{ sb.tabCount }}
-              <span class="sb-tab-label">{{ filterTab === 'all' ? 'total' : filterTab }}</span>
+        <div class="subject-breakdown-grid">
+          <!-- "All subjects" card -->
+          <div
+            class="sb-card sb-card--all"
+            :class="{ 'sb-card--active': activeSubjectFilter === 'all' }"
+            @click="activeSubjectFilter = 'all'; filterTab = 'all'"
+          >
+            <div class="sb-top">
+              <span class="sb-name">All Subjects</span>
+              <span class="sb-pct" :class="parseFloat(scoreData.pct) >= 60 ? 'sb-high' : parseFloat(scoreData.pct) >= 40 ? 'sb-mid' : 'sb-low'">
+                {{ scoreData.pct }}%
+              </span>
             </div>
+            <div class="sb-stats-row">
+              <span class="sb-stat correct">✓{{ scoreData.correct }}</span>
+              <span class="sb-stat wrong">✗{{ scoreData.wrong }}</span>
+              <span class="sb-stat skip">—{{ scoreData.skipped }}</span>
+              <span class="sb-total">/ {{ scoreData.total }}Q</span>
+            </div>
+            <div class="sb-bar-track">
+              <div class="sb-bar-fill" :class="parseFloat(scoreData.pct) >= 60 ? 'sb-high-fill' : parseFloat(scoreData.pct) >= 40 ? 'sb-mid-fill' : 'sb-low-fill'" :style="{ width: parseFloat(scoreData.pct) + '%' }"></div>
+            </div>
+            <div class="sb-filter-tag" v-if="activeSubjectFilter === 'all'">● ACTIVE</div>
           </div>
-          <div class="sb-stats-row">
-            <span class="sb-stat correct">✓ {{ sb.correct }}</span>
-            <span class="sb-stat wrong">✗ {{ sb.wrong }}</span>
-            <span class="sb-stat skip">— {{ sb.skipped }}</span>
-          </div>
-          <div class="sb-bar-track">
-            <div
-              class="sb-bar-fill"
-              :class="parseFloat(sb.pct) >= 60 ? 'sb-high-fill' : parseFloat(sb.pct) >= 40 ? 'sb-mid-fill' : 'sb-low-fill'"
-              :style="{ width: Math.max(0, parseFloat(sb.pct)) + '%' }"
-            ></div>
-          </div>
-          <div class="sb-card-footer">
-            <div class="sb-pct" :class="parseFloat(sb.pct) >= 60 ? 'sb-high' : parseFloat(sb.pct) >= 40 ? 'sb-mid' : 'sb-low'">{{ sb.pct }}%</div>
-            <div class="sb-filter-cta">{{ subjectFilter === sb.subj ? '✕ clear' : 'filter →' }}</div>
+
+          <!-- Per-subject cards -->
+          <div
+            v-for="sb in subjectBreakdown"
+            :key="sb.subj"
+            class="sb-card"
+            :class="{ 'sb-card--active': activeSubjectFilter === sb.subj }"
+            @click="activeSubjectFilter = sb.subj; filterTab = 'all'"
+          >
+            <div class="sb-top">
+              <span class="sb-name">{{ sb.label }}</span>
+              <span class="sb-pct" :class="parseFloat(sb.pct) >= 60 ? 'sb-high' : parseFloat(sb.pct) >= 40 ? 'sb-mid' : 'sb-low'">{{ sb.pct }}%</span>
+            </div>
+            <div class="sb-stats-row">
+              <span class="sb-stat correct">✓{{ sb.correct }}</span>
+              <span class="sb-stat wrong">✗{{ sb.wrong }}</span>
+              <span class="sb-stat skip">—{{ sb.skipped }}</span>
+              <span class="sb-total">/ {{ sb.total }}Q</span>
+            </div>
+            <div class="sb-bar-track">
+              <div class="sb-bar-fill" :class="parseFloat(sb.pct) >= 60 ? 'sb-high-fill' : parseFloat(sb.pct) >= 40 ? 'sb-mid-fill' : 'sb-low-fill'" :style="{ width: Math.max(0, parseFloat(sb.pct)) + '%' }"></div>
+            </div>
+            <div class="sb-filter-tag" v-if="activeSubjectFilter === sb.subj">● ACTIVE</div>
           </div>
         </div>
       </div>
@@ -1078,14 +1085,13 @@ function reviewOptClass(q, idx) {
         </div>
       </div>
 
-      <!-- MCQ Question Review -->
+      <!-- Question Review — with combined subject + result-type filters -->
       <div class="review-header">
         <div class="review-header-left">
-          <span class="section-title-label">MCQ QUESTION REVIEW
-            <span v-if="subjectFilter !== 'all'" class="review-subject-chip">
-              {{ subjectLabels[subjectFilter] || subjectFilter }}
-              <button class="review-clear-subj" @click="subjectFilter = 'all'">×</button>
-            </span>
+          <span class="section-title-label">MCQ QUESTION REVIEW</span>
+          <span v-if="activeSubjectFilter !== 'all'" class="review-subject-active">
+            {{ subjectLabels[activeSubjectFilter] || activeSubjectFilter }}
+            <button class="review-clear-subj" @click="activeSubjectFilter = 'all'">✕</button>
           </span>
         </div>
         <div class="review-tabs">
@@ -1105,19 +1111,15 @@ function reviewOptClass(q, idx) {
       <div v-if="filteredReview.length === 0" class="review-empty">
         <span class="review-empty-icon">—</span>
         <span>No questions match this filter.</span>
-        <button class="iso-btn iso-btn--ghost" style="font-size:0.68rem;padding:6px 14px;" @click="filterTab = 'all'; subjectFilter = 'all'">Clear filters</button>
+        <button class="iso-btn iso-btn--ghost" style="font-size:0.68rem;padding:6px 14px;" @click="filterTab = 'all'; activeSubjectFilter = 'all'">Clear filters</button>
       </div>
 
       <div class="review-list">
         <div
-          v-for="q in filteredReview"
+          v-for="(q) in filteredReview"
           :key="q.id"
           class="rc-card"
-          :class="{
-            'rc-correct': answers[q.id] === q.answer,
-            'rc-wrong':   answers[q.id] !== undefined && answers[q.id] !== q.answer,
-            'rc-skipped': answers[q.id] === undefined
-          }"
+          :class="{ 'rc-correct': answers[q.id] === q.answer, 'rc-wrong': answers[q.id] !== undefined && answers[q.id] !== q.answer, 'rc-skipped': answers[q.id] === undefined }"
         >
           <div class="rc-header">
             <div class="rc-meta">
@@ -1126,11 +1128,9 @@ function reviewOptClass(q, idx) {
               <span class="rc-chapter">{{ q.chapter }}</span>
               <span :class="['rc-diff', diffClass(q.difficulty)]">{{ q.difficulty }}</span>
             </div>
-            <div class="rc-result-badge">
-              <span v-if="answers[q.id] === q.answer" class="rc-badge rc-badge-correct">✓ Correct</span>
-              <span v-else-if="answers[q.id] !== undefined" class="rc-badge rc-badge-wrong">✗ Wrong</span>
-              <span v-else class="rc-badge rc-badge-skip">— Skipped</span>
-            </div>
+            <span v-if="answers[q.id] === q.answer" class="rc-badge rc-badge-correct">✓ Correct</span>
+            <span v-else-if="answers[q.id] !== undefined" class="rc-badge rc-badge-wrong">✗ Wrong</span>
+            <span v-else class="rc-badge rc-badge-skip">— Skipped</span>
           </div>
           <div class="rc-question">{{ q.text }}</div>
           <div class="rc-options">
@@ -1141,12 +1141,11 @@ function reviewOptClass(q, idx) {
               <span v-else-if="answers[q.id] === idx && idx !== q.answer" class="rc-tag-wrong">✗ Your answer</span>
             </div>
           </div>
-          <div v-if="answers[q.id] === undefined" class="rc-skipped-note">— Skipped · No marks deducted</div>
-          <!-- Explanation — always visible -->
           <div v-if="q.explanation" class="rc-explanation">
-            <span class="exp-label">EXPLANATION</span>
-            <p class="exp-text">{{ q.explanation }}</p>
+            <span class="rc-explanation-label">EXPLANATION</span>
+            <p class="rc-explanation-text">{{ q.explanation }}</p>
           </div>
+          <div v-if="answers[q.id] === undefined" class="rc-skipped-note">— Skipped · No marks deducted</div>
         </div>
       </div>
 
@@ -1589,74 +1588,33 @@ function reviewOptClass(q, idx) {
 .skipped-card .smc-val { color: var(--gray); }
 
 /* ─── SUBJECT BREAKDOWN ──────────────────────────────────────────────────── */
-.section-title-label {
-  font-family: var(--font-mono); font-size: 0.62rem;
-  letter-spacing: 0.14em; color: var(--dim);
+.subject-perf-header {
+  display: flex; align-items: center; justify-content: space-between;
+  border: 1px solid var(--border); padding: 12px 16px; margin-bottom: 0;
+  cursor: pointer; transition: border-color 0.2s; background: rgba(240,240,234,0.01);
 }
-.sb-section-header {
-  display: flex; align-items: baseline; justify-content: space-between;
-  flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
-}
-.sb-filter-hint {
-  font-family: var(--font-mono); font-size: 0.57rem;
-  letter-spacing: 0.05em; color: var(--dim);
-}
-.sb-filter-active-hint { color: rgba(255,200,80,0.8); }
-.sb-filter-active-hint strong { color: rgba(255,200,80,0.95); }
-
-.subject-breakdown-grid {
-  display: grid; grid-template-columns: repeat(auto-fill,minmax(180px,1fr));
-  gap: 1px; background: var(--border); margin-bottom: 24px;
-}
-.sb-card {
-  background: var(--black); padding: 14px 16px;
-  cursor: pointer;
-  border: 1px solid transparent; border-left: 2px solid transparent;
-  transition: all 0.15s;
-}
-.sb-card:hover { border-left-color: var(--border-bright); background: rgba(240,240,234,0.02); }
-.sb-card--active { border-left-color: rgba(255,200,80,0.8) !important; background: rgba(255,200,80,0.04) !important; }
-.sb-card--dim { opacity: 0.38; }
-
-.sb-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
+.subject-perf-header:hover { border-color: var(--border-bright); }
+.section-title-label { font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.14em; color: var(--dim); }
+.toggle-breakdown-btn { font-family: var(--font-mono); font-size: 0.6rem; color: var(--dim); background: transparent; border: none; cursor: pointer; padding: 0; }
+.subject-breakdown-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); gap: 1px; background: var(--border); margin-bottom: 24px; }
+.sb-card { background: var(--black); padding: 16px; }
+.sb-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .sb-name { font-family: var(--font-mono); font-size: 0.65rem; color: var(--white); }
-.sb-card--active .sb-name { color: rgba(255,200,80,0.95); }
-
-.sb-tab-count {
-  font-family: var(--font-mono); font-size: 1.1rem; font-weight: 700;
-  color: var(--white); text-align: right; line-height: 1;
-}
-.sb-tab-label {
-  display: block; font-size: 0.48rem; color: var(--dim);
-  font-weight: 400; letter-spacing: 0.08em; text-align: right; margin-top: 2px;
-}
-.sb-tab-correct .sb-tab-count { color: rgba(120,220,120,0.9); }
-.sb-tab-wrong   .sb-tab-count { color: rgba(255,100,100,0.9); }
-.sb-tab-skipped .sb-tab-count { color: var(--gray); }
-
+.sb-pct { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; }
+.sb-high { color: rgba(120,220,120,0.9); }
+.sb-mid  { color: rgba(255,200,80,0.9); }
+.sb-low  { color: rgba(255,100,100,0.9); }
 .sb-stats-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
 .sb-stat { font-family: var(--font-mono); font-size: 0.58rem; }
-.sb-stat.correct { color: rgba(120,220,120,0.8); }
-.sb-stat.wrong   { color: rgba(255,100,100,0.8); }
+.sb-stat.correct { color: rgba(120,220,120,0.7); }
+.sb-stat.wrong   { color: rgba(255,100,100,0.7); }
 .sb-stat.skip    { color: var(--dim); }
-
-.sb-bar-track { height: 3px; background: rgba(240,240,234,0.06); margin-bottom: 8px; }
+.sb-total { font-family: var(--font-mono); font-size: 0.55rem; color: var(--dim); margin-left: auto; }
+.sb-bar-track { height: 3px; background: rgba(240,240,234,0.06); }
 .sb-bar-fill { height: 100%; transition: width 0.5s; }
 .sb-high-fill { background: rgba(120,220,120,0.5); }
 .sb-mid-fill  { background: rgba(255,200,80,0.5); }
 .sb-low-fill  { background: rgba(255,100,100,0.5); }
-.sb-high { color: rgba(120,220,120,0.9); }
-.sb-mid  { color: rgba(255,200,80,0.9); }
-.sb-low  { color: rgba(255,100,100,0.9); }
-
-.sb-card-footer { display: flex; align-items: center; justify-content: space-between; }
-.sb-pct { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; }
-.sb-filter-cta {
-  font-family: var(--font-mono); font-size: 0.52rem;
-  letter-spacing: 0.08em; color: var(--dim); transition: color 0.15s;
-}
-.sb-card:hover .sb-filter-cta { color: var(--border-bright); }
-.sb-card--active .sb-filter-cta { color: rgba(255,200,80,0.7); }
 
 /* ─── WRITTEN SUMMARY ────────────────────────────────────────────────────── */
 .written-summary { border: 1px solid rgba(255,200,80,0.2); padding: 20px; margin-bottom: 28px; background: rgba(255,200,80,0.02); }
@@ -1672,20 +1630,6 @@ function reviewOptClass(q, idx) {
 
 /* ─── MCQ REVIEW ─────────────────────────────────────────────────────────── */
 .review-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; margin-top: 28px; }
-.review-header-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.review-subject-chip {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-family: var(--font-mono); font-size: 0.57rem; letter-spacing: 0.08em;
-  color: rgba(255,200,80,0.9);
-  border: 1px solid rgba(255,200,80,0.35); background: rgba(255,200,80,0.06);
-  padding: 2px 8px; margin-left: 8px; vertical-align: middle;
-}
-.review-clear-subj {
-  background: none; border: none;
-  color: rgba(255,200,80,0.7); cursor: pointer;
-  font-size: 0.78rem; padding: 0; line-height: 1; transition: color 0.15s;
-}
-.review-clear-subj:hover { color: rgba(255,100,100,0.8); }
 .review-tabs { display: flex; gap: 1px; background: var(--border); }
 .rev-tab { font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.1em; padding: 6px 14px; background: var(--black); border: none; color: var(--dim); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.15s; }
 .rev-tab:hover { color: var(--white); }
@@ -1701,38 +1645,23 @@ function reviewOptClass(q, idx) {
 .rc-qnum { font-family: var(--font-mono); font-size: 0.65rem; font-weight: 700; color: var(--white); background: rgba(240,240,234,0.05); padding: 2px 7px; border: 1px solid var(--border); }
 .rc-subj, .rc-chapter { font-family: var(--font-mono); font-size: 0.54rem; color: var(--dim); border: 1px solid var(--border); padding: 2px 5px; }
 .rc-diff { font-family: var(--font-mono); font-size: 0.52rem; padding: 2px 5px; border: 1px solid; }
-.rc-result-badge {}
-.rc-badge { font-family: var(--font-mono); font-size: 0.62rem; font-weight: 700; padding: 3px 8px; border: 1px solid; }
+.rc-badge { font-family: var(--font-mono); font-size: 0.62rem; font-weight: 700; padding: 2px 8px; border: 1px solid; }
 .rc-badge-correct { color: rgba(120,220,120,0.9); border-color: rgba(120,220,120,0.3); background: rgba(120,220,120,0.05); }
 .rc-badge-wrong   { color: rgba(255,100,100,0.9); border-color: rgba(255,100,100,0.3); background: rgba(255,100,100,0.05); }
 .rc-badge-skip    { color: var(--dim); border-color: var(--border); }
 .rc-question { font-family: var(--font-sans); font-size: 0.88rem; color: var(--white); line-height: 1.6; margin-bottom: 12px; }
-.rc-options { display: flex; flex-direction: column; gap: 5px; margin-bottom: 4px; }
+.rc-options { display: flex; flex-direction: column; gap: 5px; }
 .rc-opt { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--border); }
-.rc-opt.rc-correct { border-color: rgba(120,220,120,0.4); background: rgba(120,220,120,0.04); }
-.rc-opt.rc-wrong   { border-color: rgba(255,100,100,0.4); background: rgba(255,100,100,0.04); }
+.rc-correct { border-color: rgba(120,220,120,0.4); background: rgba(120,220,120,0.04); }
+.rc-wrong   { border-color: rgba(255,100,100,0.4); background: rgba(255,100,100,0.04); }
 .rc-opt-letter { font-family: var(--font-mono); font-size: 0.6rem; width: 20px; height: 20px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--white); flex-shrink: 0; }
-.rc-opt.rc-correct .rc-opt-letter { background: rgba(120,220,120,0.25); border-color: rgba(120,220,120,0.5); }
-.rc-opt.rc-wrong   .rc-opt-letter { background: rgba(255,100,100,0.25); border-color: rgba(255,100,100,0.5); }
+.rc-correct .rc-opt-letter { background: rgba(120,220,120,0.25); border-color: rgba(120,220,120,0.5); }
+.rc-wrong   .rc-opt-letter { background: rgba(255,100,100,0.25); border-color: rgba(255,100,100,0.5); }
 .rc-opt-text { font-family: var(--font-sans); font-size: 0.82rem; color: var(--white); flex: 1; }
 .rc-tag-correct, .rc-tag-wrong { font-family: var(--font-mono); font-size: 0.54rem; padding: 2px 5px; border: 1px solid; flex-shrink: 0; }
 .rc-tag-correct { color: rgba(120,220,120,0.9); border-color: rgba(120,220,120,0.3); }
 .rc-tag-wrong   { color: rgba(255,100,100,0.9); border-color: rgba(255,100,100,0.3); }
 .rc-skipped-note { font-family: var(--font-mono); font-size: 0.58rem; color: var(--dim); border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px; }
-
-/* Explanation — always visible, admission-exam style */
-.rc-explanation {
-  display: flex; flex-direction: column; gap: 5px;
-  margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--border);
-}
-.exp-label {
-  font-family: var(--font-mono); font-size: 0.55rem;
-  letter-spacing: 0.18em; color: var(--gray);
-}
-.exp-text {
-  font-family: var(--font-sans); font-size: 0.8rem;
-  color: var(--dim); line-height: 1.65;
-}
 
 /* ─── RESULTS ACTIONS ────────────────────────────────────────────────────── */
 .results-actions { display: flex; gap: 12px; justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 24px; flex-wrap: wrap; }
