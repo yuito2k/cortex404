@@ -270,7 +270,7 @@ const timerInterval = ref(null)
 const showEndModal = ref(false)
 const showStartModal = ref(false)
 const filterTab = ref('all')
-const activeSubjectFilter = ref('all') // 'all' or a subject key like 'physics'
+const showSubjectBreakdown = ref(false)
 
 // Written section state
 const writtenAnswers = ref({})
@@ -329,30 +329,10 @@ const gradeInfo = computed(() => {
 })
 
 const filteredReview = computed(() => {
-  let pool = questions.value
-  // Filter by subject
-  if (activeSubjectFilter.value !== 'all') {
-    pool = pool.filter(q => q.subject === activeSubjectFilter.value)
-  }
-  // Filter by result type
-  if (filterTab.value === 'correct') return pool.filter(q => answers.value[q.id] === q.answer)
-  if (filterTab.value === 'wrong')   return pool.filter(q => answers.value[q.id] !== undefined && answers.value[q.id] !== q.answer)
-  if (filterTab.value === 'skipped') return pool.filter(q => answers.value[q.id] === undefined)
-  return pool
-})
-
-// Counts for the active subject filter
-const filteredCounts = computed(() => {
-  let pool = questions.value
-  if (activeSubjectFilter.value !== 'all') {
-    pool = pool.filter(q => q.subject === activeSubjectFilter.value)
-  }
-  return {
-    all: pool.length,
-    correct: pool.filter(q => answers.value[q.id] === q.answer).length,
-    wrong: pool.filter(q => answers.value[q.id] !== undefined && answers.value[q.id] !== q.answer).length,
-    skipped: pool.filter(q => answers.value[q.id] === undefined).length,
-  }
+  if (filterTab.value === 'correct') return questions.value.filter(q => answers.value[q.id] === q.answer)
+  if (filterTab.value === 'wrong') return questions.value.filter(q => answers.value[q.id] !== undefined && answers.value[q.id] !== q.answer)
+  if (filterTab.value === 'skipped') return questions.value.filter(q => answers.value[q.id] === undefined)
+  return questions.value
 })
 
 const subjectBreakdown = computed(() => {
@@ -494,8 +474,6 @@ function resetToSetup() {
   flagged.value = new Set()
   writtenAnswers.value = {}
   writtenQuestionsList.value = []
-  filterTab.value = 'all'
-  activeSubjectFilter.value = 'all'
 }
 
 let observer = null
@@ -1008,45 +986,17 @@ function reviewOptClass(q, idx) {
         </div>
       </div>
 
-      <!-- Subject-wise Performance — always expanded, cards are clickable filters -->
-      <div class="subject-perf-section">
-        <div class="subject-perf-title-row">
-          <span class="section-title-label">SUBJECT-WISE PERFORMANCE</span>
-          <span class="subject-perf-hint">Click a subject to filter the review below</span>
-        </div>
-        <div class="subject-breakdown-grid">
-          <!-- "All subjects" card -->
-          <div
-            class="sb-card sb-card--all"
-            :class="{ 'sb-card--active': activeSubjectFilter === 'all' }"
-            @click="activeSubjectFilter = 'all'; filterTab = 'all'"
-          >
-            <div class="sb-top">
-              <span class="sb-name">All Subjects</span>
-              <span class="sb-pct" :class="parseFloat(scoreData.pct) >= 60 ? 'sb-high' : parseFloat(scoreData.pct) >= 40 ? 'sb-mid' : 'sb-low'">
-                {{ scoreData.pct }}%
-              </span>
-            </div>
-            <div class="sb-stats-row">
-              <span class="sb-stat correct">✓{{ scoreData.correct }}</span>
-              <span class="sb-stat wrong">✗{{ scoreData.wrong }}</span>
-              <span class="sb-stat skip">—{{ scoreData.skipped }}</span>
-              <span class="sb-total">/ {{ scoreData.total }}Q</span>
-            </div>
-            <div class="sb-bar-track">
-              <div class="sb-bar-fill" :class="parseFloat(scoreData.pct) >= 60 ? 'sb-high-fill' : parseFloat(scoreData.pct) >= 40 ? 'sb-mid-fill' : 'sb-low-fill'" :style="{ width: parseFloat(scoreData.pct) + '%' }"></div>
-            </div>
-            <div class="sb-filter-tag" v-if="activeSubjectFilter === 'all'">● ACTIVE</div>
-          </div>
+      <!-- Subject Performance Toggle -->
+      <div class="subject-perf-header" @click="showSubjectBreakdown = !showSubjectBreakdown">
+        <span class="section-title-label">SUBJECT-WISE PERFORMANCE</span>
+        <button class="toggle-breakdown-btn">
+          {{ showSubjectBreakdown ? '▲ Hide Details' : '▼ Show Details' }}
+        </button>
+      </div>
 
-          <!-- Per-subject cards -->
-          <div
-            v-for="sb in subjectBreakdown"
-            :key="sb.subj"
-            class="sb-card"
-            :class="{ 'sb-card--active': activeSubjectFilter === sb.subj }"
-            @click="activeSubjectFilter = sb.subj; filterTab = 'all'"
-          >
+      <transition name="fade-expand">
+        <div v-if="showSubjectBreakdown" class="subject-breakdown-grid">
+          <div v-for="sb in subjectBreakdown" :key="sb.subj" class="sb-card">
             <div class="sb-top">
               <span class="sb-name">{{ sb.label }}</span>
               <span class="sb-pct" :class="parseFloat(sb.pct) >= 60 ? 'sb-high' : parseFloat(sb.pct) >= 40 ? 'sb-mid' : 'sb-low'">{{ sb.pct }}%</span>
@@ -1060,10 +1010,9 @@ function reviewOptClass(q, idx) {
             <div class="sb-bar-track">
               <div class="sb-bar-fill" :class="parseFloat(sb.pct) >= 60 ? 'sb-high-fill' : parseFloat(sb.pct) >= 40 ? 'sb-mid-fill' : 'sb-low-fill'" :style="{ width: Math.max(0, parseFloat(sb.pct)) + '%' }"></div>
             </div>
-            <div class="sb-filter-tag" v-if="activeSubjectFilter === sb.subj">● ACTIVE</div>
           </div>
         </div>
-      </div>
+      </transition>
 
       <!-- Written answers summary (if attempted) -->
       <div v-if="isPaid && writtenQuestionsList.length > 0" class="written-summary">
@@ -1085,33 +1034,15 @@ function reviewOptClass(q, idx) {
         </div>
       </div>
 
-      <!-- Question Review — with combined subject + result-type filters -->
+      <!-- Question Review -->
       <div class="review-header">
-        <div class="review-header-left">
-          <span class="section-title-label">MCQ QUESTION REVIEW</span>
-          <span v-if="activeSubjectFilter !== 'all'" class="review-subject-active">
-            {{ subjectLabels[activeSubjectFilter] || activeSubjectFilter }}
-            <button class="review-clear-subj" @click="activeSubjectFilter = 'all'">✕</button>
-          </span>
-        </div>
+        <span class="section-title-label">MCQ QUESTION REVIEW</span>
         <div class="review-tabs">
-          <button
-            v-for="t in ['all','correct','wrong','skipped']"
-            :key="t"
-            class="rev-tab"
-            :class="{ active: filterTab === t }"
-            @click="filterTab = t"
-          >
+          <button v-for="t in ['all','correct','wrong','skipped']" :key="t" class="rev-tab" :class="{ active: filterTab === t }" @click="filterTab = t">
             {{ t.toUpperCase() }}
-            <span class="rev-count">{{ filteredCounts[t] }}</span>
+            <span class="rev-count">{{ t === 'all' ? questions.length : t === 'correct' ? scoreData.correct : t === 'wrong' ? scoreData.wrong : scoreData.skipped }}</span>
           </button>
         </div>
-      </div>
-
-      <div v-if="filteredReview.length === 0" class="review-empty">
-        <span class="review-empty-icon">—</span>
-        <span>No questions match this filter.</span>
-        <button class="iso-btn iso-btn--ghost" style="font-size:0.68rem;padding:6px 14px;" @click="filterTab = 'all'; activeSubjectFilter = 'all'">Clear filters</button>
       </div>
 
       <div class="review-list">
