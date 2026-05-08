@@ -36,7 +36,7 @@
                 :key="s.id"
                 class="stream-card"
                 :class="{ active: config.stream === s.id }"
-                @click="config.stream = s.id; config.subject = 'All'; config.chapter = 'All'; if (['HSC','SSC'].includes(s.id)) config.negativeMarking = false"
+                @click="config.stream = s.id; config.subject = 'All'; config.chapter = 'All'"
               >
                 <span class="stream-icon" v-html="s.icon" />
                 <span class="stream-name">{{ s.name }}</span>
@@ -154,16 +154,12 @@
                 <span class="toggle-knob" />
               </button>
             </label>
-            <label class="toggle-row" v-if="!['HSC','SSC'].includes(config.stream)">
+            <label class="toggle-row">
               <span class="toggle-label">Negative Marking (−0.25)</span>
               <button class="toggle-btn" :class="{ on: config.negativeMarking }" @click="config.negativeMarking = !config.negativeMarking">
                 <span class="toggle-knob" />
               </button>
             </label>
-            <div class="toggle-row toggle-row--disabled" v-else>
-              <span class="toggle-label">Negative Marking</span>
-              <span class="toggle-na">N/A for {{ config.stream }}</span>
-            </div>
           </div>
 
           <!-- Start CTA -->
@@ -384,9 +380,6 @@
                 {{ answeredCount }} of {{ questions.length }} answered.
                 {{ questions.length - answeredCount > 0 ? (questions.length - answeredCount) + ' unanswered will be skipped.' : 'All answered!' }}
               </p>
-              <div v-if="config.negativeMarking" class="nm-active-badge">
-                ⚠ Negative marking active · −0.25 per wrong
-              </div>
               <button class="iso-btn iso-btn--fill iso-btn--full" @click="confirmEndExam">
                 Submit Exam →
               </button>
@@ -432,14 +425,9 @@
             <div class="score-meta-col">
               <span class="score-label">Final Score</span>
               <span class="score-grade" :class="scoreClass(result.score)">{{ gradeLabel(result.score) }}</span>
-              <span class="score-marks">{{ result.marksEarned }} / {{ result.total }} marks</span>
             </div>
           </div>
           <p class="score-sub">{{ result.correct }} correct · {{ result.wrong }} wrong · {{ result.skipped }} skipped out of {{ questions.length }}</p>
-          <div v-if="config.negativeMarking && result.deducted > 0" class="neg-mark-notice">
-            <span class="nm-icon">−</span>
-            <span class="nm-text">{{ result.deducted }} marks deducted for {{ result.wrong }} wrong answer{{ result.wrong !== 1 ? 's' : '' }} (−0.25 each)</span>
-          </div>
         </div>
         <div class="rh-right">
           <div class="result-actions">
@@ -1089,13 +1077,9 @@ const result = computed(() => {
     else wrong++
   })
   const total = questions.value.length
-  const deducted = config.negativeMarking ? wrong * 0.25 : 0
-  const raw = correct - deducted
-  // Score = (marks earned / total possible marks) * 100
-  const score = total > 0 ? Math.max(0, Math.round((raw / total) * 100)) : 0
-  // Marks display: show as X.XX out of total
-  const marksEarned = Math.max(0, parseFloat(raw.toFixed(2)))
-  return { correct, wrong, skipped, score, deducted: parseFloat(deducted.toFixed(2)), marksEarned, total }
+  const raw = correct - (config.negativeMarking ? wrong * 0.25 : 0)
+  const score = Math.max(0, Math.round((raw / total) * 100))
+  return { correct, wrong, skipped, score }
 })
 
 const resultStats = computed(() => [
@@ -1552,46 +1536,6 @@ onUnmounted(() => { stopTimer(); observer?.disconnect() })
 .toggle-btn.on .toggle-knob {
   left: 21px;
   background: var(--white);
-}
-/* Disabled toggle row for N/A streams */
-.toggle-row--disabled {
-  cursor: default; opacity: 0.45;
-}
-.toggle-na {
-  font-family: var(--font-mono); font-size: 0.6rem;
-  letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--gray); border: 1px solid var(--border); padding: 2px 8px;
-}
-
-/* Negative marking active badge (exam sidebar) */
-.nm-active-badge {
-  font-family: var(--font-mono); font-size: 0.6rem;
-  letter-spacing: 0.08em; color: rgba(255,200,80,0.85);
-  border: 1px solid rgba(255,200,80,0.2);
-  background: rgba(255,200,80,0.04);
-  padding: 6px 10px; margin-bottom: 4px;
-}
-
-/* Negative marking deduction notice (results hero) */
-.neg-mark-notice {
-  display: inline-flex; align-items: center; gap: 8px;
-  margin-top: 4px;
-  padding: 6px 12px;
-  border: 1px solid rgba(255,100,100,0.25);
-  background: rgba(255,100,100,0.05);
-}
-.nm-icon {
-  font-family: var(--font-mono); font-size: 0.9rem; font-weight: 700;
-  color: rgba(255,100,100,0.8);
-}
-.nm-text {
-  font-size: 0.72rem; color: rgba(255,100,100,0.75);
-}
-
-/* Marks sub-label in score display */
-.score-marks {
-  font-family: var(--font-mono); font-size: 0.65rem;
-  color: var(--gray); letter-spacing: 0.04em; margin-top: 2px;
 }
 
 /* CTA */

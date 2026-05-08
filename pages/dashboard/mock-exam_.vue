@@ -36,7 +36,7 @@
                 :key="s.id"
                 class="stream-card"
                 :class="{ active: config.stream === s.id }"
-                @click="config.stream = s.id; config.subject = 'All'; config.chapter = 'All'; if (['HSC','SSC'].includes(s.id)) config.negativeMarking = false"
+                @click="config.stream = s.id; config.subject = 'All'"
               >
                 <span class="stream-icon" v-html="s.icon" />
                 <span class="stream-name">{{ s.name }}</span>
@@ -58,33 +58,15 @@
                 :key="sub"
                 class="filter-pill"
                 :class="{ active: config.subject === sub }"
-                @click="config.subject = sub; config.chapter = 'All'"
+                @click="config.subject = sub"
               >{{ sub }}</button>
-            </div>
-          </div>
-
-          <!-- Chapter — only shown when a specific subject is selected -->
-          <div class="config-section chapter-section" v-if="availableChapters.length > 1">
-            <div class="config-section-header">
-              <span class="csec-tag">03</span>
-              <span class="csec-label">Chapter</span>
-              <span class="csec-hint">Filter by chapter within {{ config.subject }}</span>
-            </div>
-            <div class="filter-pills chapter-pills">
-              <button
-                v-for="ch in availableChapters"
-                :key="ch"
-                class="filter-pill"
-                :class="{ active: config.chapter === ch }"
-                @click="config.chapter = ch"
-              >{{ ch }}</button>
             </div>
           </div>
 
           <!-- Question count + Duration -->
           <div class="config-section">
             <div class="config-section-header">
-              <span class="csec-tag">{{ availableChapters.length > 1 ? '04' : availableSubjects.length > 1 ? '03' : '02' }}</span>
+              <span class="csec-tag">{{ availableSubjects.length > 1 ? '03' : '02' }}</span>
               <span class="csec-label">Questions &amp; Duration</span>
             </div>
             <div class="dual-config">
@@ -118,7 +100,7 @@
           <!-- Difficulty mix -->
           <div class="config-section">
             <div class="config-section-header">
-              <span class="csec-tag">{{ availableChapters.length > 1 ? '05' : availableSubjects.length > 1 ? '04' : '03' }}</span>
+              <span class="csec-tag">{{ availableSubjects.length > 1 ? '04' : '03' }}</span>
               <span class="csec-label">Difficulty Mix</span>
             </div>
             <div class="diff-options">
@@ -154,16 +136,12 @@
                 <span class="toggle-knob" />
               </button>
             </label>
-            <label class="toggle-row" v-if="!['HSC','SSC'].includes(config.stream)">
+            <label class="toggle-row">
               <span class="toggle-label">Negative Marking (−0.25)</span>
               <button class="toggle-btn" :class="{ on: config.negativeMarking }" @click="config.negativeMarking = !config.negativeMarking">
                 <span class="toggle-knob" />
               </button>
             </label>
-            <div class="toggle-row toggle-row--disabled" v-else>
-              <span class="toggle-label">Negative Marking</span>
-              <span class="toggle-na">N/A for {{ config.stream }}</span>
-            </div>
           </div>
 
           <!-- Start CTA -->
@@ -176,7 +154,7 @@
               <span class="dot-sep">·</span>
               <span>{{ durationOptions.find(d => d.val === config.duration)?.label }}</span>
               <span class="dot-sep">·</span>
-              <span>{{ config.stream }}{{ config.subject !== 'All' ? ' / ' + config.subject : '' }}{{ config.chapter !== 'All' ? ' / ' + config.chapter : '' }}</span>
+              <span>{{ config.stream }}{{ config.subject !== 'All' ? ' / ' + config.subject : '' }}</span>
             </div>
           </div>
         </div>
@@ -237,7 +215,7 @@
       <!-- Exam top bar -->
       <div class="exam-topbar">
         <div class="etb-left">
-          <span class="etb-chip">{{ config.stream }}{{ config.subject !== 'All' ? ' / ' + config.subject : '' }}{{ config.chapter !== 'All' ? ' / ' + config.chapter : '' }}</span>
+          <span class="etb-chip">{{ config.stream }}{{ config.subject !== 'All' ? ' / ' + config.subject : '' }}</span>
           <span class="etb-progress">{{ answeredCount }} / {{ questions.length }} answered</span>
         </div>
 
@@ -384,9 +362,6 @@
                 {{ answeredCount }} of {{ questions.length }} answered.
                 {{ questions.length - answeredCount > 0 ? (questions.length - answeredCount) + ' unanswered will be skipped.' : 'All answered!' }}
               </p>
-              <div v-if="config.negativeMarking" class="nm-active-badge">
-                ⚠ Negative marking active · −0.25 per wrong
-              </div>
               <button class="iso-btn iso-btn--fill iso-btn--full" @click="confirmEndExam">
                 Submit Exam →
               </button>
@@ -432,14 +407,9 @@
             <div class="score-meta-col">
               <span class="score-label">Final Score</span>
               <span class="score-grade" :class="scoreClass(result.score)">{{ gradeLabel(result.score) }}</span>
-              <span class="score-marks">{{ result.marksEarned }} / {{ result.total }} marks</span>
             </div>
           </div>
           <p class="score-sub">{{ result.correct }} correct · {{ result.wrong }} wrong · {{ result.skipped }} skipped out of {{ questions.length }}</p>
-          <div v-if="config.negativeMarking && result.deducted > 0" class="neg-mark-notice">
-            <span class="nm-icon">−</span>
-            <span class="nm-text">{{ result.deducted }} marks deducted for {{ result.wrong }} wrong answer{{ result.wrong !== 1 ? 's' : '' }} (−0.25 each)</span>
-          </div>
         </div>
         <div class="rh-right">
           <div class="result-actions">
@@ -1042,7 +1012,6 @@ const phase = ref<'setup' | 'exam' | 'results'>('setup')
 const config = reactive({
   stream: 'HSC',
   subject: 'All',
-  chapter: 'All',
   count: 20,
   duration: 30,
   diffMode: 'balanced',
@@ -1064,18 +1033,6 @@ let timerInterval: ReturnType<typeof setInterval> | null = null
 // ── Computed ───────────────────────────────────────────────
 const availableSubjects = computed(() => subjectMap[config.stream] ?? ['All'])
 
-// Chapters only available when a specific subject is selected (not 'All')
-const availableChapters = computed(() => {
-  if (config.subject === 'All') return []
-  const chapters = new Set<string>()
-  questionBank.forEach(q => {
-    if (q.exam === config.stream && getSubjectStr(q) === config.subject) {
-      chapters.add(getChapterStr(q))
-    }
-  })
-  return ['All', ...Array.from(chapters).sort()]
-})
-
 const currentQ = computed(() => questions.value[currentIdx.value])
 
 const answeredCount = computed(() => Object.keys(answers.value).length)
@@ -1089,13 +1046,9 @@ const result = computed(() => {
     else wrong++
   })
   const total = questions.value.length
-  const deducted = config.negativeMarking ? wrong * 0.25 : 0
-  const raw = correct - deducted
-  // Score = (marks earned / total possible marks) * 100
-  const score = total > 0 ? Math.max(0, Math.round((raw / total) * 100)) : 0
-  // Marks display: show as X.XX out of total
-  const marksEarned = Math.max(0, parseFloat(raw.toFixed(2)))
-  return { correct, wrong, skipped, score, deducted: parseFloat(deducted.toFixed(2)), marksEarned, total }
+  const raw = correct - (config.negativeMarking ? wrong * 0.25 : 0)
+  const score = Math.max(0, Math.round((raw / total) * 100))
+  return { correct, wrong, skipped, score }
 })
 
 const resultStats = computed(() => [
@@ -1150,55 +1103,18 @@ function autoSetDuration(n: number) {
   else config.duration = 60
 }
 
-function getSubjectStr(q: Question): string {
-  return typeof q.subject === 'object' ? (q.subject as any).english : q.subject as string
-}
-function getChapterStr(q: Question): string {
-  return typeof q.chapter === 'object' ? (q.chapter as any).english : q.chapter as string
-}
-
 function buildQuestions(): Question[] {
   let pool = [...questionBank]
   if (config.stream !== 'All') pool = pool.filter(q => q.exam === config.stream)
-  if (config.subject !== 'All') pool = pool.filter(q => getSubjectStr(q) === config.subject)
-  if (config.chapter !== 'All') pool = pool.filter(q => getChapterStr(q) === config.chapter)
+  if (config.subject !== 'All') pool = pool.filter(q => q.subject === config.subject)
 
-  // Difficulty mix — actually slice by ratios
+  // Difficulty filter
   if (config.diffMode !== 'mixed') {
     const weights: Record<string, Record<string, number>> = {
       balanced: { easy: 0.3, medium: 0.5, hard: 0.2 },
       easy:     { easy: 0.6, medium: 0.3, hard: 0.1 },
       hard:     { easy: 0.1, medium: 0.3, hard: 0.6 },
     }
-    const w = weights[config.diffMode]
-    const easyPool   = pool.filter(q => q.difficultyLevel === 'easy')
-    const medPool    = pool.filter(q => q.difficultyLevel === 'medium')
-    const hardPool   = pool.filter(q => q.difficultyLevel === 'hard')
-
-    if (config.shuffle) {
-      easyPool.sort(() => Math.random() - 0.5)
-      medPool.sort(() => Math.random() - 0.5)
-      hardPool.sort(() => Math.random() - 0.5)
-    }
-
-    const eCount = Math.round(config.count * w.easy)
-    const mCount = Math.round(config.count * w.medium)
-    const hCount = config.count - eCount - mCount
-
-    const mixed = [
-      ...easyPool.slice(0, eCount),
-      ...medPool.slice(0, mCount),
-      ...hardPool.slice(0, hCount),
-    ]
-    // If we don't have enough questions from a bucket, fill from the rest
-    if (mixed.length < config.count) {
-      const usedIds = new Set(mixed.map(q => q.id))
-      const remaining = pool.filter(q => !usedIds.has(q.id))
-      if (config.shuffle) remaining.sort(() => Math.random() - 0.5)
-      mixed.push(...remaining.slice(0, config.count - mixed.length))
-    }
-    if (config.shuffle) mixed.sort(() => Math.random() - 0.5)
-    return mixed.slice(0, config.count)
   }
 
   if (config.shuffle) pool = pool.sort(() => Math.random() - 0.5)
@@ -1420,19 +1336,6 @@ onUnmounted(() => { stopTimer(); observer?.disconnect() })
   font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700;
   color: var(--white); letter-spacing: 0.04em;
 }
-.csec-hint {
-  font-size: 0.65rem; color: var(--gray); margin-left: auto;
-  font-family: var(--font-sans);
-}
-
-/* Chapter section */
-.chapter-section {
-  background: rgba(240,240,234,0.015);
-  border-left: 2px solid rgba(240,240,234,0.12) !important;
-}
-.chapter-pills {
-  flex-wrap: wrap;
-}
 
 /* Stream grid */
 .stream-grid {
@@ -1552,46 +1455,6 @@ onUnmounted(() => { stopTimer(); observer?.disconnect() })
 .toggle-btn.on .toggle-knob {
   left: 21px;
   background: var(--white);
-}
-/* Disabled toggle row for N/A streams */
-.toggle-row--disabled {
-  cursor: default; opacity: 0.45;
-}
-.toggle-na {
-  font-family: var(--font-mono); font-size: 0.6rem;
-  letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--gray); border: 1px solid var(--border); padding: 2px 8px;
-}
-
-/* Negative marking active badge (exam sidebar) */
-.nm-active-badge {
-  font-family: var(--font-mono); font-size: 0.6rem;
-  letter-spacing: 0.08em; color: rgba(255,200,80,0.85);
-  border: 1px solid rgba(255,200,80,0.2);
-  background: rgba(255,200,80,0.04);
-  padding: 6px 10px; margin-bottom: 4px;
-}
-
-/* Negative marking deduction notice (results hero) */
-.neg-mark-notice {
-  display: inline-flex; align-items: center; gap: 8px;
-  margin-top: 4px;
-  padding: 6px 12px;
-  border: 1px solid rgba(255,100,100,0.25);
-  background: rgba(255,100,100,0.05);
-}
-.nm-icon {
-  font-family: var(--font-mono); font-size: 0.9rem; font-weight: 700;
-  color: rgba(255,100,100,0.8);
-}
-.nm-text {
-  font-size: 0.72rem; color: rgba(255,100,100,0.75);
-}
-
-/* Marks sub-label in score display */
-.score-marks {
-  font-family: var(--font-mono); font-size: 0.65rem;
-  color: var(--gray); letter-spacing: 0.04em; margin-top: 2px;
 }
 
 /* CTA */
