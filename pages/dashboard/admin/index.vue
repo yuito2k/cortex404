@@ -152,6 +152,41 @@ function promoteUser(u) {
   showToast(`${u.name} is now ${u.role}.`)
 }
 
+// ─── Review Queue tab ────────────────────────────────────────────
+const queueFilter = ref('all')
+const queueStream = ref('All')
+const queueSearch = ref('')
+
+const reviewQueue = ref([
+  { id:101, text:'What is the Krebs cycle?',                    stream:'Medical', subject:'Biology',   diff:'Medium', submittedBy:'Moderator A', status:'pending',  date:'2025-05-09' },
+  { id:102, text:'Solve for x: 3x² + 5x - 2 = 0',             stream:'BUET',    subject:'Math',      diff:'Hard',   submittedBy:'Moderator B', status:'pending',  date:'2025-05-09' },
+  { id:103, text:'Who was the first President of Bangladesh?',  stream:'BCS',     subject:'History',   diff:'Easy',   submittedBy:'Moderator A', status:'pending',  date:'2025-05-08' },
+  { id:104, text:'What does RAM stand for?',                    stream:'SSC',     subject:'ICT',       diff:'Easy',   submittedBy:'Moderator C', status:'approved', date:'2025-05-08' },
+  { id:105, text:"Define Newton's third law",                   stream:'HSC',     subject:'Physics',   diff:'Medium', submittedBy:'Moderator B', status:'pending',  date:'2025-05-07' },
+  { id:106, text:'What is the capital of France?',             stream:'BCS',     subject:'GK',        diff:'Easy',   submittedBy:'Moderator A', status:'rejected', date:'2025-05-07', note:'Too generic' },
+  { id:107, text:'Find derivative of sin²(x)',                 stream:'DU',      subject:'Math',      diff:'Medium', submittedBy:'Moderator C', status:'pending',  date:'2025-05-06' },
+  { id:108, text:'What is the atomic number of gold?',         stream:'HSC',     subject:'Chemistry', diff:'Easy',   submittedBy:'Moderator A', status:'pending',  date:'2025-05-05' },
+  { id:109, text:'Binary search time complexity?',             stream:'BUET',    subject:'CS',        diff:'Medium', submittedBy:'Moderator B', status:'approved', date:'2025-05-05' },
+  { id:110, text:'What is photosynthesis?',                    stream:'SSC',     subject:'Biology',   diff:'Easy',   submittedBy:'Moderator C', status:'pending',  date:'2025-05-04' },
+])
+
+const filteredReviewQueue = computed(() => {
+  let list = reviewQueue.value
+  if (queueFilter.value !== 'all') list = list.filter(q => q.status === queueFilter.value)
+  if (queueStream.value !== 'All') list = list.filter(q => q.stream === queueStream.value)
+  if (queueSearch.value) { const s = queueSearch.value.toLowerCase(); list = list.filter(q => q.text.toLowerCase().includes(s)) }
+  return list
+})
+
+function adminApproveQ(q) {
+  q.status = 'approved'
+  showToast('Question approved and published.')
+}
+function adminRejectQ(q) {
+  q.status = 'rejected'
+  showToast('Question rejected.', 'error')
+}
+
 // ─── Questions tab ────────────────────────────────────────────
 const qSearch = ref('')
 const qStream = ref('All')
@@ -284,7 +319,7 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
       v-if="mobileDrawerOpen"
       class="mobile-backdrop"
       @click="mobileDrawerOpen = false"
-    />
+    ></div>
 
     <!-- ── Main content ─────────────────────────────────────── -->
     <div class="admin-main">
@@ -522,7 +557,8 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                 <button class="act-btn ban" @click="deleteQuestion(q)" title="Delete">✕</button>
               </div>
             </div>
-          </div></div><!-- /table-scroll -->
+          </div>
+          </div><!-- /table-scroll -->
           <div class="dt-footer mono">{{ filteredQuestions.length }} questions</div>
         </div>
       </div>
@@ -577,8 +613,78 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
               <span class="mono dim">{{ r.date }}</span>
               <span class="status-badge" :class="r.status">{{ r.status }}</span>
             </div>
-          </div>
         </div></div><!-- /table-scroll -->
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           REVIEW QUEUE TAB
+      ══════════════════════════════════════════════════════ -->
+      <div v-if="activeTab === 'queue'" class="tab-body">
+
+        <div class="page-header">
+          <div class="header-left">
+            <div class="page-chip"><span class="chip-dot" /> Review Queue</div>
+            <h1 class="page-title">Moderator Submissions.<br><span class="text-outline">Approve or Reject.</span></h1>
+            <p class="page-sub">Review questions submitted by moderators — including mod-fixed reported questions — then publish or reject them.</p>
+          </div>
+          <div class="header-right">
+            <div class="header-stat-card">
+              <span class="hsc-label">Pending Review</span>
+              <span class="hsc-value">{{ reviewQueue.filter(q=>q.status==='pending'||q.status==='fixed').length }}</span>
+              <div class="hsc-row"><span class="hsc-meta">{{ reviewQueue.filter(q=>q.status==='approved').length }} approved · {{ reviewQueue.filter(q=>q.status==='rejected').length }} rejected</span></div>
+              <div class="hsc-bar-wrap"><div class="hsc-bar-fill" :style="{width:(reviewQueue.filter(q=>q.status==='pending'||q.status==='fixed').length/reviewQueue.length*100)+'%'}" /></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="filter-bar">
+          <div class="fb-search">
+            <span class="fb-icon">⌕</span>
+            <input v-model="queueSearch" class="fb-input" placeholder="Search questions…" />
+            <button v-if="queueSearch" class="fb-clear" @click="queueSearch=''">×</button>
+          </div>
+          <div class="fb-pills">
+            <button v-for="f in ['all','pending','fixed','approved','rejected']" :key="f"
+              class="pill" :class="{active:queueFilter===f}" @click="queueFilter=f">
+              {{ f === 'fixed' ? 'Mod-Fixed' : f.charAt(0).toUpperCase()+f.slice(1) }}
+            </button>
+          </div>
+          <div class="fb-pills">
+            <button v-for="s in ['All','SSC','HSC','BUET','Medical','DU','BCS','Bank']" :key="s"
+              class="pill" :class="{active:queueStream===s}" @click="queueStream=s">{{ s }}</button>
+          </div>
+          <div class="fb-meta">{{ filteredReviewQueue.length }} questions</div>
+        </div>
+
+        <div class="queue-cards">
+          <div class="queue-card" v-for="q in filteredReviewQueue" :key="q.id" :class="'qcard-'+q.status">
+            <div class="qcard-top">
+              <div class="qcard-meta">
+                <span class="stream-tag">{{ q.stream }}</span>
+                <span class="mono dim">{{ q.subject }}</span>
+                <span class="diff-badge" :class="diffClass(q.diff)">{{ q.diff }}</span>
+                <span v-if="q.status==='fixed'" class="fixed-tag">✎ Mod-Fixed</span>
+              </div>
+              <span class="status-badge" :class="q.status==='fixed'?'pending':q.status">
+                {{ q.status === 'fixed' ? 'pending (fixed)' : q.status }}
+              </span>
+            </div>
+            <p class="qcard-text">{{ q.text }}</p>
+            <div class="qcard-footer">
+              <span class="qcard-by mono dim">Submitted by {{ q.submittedBy }} · {{ q.date }}</span>
+              <span v-if="q.note" class="qcard-note">Note: {{ q.note }}</span>
+              <div class="qcard-actions" v-if="q.status==='pending'||q.status==='fixed'">
+                <button class="iso-btn iso-btn--ghost qact-btn approve-btn" @click="adminApproveQ(q)">✓ Approve & Publish</button>
+                <button class="iso-btn iso-btn--ghost qact-btn reject-btn"  @click="openModal('adminRejectQ', q)">✕ Reject</button>
+              </div>
+              <div v-else class="qcard-done">
+                <span class="status-badge" :class="q.status">{{ q.status }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-if="!filteredReviewQueue.length" class="empty-panel">No questions match this filter.</div>
+        </div>
       </div>
 
       <!-- ═══════════════════════════════════════════════════
@@ -841,6 +947,32 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
             </div>
           </template>
 
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Admin Reject Queue Question Modal -->
+    <Teleport to="body">
+      <div class="modal-overlay" v-if="modal.show && modal.type==='adminRejectQ'" @click.self="closeModal()">
+        <div class="modal-box">
+          <div class="modal-head">
+            <span class="panel-title">REJECT QUESTION</span>
+            <button class="modal-close" @click="closeModal()">×</button>
+          </div>
+          <div class="modal-form">
+            <div class="mf-group">
+              <label class="mf-label">QUESTION</label>
+              <span style="font-size:0.82rem;color:var(--white);line-height:1.4">{{ modal.data?.text }}</span>
+            </div>
+            <div class="mf-group">
+              <label class="mf-label">REJECTION REASON (sent to moderator)</label>
+              <textarea class="mf-input mf-textarea" rows="3" placeholder="E.g. Answer key is incorrect, duplicate, out of scope…"></textarea>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="iso-btn iso-btn--ghost" @click="closeModal()">Cancel</button>
+            <button class="iso-btn iso-btn--fill"  @click="adminRejectQ(modal.data); closeModal()">Confirm Reject</button>
+          </div>
         </div>
       </div>
     </Teleport>
@@ -1270,6 +1402,37 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
 .toast-slide-enter-active, .toast-slide-leave-active { transition: all 0.25s ease; }
 .toast-slide-enter-from { transform: translateX(20px); opacity: 0; }
 .toast-slide-leave-to   { transform: translateX(20px); opacity: 0; }
+
+.queue-cards { display: flex; flex-direction: column; gap: 12px; }
+.queue-card {
+  border: 1px solid var(--border); background: rgba(240,240,234,0.02);
+  padding: 16px 18px; transition: border-color 0.15s;
+  box-shadow: 4px 4px 0 0 rgba(240,240,234,0.03);
+}
+.queue-card:hover  { border-color: var(--border-bright); }
+.qcard-pending     { border-left: 2px solid rgba(255,200,80,0.5); }
+.qcard-fixed       { border-left: 2px solid rgba(120,200,255,0.5); }
+.qcard-approved    { border-left: 2px solid rgba(120,230,120,0.4); }
+.qcard-rejected    { border-left: 2px solid rgba(255,100,100,0.3); opacity: 0.7; }
+.qcard-top    { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.qcard-meta   { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.qcard-text   { font-family: var(--font-sans); font-size: 0.9rem; color: var(--white); margin-bottom: 12px; line-height: 1.4; }
+.qcard-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.qcard-by     { font-size: 0.68rem; }
+.qcard-note   { font-size: 0.72rem; color: rgba(255,100,100,0.8); font-style: italic; }
+.qcard-actions{ display: flex; gap: 8px; }
+.qcard-done   { display: flex; align-items: center; }
+.qact-btn     { font-size: 0.68rem !important; padding: 6px 14px !important; }
+.approve-btn:hover { border-color: rgba(120,230,120,0.5) !important; color: rgba(120,230,120,0.9) !important; }
+.reject-btn:hover  { border-color: rgba(255,100,100,0.5) !important; color: rgba(255,100,100,0.9) !important; }
+.fixed-tag {
+  font-family: var(--font-mono); font-size: 0.58rem; padding: 2px 7px;
+  border: 1px solid rgba(120,200,255,0.3); color: rgba(120,200,255,0.8); background: rgba(120,200,255,0.06);
+}
+.empty-panel {
+  padding: 2rem; text-align: center; border: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: 0.72rem; color: var(--gray);
+}
 
 /* ═══════════════════════════════════════════════════════════════
    RESPONSIVE
