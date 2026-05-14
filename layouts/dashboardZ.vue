@@ -1,21 +1,14 @@
 <template>
   <div class="dash-shell">
     <!-- Sidebar -->
-    <DashboardDashSidebar
-      :collapsed="sidebarCollapsed"
-      :mobile-open="mobileMenuOpen"
-      @toggle="sidebarCollapsed = !sidebarCollapsed"
-      @close-mobile="mobileMenuOpen = false"
-    />
+    <DashboardDashSidebar :collapsed="sidebarCollapsed" @toggle="sidebarCollapsed = !sidebarCollapsed" />
 
     <!-- Mobile overlay -->
-    <Transition name="overlay-fade">
-      <div
-        v-if="mobileMenuOpen"
-        class="mobile-overlay"
-        @click="mobileMenuOpen = false"
-      />
-    </Transition>
+    <div
+      v-if="mobileMenuOpen"
+      class="mobile-overlay"
+      @click="mobileMenuOpen = false"
+    />
 
     <!-- Main content -->
     <div class="dash-main" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
@@ -84,13 +77,9 @@ const streak = ref(14)
   backdrop-filter: blur(2px);
 }
 
-.overlay-fade-enter-active,
-.overlay-fade-leave-active { transition: opacity 0.28s ease; }
-.overlay-fade-enter-from,
-.overlay-fade-leave-to     { opacity: 0; }
-
 @media (max-width: 768px) {
-  .dash-main { margin-left: 0 !important; }
+  .dash-main { margin-left: 0; }
+  .dash-main.sidebar-collapsed { margin-left: 0; }
   .dash-content { padding: 1.2rem; }
 }
 </style>

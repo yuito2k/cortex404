@@ -1,5 +1,5 @@
 <template>
-  <aside class="sidebar" :class="{ collapsed: collapsed, 'mobile-open': mobileOpen }">
+  <aside class="sidebar" :class="{ collapsed: collapsed }">
     <!-- Logo -->
     <NuxtLink to="/" class="sidebar-logo">
       <span class="logo-full">CORTEX<span class="gray">404</span></span>
@@ -23,7 +23,6 @@
         :to="item.to"
         class="nav-item"
         :class="{ active: route.path === item.to }"
-        @click="$emit('closeMobile')"
       >
         <span class="nav-icon" v-html="item.icon" />
         <span class="nav-label">{{ item.label }}</span>
@@ -33,7 +32,7 @@
       <div class="nav-divider" />
       <div class="nav-section-label" v-if="!collapsed">Account</div>
 
-      <NuxtLink to="/dashboard/settings" class="nav-item" :class="{ active: route.path === '/dashboard/settings' }" @click="$emit('closeMobile')">
+      <NuxtLink to="/dashboard/settings" class="nav-item" :class="{ active: route.path === '/dashboard/settings' }">
         <span class="nav-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </span>
@@ -66,8 +65,8 @@
 
 <script setup lang="ts">
 const { t, ta, isBn } = useI18n()
-defineProps<{ collapsed: boolean; mobileOpen?: boolean }>()
-defineEmits(['toggle', 'closeMobile'])
+defineProps<{ collapsed: boolean }>()
+defineEmits(['toggle'])
 
 const route = useRoute()
 const { user, signOut } = useAuth()
@@ -100,43 +99,6 @@ async function handleSignOut() {
   overflow: hidden;
 }
 .sidebar.collapsed { width: 64px; }
-
-/* ── Tablet ≤ 1024px ─────────────────────────────────────────── */
-@media (max-width: 1024px) {
-  .sidebar.collapsed { width: 64px; }
-  .sidebar:not(.collapsed) { width: 240px; }
-  .sidebar:not(.collapsed) .logo-full          { display: inline; }
-  .sidebar:not(.collapsed) .logo-short         { display: none; }
-  .sidebar:not(.collapsed) .nav-label          { display: block; }
-  .sidebar:not(.collapsed) .nav-badge          { display: inline-block; }
-  .sidebar:not(.collapsed) .nav-section-label  { display: block; }
-  .sidebar:not(.collapsed) .user-info          { display: flex; }
-  .sidebar:not(.collapsed) .signout-btn        { display: flex; }
-  .collapse-btn { display: flex; }
-}
-
-/* ── Mobile ≤ 768px: slide-in overlay drawer ─────────────────── */
-@media (max-width: 768px) {
-  .sidebar {
-    width: 260px !important;
-    transform: translateX(-100%);
-    transition: transform 0.28s ease;
-    box-shadow: none;
-  }
-  .sidebar.mobile-open {
-    transform: translateX(0);
-    box-shadow: 6px 0 32px rgba(0,0,0,0.7);
-  }
-  /* Restore all labels inside the open drawer */
-  .sidebar.mobile-open .logo-full          { display: inline !important; }
-  .sidebar.mobile-open .logo-short         { display: none !important; }
-  .sidebar.mobile-open .nav-label          { display: block !important; }
-  .sidebar.mobile-open .nav-badge          { display: inline-block !important; }
-  .sidebar.mobile-open .nav-section-label  { display: block !important; }
-  .sidebar.mobile-open .user-info          { display: flex !important; }
-  .sidebar.mobile-open .signout-btn        { display: flex !important; }
-  .collapse-btn { display: none; }
-}
 
 .sidebar-logo {
   display: flex;
