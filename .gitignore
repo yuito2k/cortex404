@@ -12,6 +12,12 @@ node_modules
 # Bun
 bun.lockb
 
+# Supabase
+.temp/
+.supabase/
+.env.local
+.env.local.bak
+
 # Logs
 *.log
 

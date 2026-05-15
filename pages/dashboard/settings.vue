@@ -888,11 +888,17 @@ async function signOutAllSessions() {
 // ── Delete account ─────────────────────────────────────────
 async function deleteAccount() {
   if (deleteConfirmText.value !== 'DELETE') return
-  // In production: call a Supabase Edge Function that deletes the user
-  // For now, sign them out and show message
-  showToast('Account deletion requested. You have been signed out.', 'error')
-  setTimeout(async () => { await signOut() }, 2000)
+  
+  const { error } = await supabase.functions.invoke('delete-account')
+
+  if (error) {
+    showToast('Failed to delete account: ' + error.message, 'error')
+    return
+  }
+
+  showToast('Account deleted.', 'error')
   showDeleteConfirm.value = false
+  await navigateTo('/auth/login')
 }
 
 // ── Load profile from Supabase on mount ───────────────────
