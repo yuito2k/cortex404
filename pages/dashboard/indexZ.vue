@@ -114,7 +114,7 @@ onMounted(fetchDashboard)
 </script>
 
 <style scoped>
-.overview { display: flex; flex-direction: column; gap: 1.5rem; width: 100%; min-width: 0; overflow-x: hidden; }
+.overview { display: flex; flex-direction: column; gap: 1.5rem; }
 
 /* Welcome banner */
 .welcome-banner {
@@ -127,9 +127,8 @@ onMounted(fetchDashboard)
   background: #0d0d0d;
   position: relative;
   overflow: hidden;
+  /* Iso depth */
   box-shadow: 4px 4px 0 0 rgba(240,240,234,0.04);
-  min-width: 0;
-  box-sizing: border-box;
 }
 
 /* Faint CORTEX404 watermark */
@@ -182,13 +181,11 @@ onMounted(fetchDashboard)
   grid-template-columns: 1fr 380px;
   gap: 1.5rem;
   align-items: start;
-  min-width: 0;
 }
 
 .col-left,
 .col-right {
   display: flex; flex-direction: column; gap: 1.5rem;
-  min-width: 0;
 }
 
 /* Skeleton loaders */
@@ -202,7 +199,6 @@ onMounted(fetchDashboard)
 }
 .skeleton-grid {
   display: grid; grid-template-columns: 1fr 380px; gap: 1.5rem;
-  min-width: 0;
 }
 .skeleton-tall {
   height: 300px; background: #0d0d0d;
@@ -228,21 +224,13 @@ onMounted(fetchDashboard)
 
 @media (max-width: 1100px) {
   .dash-grid { grid-template-columns: 1fr; }
-  .skeleton-grid { grid-template-columns: 1fr; }
   .col-right { order: -1; }
 }
 @media (max-width: 700px) {
-  .welcome-banner { flex-direction: column; align-items: flex-start; padding: 1.4rem; }
+  .welcome-banner { flex-direction: column; align-items: flex-start; }
   .welcome-right { width: 100%; }
   .welcome-right .iso-btn { flex: 1; text-align: center; }
   .skeleton-row { grid-template-columns: repeat(2, 1fr); }
   .skeleton-grid { grid-template-columns: 1fr; }
-}
-@media (max-width: 480px) {
-  .welcome-banner { padding: 1.2rem; gap: 1.2rem; }
-  .welcome-title { font-size: 1.4rem; }
-  .welcome-right { flex-direction: column; }
-  .welcome-right .iso-btn { width: 100%; justify-content: center; }
-  .skeleton-row { grid-template-columns: repeat(2, 1fr); }
 }
 </style>

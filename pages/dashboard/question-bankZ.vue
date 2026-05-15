@@ -1173,7 +1173,7 @@ onMounted(async () => {
 
 <style scoped>
 /* ── Page layout ─────────────────────────────────────────── */
-.qbank { display: flex; flex-direction: column; gap: 1.5rem; width: 100%; min-width: 0; overflow-x: hidden; }
+.qbank { display: flex; flex-direction: column; gap: 1.5rem; }
 
 /* ── Header ──────────────────────────────────────────────── */
 .qbank-header {
@@ -1232,7 +1232,6 @@ onMounted(async () => {
   box-shadow: 4px 4px 0 0 rgba(240,240,234,0.04);
   flex-shrink: 0;
   position: relative;
-  flex-wrap: wrap;
 }
 
 .hstat {
@@ -1258,7 +1257,6 @@ onMounted(async () => {
   border: 1px solid var(--border);
   background: #0a0a0a;
   box-shadow: 4px 4px 0 0 rgba(240,240,234,0.04);
-  min-width: 0; overflow-x: hidden;
 }
 
 .filter-search {
@@ -1292,7 +1290,6 @@ onMounted(async () => {
 .filters-row {
   display: flex; flex-wrap: wrap; gap: 0;
   border-bottom: 1px solid var(--border);
-  min-width: 0; overflow-x: hidden;
 }
 
 .filter-group {
@@ -1732,33 +1729,11 @@ onMounted(async () => {
 
 @media (max-width: 768px) {
   .qbank-header { flex-direction: column; align-items: flex-start; }
-  .header-stats { width: 100%; box-sizing: border-box; }
-  .hstat { flex: 1; min-width: 80px; box-sizing: border-box; }
+  .header-stats { width: 100%; }
+  .hstat { flex: 1; }
   .filters-row { flex-direction: column; }
-  .filter-group { border-right: none; border-bottom: 1px solid var(--border); width: 100%; box-sizing: border-box; }
+  .filter-group { border-right: none; border-bottom: 1px solid var(--border); }
   .filter-group:last-child { border-bottom: none; }
   .qbank-sidebar { grid-template-columns: 1fr; }
-}
-
-@media (max-width: 480px) {
-  .qbank-header { padding: 1.2rem; }
-  .page-title { font-size: 1.4rem; }
-  .header-stats { flex-wrap: wrap; overflow-x: hidden; }
-  .hstat { padding: 0.8rem 1rem; min-width: 70px; }
-  .hstat-value { font-size: 1.1rem; }
-  .filter-pills { flex-wrap: wrap; }
-  .filter-pill { font-size: 0.6rem; padding: 4px 9px; }
-  .qcard-header { flex-wrap: wrap; padding: 10px 1rem 0; gap: 6px; }
-  .qcard-meta { flex-wrap: wrap; gap: 5px; }
-  .qcard-body { padding: 8px 1rem 12px; }
-  .qcard-expanded { padding: 1rem; }
-  .option-btn { padding: 9px 12px; }
-  .q-subject-tag, .q-chapter-tag { display: none; }
-  .search-input { font-size: 0.82rem !important; }
-  .filter-status { padding: 0.6rem 1rem; }
-  .side-panel { overflow-x: hidden; }
-  .qbank-sidebar { grid-template-columns: 1fr; }
-  .pagination { gap: 5px; padding: 1rem; }
-  .page-btn { font-size: 0.6rem !important; padding: 7px 10px !important; }
 }
 </style>

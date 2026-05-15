@@ -479,7 +479,7 @@ function masteryClass(pct: number) {
 
 <style scoped>
 /* ── Page ────────────────────────────────────────────────── */
-.progress-page { display: flex; flex-direction: column; gap: 1.5rem; width: 100%; min-width: 0; overflow-x: hidden; }
+.progress-page { display: flex; flex-direction: column; gap: 1.5rem; }
 
 /* ── Header ──────────────────────────────────────────────── */
 .page-header {
@@ -520,7 +520,6 @@ function masteryClass(pct: number) {
   display: flex; border: 1px solid var(--border);
   box-shadow: 4px 4px 0 0 rgba(240,240,234,0.04);
   flex-shrink: 0; position: relative;
-  flex-wrap: wrap;
 }
 .hstat {
   display: flex; flex-direction: column; gap: 3px;
@@ -789,13 +788,12 @@ function masteryClass(pct: number) {
 .snap-delta.down { color: rgba(255,100,100,0.8); }
 
 /* ── Heatmap ─────────────────────────────────────────────── */
-.heat-wrap { padding: 1.1rem 1.2rem 0.5rem; overflow-x: auto; }
+.heat-wrap { padding: 1.1rem 1.2rem 0.5rem; }
 .heatmap-grid {
   display: grid;
   grid-template-rows: repeat(7, 1fr);
   grid-auto-flow: column;
   gap: 3px; margin-bottom: 8px;
-  min-width: min-content;
 }
 .heat-cell {
   width: 11px; height: 11px;
@@ -889,31 +887,12 @@ function masteryClass(pct: number) {
 }
 @media (max-width: 768px) {
   .page-header { flex-direction: column; align-items: flex-start; }
-  .header-stats { width: 100%; flex-wrap: wrap; box-sizing: border-box; }
-  .hstat { flex: 1; min-width: 80px; box-sizing: border-box; }
+  .header-stats { width: 100%; }
   .mastery-grid { grid-template-columns: repeat(2, 1fr); }
   .col-side { grid-template-columns: 1fr; }
   .ht-header, .ht-row { grid-template-columns: 2fr 60px 80px 70px; }
   .ht-header span:nth-child(2), .ht-row .ht-subject,
   .ht-header span:nth-child(4), .ht-row .ht-qs { display: none; }
   .period-bar { flex-wrap: wrap; }
-}
-@media (max-width: 480px) {
-  .page-header { padding: 1.2rem; }
-  .page-title { font-size: 1.4rem; }
-  .header-stats { overflow-x: hidden; }
-  .hstat { padding: 0.8rem 1rem; min-width: 70px; }
-  .hstat-value { font-size: 1.1rem; }
-  .mastery-grid { grid-template-columns: 1fr; }
-  .mastery-card { padding: 1rem; }
-  .weak-row { flex-wrap: wrap; gap: 8px; }
-  .wr-center { width: 100%; order: 3; }
-  .wr-info { min-width: 0; }
-  .ht-header, .ht-row { grid-template-columns: 2fr 60px 70px; padding: 0.7rem 1rem; }
-  .ht-header span:nth-child(5), .ht-row .ht-date { display: none; }
-  .heatmap-grid { gap: 2px; }
-  .heat-cell { width: 9px; height: 9px; }
-  .chart-wrap { padding: 1rem 0.8rem 0.6rem; height: 200px; }
-  .panel { overflow-x: hidden; }
 }
 </style>

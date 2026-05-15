@@ -462,7 +462,7 @@ function entryStats(entry: Entry) {
 
 <style scoped>
 /* ── Page ────────────────────────────────────────────────── */
-.leaderboard-page { display: flex; flex-direction: column; gap: 1.5rem; width: 100%; min-width: 0; overflow-x: hidden; }
+.leaderboard-page { display: flex; flex-direction: column; gap: 1.5rem; }
 
 /* ── Header ──────────────────────────────────────────────── */
 .page-header {
@@ -522,12 +522,10 @@ function entryStats(entry: Entry) {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0;
   border: 1px solid var(--border); background: #0a0a0a;
   box-shadow: 4px 4px 0 0 rgba(240,240,234,0.04);
-  min-width: 0; overflow-x: hidden;
 }
 .filter-group {
   display: flex; align-items: center; gap: 10px;
   padding: 0.8rem 1.2rem; border-right: 1px solid var(--border);
-  min-width: 0;
 }
 .filter-label {
   font-family: var(--font-mono); font-size: 0.58rem;
@@ -849,10 +847,9 @@ function entryStats(entry: Entry) {
 }
 @media (max-width: 768px) {
   .page-header { flex-direction: column; align-items: flex-start; }
-  .your-rank-card { width: 100%; box-sizing: border-box; }
+  .your-rank-card { width: 100%; }
   .filter-bar { flex-direction: column; align-items: flex-start; }
-  .filter-group { border-right: none; border-bottom: 1px solid var(--border); width: 100%; box-sizing: border-box; }
-  .filter-search { flex: 1; min-width: 0; width: 100%; box-sizing: border-box; }
+  .filter-group { border-right: none; border-bottom: 1px solid var(--border); width: 100%; }
   .lb-sidebar { grid-template-columns: 1fr; }
   .podium { flex-direction: row; }
   .lb-table-header,
@@ -861,27 +858,5 @@ function entryStats(entry: Entry) {
   .lb-table-header span:nth-child(5),
   .lr-stream, .lr-exams { display: none; }
   .modal-stats { grid-template-columns: repeat(2, 1fr); }
-  .modal-box { max-width: 100%; box-sizing: border-box; }
-}
-@media (max-width: 480px) {
-  .leaderboard-page { overflow-x: hidden; }
-  .page-header { padding: 1.2rem; }
-  .page-title { font-size: 1.4rem; }
-  .filter-pills { flex-wrap: wrap; }
-  .podium-card { padding: 1rem 0.5rem; }
-  .pod-name { font-size: 0.62rem; }
-  .lb-table-header,
-  .lb-row { grid-template-columns: 36px 1fr 72px 58px; padding: 0.6rem 0.75rem; gap: 4px; }
-  .lb-table-header { font-size: 0.5rem; }
-  .lr-score { font-size: 0.72rem; }
-  .lr-change { font-size: 0.65rem; }
-  .your-rank-card { padding: 1rem 1.2rem; }
-  .yr-rank { font-size: 2rem; }
-  .side-panel { overflow-x: hidden; }
-  .climb-row { overflow-x: hidden; }
-  .cr-name { max-width: 100px; }
-  .modal-header { padding: 1rem; gap: 10px; }
-  .modal-rank-badge { font-size: 1rem; }
-  .modal-footer { padding: 1rem; flex-wrap: wrap; }
 }
 </style>
