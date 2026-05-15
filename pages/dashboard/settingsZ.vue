@@ -37,35 +37,11 @@
 
             <!-- Avatar row -->
             <div class="avatar-row">
-              <div class="avatar-display">
-                <img v-if="avatarUrl" :src="avatarUrl" alt="Profile picture" class="avatar-img" />
-                <template v-else>{{ userInitials }}</template>
-              </div>
+              <div class="avatar-display">{{ userInitials }}</div>
               <div class="avatar-info">
-                <span class="avatar-label">{{ avatarUrl ? 'Profile Picture' : 'Profile Initials' }}</span>
-                <span class="avatar-sub">{{ avatarUrl ? 'Your uploaded profile picture.' : 'Auto-generated from your full name.' }}</span>
+                <span class="avatar-label">Profile Initials</span>
+                <span class="avatar-sub">Auto-generated from your full name.</span>
               </div>
-            </div>
-
-            <!-- Avatar upload -->
-            <div class="avatar-upload-row">
-              <label class="avatar-upload-btn iso-btn iso-btn--ghost">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="13" height="13">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="17 8 12 3 7 8"/>
-                  <line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
-                {{ uploadingAvatar ? 'Uploading…' : 'Upload Photo' }}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif"
-                  style="display:none"
-                  :disabled="uploadingAvatar"
-                  @change="uploadAvatar"
-                />
-              </label>
-              <button v-if="avatarUrl" class="iso-btn iso-btn--ghost danger-btn" :disabled="uploadingAvatar" @click="removeAvatar">Remove</button>
-              <span class="form-hint" style="margin:0">PNG, JPG, WEBP or GIF · max 2 MB</span>
             </div>
 
             <div class="form-divider" />
@@ -373,7 +349,7 @@
             <div v-if="notifPrefs.dailyReminder" class="reminder-time">
               <label class="form-label">Reminder Time</label>
               <div class="select-wrap narrow">
-                <select v-model="notifPrefs.reminderTime" class="form-input form-select">
+                <select v-model="reminderTime" class="form-input form-select">
                   <option v-for="t in reminderTimes" :key="t" :value="t">{{ t }}</option>
                 </select>
                 <span class="select-arrow">▾</span>
@@ -638,9 +614,6 @@ const userInitials = computed(() =>
   userName.value.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'ME'
 )
 
-const avatarUrl       = ref<string | null>(null)
-const uploadingAvatar = ref(false)
-
 // ── Tabs ───────────────────────────────────────────────────
 const activeTab = ref('profile')
 const tabs = [
@@ -703,8 +676,6 @@ const sessions = ref([
     icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>` },
 ])
 
-const reminderTimes = ['06:00 AM','07:00 AM','08:00 AM','09:00 AM','10:00 AM','12:00 PM','06:00 PM','08:00 PM','10:00 PM']
-
 // ── Notification state ─────────────────────────────────────
 const notifPrefs = reactive<Record<string, boolean>>({
   examResults:    true,
@@ -715,8 +686,9 @@ const notifPrefs = reactive<Record<string, boolean>>({
   leaderboard:    false,
   dailyReminder:  true,
   announcements:  true,
-  reminderTime:   '08:00 AM',
 })
+const reminderTime = ref('08:00 AM')
+const reminderTimes = ['06:00 AM','07:00 AM','08:00 AM','09:00 AM','10:00 AM','12:00 PM','06:00 PM','08:00 PM','10:00 PM']
 
 const emailNotifs = [
   { id: 'examResults',   label: 'Exam Results',      desc: 'Get emailed when your exam is graded.' },
@@ -813,14 +785,14 @@ async function saveProfile() {
     if (error) throw error
 
     // Also upsert profiles table if it exists
-    await supabase.from('profiles').update({
-      full_name:    profile.fullName.trim(),
+    await supabase.from('profiles').upsert({
+      user_id:      user.value!.id,
       display_name: profile.displayName.trim(),
       bio:          profile.bio,
-      primary_stream:       profile.stream,
+      stream:       profile.stream,
       institution:  profile.institution,
       district:     profile.district,
-    }).eq('user_id', user.value!.id)
+    }, { onConflict: 'user_id' }).then(() => {})
 
     flashSaved('profile')
     showToast('Profile updated successfully.')
@@ -870,18 +842,10 @@ async function changePassword() {
 // ── Notifications save ─────────────────────────────────────
 async function saveNotifs() {
   saving.notifs = true
-  try {
-    await supabase.from('profiles').upsert({
-      user_id:     user.value!.id,
-      notification_prefs:  JSON.stringify(notifPrefs),
-    }, { onConflict: 'user_id' }).then(() => {})
-    flashSaved('notifs')
-    showToast('Notification preferences saved.')
-  } catch {
-    showToast('Failed to save notification preferences.', 'error')
-  } finally {
-    saving.notifs = false
-  }
+  await new Promise(r => setTimeout(r, 600)) // Simulate save — wire to profiles table
+  flashSaved('notifs')
+  showToast('Notification preferences saved.')
+  saving.notifs = false
 }
 
 // ── Exam prefs save ────────────────────────────────────────
@@ -935,69 +899,6 @@ async function deleteAccount() {
   showDeleteConfirm.value = false
 }
 
-// ── Avatar upload / remove ─────────────────────────────────
-async function uploadAvatar(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  if (!file || !user.value) return
-
-  if (file.size > 2 * 1024 * 1024) {
-    showToast('Image must be under 2 MB.', 'error')
-    return
-  }
-
-  uploadingAvatar.value = true
-  try {
-    const ext  = file.name.split('.').pop()
-    const path = `${user.value.id}/avatar.${ext}`
-
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(path, file, { upsert: true, contentType: file.type })
-
-    if (uploadError) throw uploadError
-
-    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
-    const publicUrl = urlData.publicUrl + `?t=${Date.now()}`
-
-    await supabase.from('profiles').upsert(
-      { user_id: user.value.id, avatar_url: publicUrl },
-      { onConflict: 'user_id' }
-    )
-
-    avatarUrl.value = publicUrl
-    showToast('Profile picture updated.')
-  } catch (e: any) {
-    showToast(e?.message ?? 'Failed to upload image.', 'error')
-  } finally {
-    uploadingAvatar.value = false
-    ;(event.target as HTMLInputElement).value = ''
-  }
-}
-
-async function removeAvatar() {
-  if (!user.value || !avatarUrl.value) return
-  uploadingAvatar.value = true
-  try {
-    // Derive storage path from URL (last two segments: userId/avatar.ext)
-    const url   = new URL(avatarUrl.value)
-    const parts = url.pathname.split('/')
-    const path  = parts.slice(-2).join('/')
-
-    await supabase.storage.from('avatars').remove([path])
-    await supabase.from('profiles').upsert(
-      { user_id: user.value.id, avatar_url: null },
-      { onConflict: 'user_id' }
-    )
-
-    avatarUrl.value = null
-    showToast('Profile picture removed.')
-  } catch (e: any) {
-    showToast(e?.message ?? 'Failed to remove image.', 'error')
-  } finally {
-    uploadingAvatar.value = false
-  }
-}
-
 // ── Load profile from Supabase on mount ───────────────────
 onMounted(async () => {
   if (!user.value) return
@@ -1008,24 +909,15 @@ onMounted(async () => {
   profile.institution = user.value.user_metadata?.institution ?? ''
   profile.district    = user.value.user_metadata?.district ?? ''
 
-  const { data: { session } } = await supabase.auth.getSession()
-
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('profiles')
-    .select('exam_prefs, notification_prefs, avatar_url')
-    .eq('user_id', user.value?.id)
-    .maybeSingle()
-
-  if (data?.avatar_url) avatarUrl.value = data.avatar_url
+    .select('exam_prefs')
+    .eq('user_id', user.value.id)
+    .single()
 
   if (data?.exam_prefs) {
     try {
       Object.assign(examPrefs, JSON.parse(data.exam_prefs))
-    } catch {}
-  }
-  if (data?.notification_prefs) {
-    try {
-      Object.assign(notifPrefs, JSON.parse(data.notification_prefs))
     } catch {}
   }
 })
@@ -1127,13 +1019,6 @@ onMounted(async () => {
 .avatar-info { display: flex; flex-direction: column; gap: 4px; }
 .avatar-label { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700; color: var(--white); }
 .avatar-sub   { font-size: 0.72rem; color: var(--gray); }
-.avatar-img   { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 50%; }
-.avatar-upload-row {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  padding: 0.7rem 0.9rem;
-  border: 1px solid var(--border); background: #0a0a0a;
-}
-.avatar-upload-btn { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 
 /* ── Form elements ───────────────────────────────────────── */
 .form-group { display: flex; flex-direction: column; gap: 7px; }

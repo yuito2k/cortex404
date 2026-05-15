@@ -29,7 +29,7 @@
         >{{ p.label }}</button>
       </div>
       <div class="period-right">
-        <span class="updated-at">{{ loading ? 'Loading…' : 'Updated just now' }}</span>
+        <span class="updated-at">Updated just now</span>
       </div>
     </div>
 
@@ -242,12 +242,12 @@
             </div>
             <div class="sr-divider" />
             <div class="sr-stat">
-              <span class="sr-val">{{ longestStreak }}</span>
+              <span class="sr-val">22</span>
               <span class="sr-label">Best</span>
             </div>
             <div class="sr-divider" />
             <div class="sr-stat">
-              <span class="sr-val">{{ totalActiveDays }}</span>
+              <span class="sr-val">51</span>
               <span class="sr-label">Total Days</span>
             </div>
           </div>
@@ -317,7 +317,7 @@
               </span>
               <div class="ns-text">
                 <span class="ns-title">View Leaderboard</span>
-                <span class="ns-sub">{{ userRank ? `You're ranked #${userRank}` : 'See how you rank' }}</span>
+                <span class="ns-sub">You're ranked #142</span>
               </div>
               <span class="ns-arrow">→</span>
             </NuxtLink>
@@ -332,363 +332,130 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'auth', layout: 'dashboard' })
 
-// ── Setup ─────────────────────────────────────────────────────
-const supabase = useSupabaseClient()
-const user     = useSupabaseUser()
-
-const loading       = ref(true)
-const period        = ref('30d')
+const period = ref('30d')
 const historyFilter = ref('All')
-const hoveredBar    = ref<number | null>(null)
+const hoveredBar = ref<number | null>(null)
+const currentStreak = ref(14)
 
 const periods = [
-  { val: '7d',  label: '7 Days'    },
-  { val: '30d', label: '30 Days'   },
-  { val: '3m',  label: '3 Months'  },
-  { val: 'all', label: 'All Time'  },
+  { val: '7d',  label: '7 Days' },
+  { val: '30d', label: '30 Days' },
+  { val: '3m',  label: '3 Months' },
+  { val: 'all', label: 'All Time' },
 ]
 
-// ── Raw state (populated from DB) ────────────────────────────
-const allSessions      = ref<any[]>([])   // exam_sessions rows for trend + history
-const allResults       = ref<any[]>([])   // exam_results rows (for history table)
-const subjectMastery   = ref<any[]>([])   // subject_mastery rows
-const weakTopics       = ref<any[]>([])   // topic_mastery rows (low mastery)
-const activityMap      = ref<Record<string, number>>({})  // date → questions_answered
-const currentStreak    = ref(0)
-const longestStreak    = ref(0)
-const totalActiveDays  = ref(0)
-const userRank         = ref(0)
+// ── Demo data ──────────────────────────────────────────────
 
-// ── Helpers ───────────────────────────────────────────────────
-/** Read English value from a bilingual JSONB field safely. */
-const eng = (field: any, fallback = ''): string => {
-  if (!field) return fallback
-  if (typeof field === 'string') return field
-  return field?.english ?? fallback
-}
-
-const formatCount = (n: number) =>
-  n >= 1000 ? (n / 1000).toFixed(1) + 'K' : String(n)
-
-/** Returns the start-of-day UTC timestamp for `daysAgo` days before now. */
-const daysAgoIso = (daysAgo: number) => {
-  const d = new Date()
-  d.setDate(d.getDate() - daysAgo)
-  d.setHours(0, 0, 0, 0)
-  return d.toISOString()
-}
-
-/** Format a date string as "Apr 23" */
-const fmtDate = (iso: string) => {
-  const d = new Date(iso)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-/** Format a date string as "4/23" */
-const fmtShortDate = (iso: string) => {
-  const d = new Date(iso)
-  return `${d.getMonth() + 1}/${d.getDate()}`
-}
-
-// ── Period → date filter ──────────────────────────────────────
-const periodCutoff = computed((): string | null => {
-  if (period.value === '7d')  return daysAgoIso(7)
-  if (period.value === '30d') return daysAgoIso(30)
-  if (period.value === '3m')  return daysAgoIso(90)
-  return null  // 'all'
-})
-
-// ── Data fetching ─────────────────────────────────────────────
-const fetchAll = async () => {
-  if (!user.value) return
-  loading.value = true
-
-  await Promise.all([
-    fetchSessions(),
-    fetchResults(),
-    fetchSubjectMastery(),
-    fetchWeakTopics(),
-    fetchStreakAndActivity(),
-    fetchUserRank(),
-  ])
-
-  loading.value = false
-}
-
-// exam_sessions — used for score trend chart (has completed_at + subject JSONB)
-const fetchSessions = async () => {
-  const { data } = await supabase
-    .from('exam_sessions')
-    .select('id, subject, stream, score, exam_type, questions_count, correct_count, wrong_count, skipped_count, completed_at')
-    .eq('user_id', user.value!.id)
-    .order('completed_at', { ascending: false })
-    .limit(100)
-
-  allSessions.value = data ?? []
-}
-
-// exam_results — used for the history table (has title + status)
-const fetchResults = async () => {
-  const { data } = await supabase
-    .from('exam_results')
-    .select('id, title, subject, score, questions_count, correct_count, wrong_count, skipped_count, exam_type, status, difficulty_breakdown, created_at')
-    .eq('user_id', user.value!.id)
-    .order('created_at', { ascending: false })
-    .limit(200)
-
-  allResults.value = data ?? []
-}
-
-// subject_mastery — one row per subject
-const fetchSubjectMastery = async () => {
-  const { data } = await supabase
-    .from('subject_mastery')
-    .select('subject, stream, mastery_percent, exams_count, question_count, correct_count, trend')
-    .eq('user_id', user.value!.id)
-    .order('mastery_percent', { ascending: false })
-
-  subjectMastery.value = (data ?? []).map(s => ({
-    name:      eng(s.subject, 'General'),
-    stream:    s.stream,
-    mastery:   s.mastery_percent,
-    exams:     s.exams_count,
-    questions: s.question_count,
-    trend:     s.trend ?? 0,
-    icon:      subjectIcon(eng(s.subject, '')),
-  }))
-}
-
-// topic_mastery — weak = lowest mastery percent
-const fetchWeakTopics = async () => {
-  const { data } = await supabase
-    .from('topic_mastery')
-    .select('topic, subject, stream, mastery_percent, question_count')
-    .eq('user_id', user.value!.id)
-    .order('mastery_percent', { ascending: true })
-    .limit(8)
-
-  weakTopics.value = (data ?? []).map(t => ({
-    name:    eng(t.topic, 'General'),
-    subject: `${eng(t.subject)} · ${t.stream}`,
-    mastery: t.mastery_percent,
-  }))
-}
-
-// profiles (streak) + daily_activity (heatmap)
-const fetchStreakAndActivity = async () => {
-  const uid = user.value!.id
-
-  const [{ data: profile }, { data: activity }] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('streak, longest_streak')
-      .eq('user_id', uid)
-      .single(),
-    supabase
-      .from('daily_activity')
-      .select('date, questions_answered')
-      .eq('user_id', uid)
-      .order('date', { ascending: false })
-      .limit(365),
-  ])
-
-  currentStreak.value  = profile?.streak          ?? 0
-  longestStreak.value  = profile?.longest_streak  ?? 0
-
-  const map: Record<string, number> = {}
-  let activeDays = 0
-  ;(activity ?? []).forEach(a => {
-    const key = typeof a.date === 'string' ? a.date : new Date(a.date).toISOString().slice(0, 10)
-    map[key] = a.questions_answered
-    if (a.questions_answered > 0) activeDays++
-  })
-  activityMap.value     = map
-  totalActiveDays.value = activeDays
-}
-
-// leaderboard — user's own rank
-const fetchUserRank = async () => {
-  const { data } = await supabase
-    .from('leaderboard')
-    .select('rank')
-    .eq('user_id', user.value!.id)
-    .single()
-
-  userRank.value = data?.rank ?? 0
-}
-
-// ── Re-fetch when period changes ──────────────────────────────
-// (sessions are already fully loaded; computed filtering handles the rest)
-watch(() => user.value, (u) => { if (u) fetchAll() }, { immediate: true })
-
-// ── Score trend (filtered by period) ─────────────────────────
 const scoreTrend = computed(() => {
-  let rows = allSessions.value
-  if (periodCutoff.value) {
-    rows = rows.filter(r => new Date(r.completed_at) >= new Date(periodCutoff.value!))
-  }
-  // Oldest → newest for chart left-to-right
-  return [...rows]
-    .sort((a, b) => new Date(a.completed_at).getTime() - new Date(b.completed_at).getTime())
-    .slice(-20)   // max 20 bars to avoid cramping
-    .map(r => ({
-      score:     r.score,
-      subject:   eng(r.subject, r.stream),
-      date:      fmtDate(r.completed_at),
-      shortDate: fmtShortDate(r.completed_at),
-    }))
-})
-
-const avgScore = computed(() => {
-  if (!scoreTrend.value.length) return 0
-  return Math.round(scoreTrend.value.reduce((s, e) => s + e.score, 0) / scoreTrend.value.length)
-})
-
-// ── Exam history table (filtered by period + type) ────────────
-const periodFilteredResults = computed(() => {
-  let rows = allResults.value
-  if (periodCutoff.value) {
-    rows = rows.filter(r => new Date(r.created_at) >= new Date(periodCutoff.value!))
-  }
-  return rows
-})
-
-const filteredHistory = computed(() => {
-  let rows = periodFilteredResults.value
-  if (historyFilter.value === 'Mock')     rows = rows.filter(r => r.exam_type === 'mock')
-  if (historyFilter.value === 'Practice') rows = rows.filter(r => r.exam_type === 'practice')
-  return rows.map(r => ({
-    id:        r.id,
-    title:     r.title ?? `${eng(r.subject)} ${examTypeLabel(r.exam_type)}`,
-    subject:   eng(r.subject),
-    score:     r.score,
-    questions: r.questions_count,
-    date:      fmtDate(r.created_at),
-    type:      r.exam_type === 'practice' ? 'Practice' : 'Mock',
-    status:    r.status ?? (r.score >= 50 ? 'passed' : 'failed'),
-  }))
-})
-
-// ── Header stats ──────────────────────────────────────────────
-const headerStats = computed(() => {
-  const rows    = periodFilteredResults.value
-  const avg     = rows.length
-    ? Math.round(rows.reduce((s, r) => s + r.score, 0) / rows.length)
-    : 0
-  const totalQs = rows.reduce((s, r) => s + (r.questions_count ?? 0), 0)
-
-  return [
-    { label: 'Avg Score',   value: avg + '%',             cls: 'high' },
-    { label: 'Exams Taken', value: rows.length,           cls: ''     },
-    { label: 'Questions',   value: formatCount(totalQs),  cls: ''     },
-    { label: 'Rank',        value: userRank.value ? `#${userRank.value}` : '—', cls: '' },
+  const base = [
+    { score: 62, subject: 'SSC Science',    date: 'Apr 1',  shortDate: '4/1'  },
+    { score: 71, subject: 'BCS General',    date: 'Apr 3',  shortDate: '4/3'  },
+    { score: 55, subject: 'HSC Chemistry',  date: 'Apr 5',  shortDate: '4/5'  },
+    { score: 79, subject: 'HSC Physics',    date: 'Apr 7',  shortDate: '4/7'  },
+    { score: 68, subject: 'BCS English',    date: 'Apr 9',  shortDate: '4/9'  },
+    { score: 84, subject: 'HSC Math',       date: 'Apr 11', shortDate: '4/11' },
+    { score: 72, subject: 'Bank Math',      date: 'Apr 13', shortDate: '4/13' },
+    { score: 88, subject: 'HSC Physics',    date: 'Apr 15', shortDate: '4/15' },
+    { score: 65, subject: 'BUET Physics',   date: 'Apr 17', shortDate: '4/17' },
+    { score: 91, subject: 'HSC Math',       date: 'Apr 19', shortDate: '4/19' },
+    { score: 76, subject: 'BCS Bangla',     date: 'Apr 21', shortDate: '4/21' },
+    { score: 88, subject: 'HSC Chemistry',  date: 'Apr 23', shortDate: '4/23' },
   ]
+  if (period.value === '7d') return base.slice(-6)
+  if (period.value === '3m') return base
+  return base
 })
 
-// ── Snapshot stats (sidebar) ──────────────────────────────────
-const snapshotStats = computed(() => {
-  const rows     = allResults.value
-  const weekAgo  = Date.now() - 7 * 86_400_000
-  const thisWeek = rows.filter(r => new Date(r.created_at).getTime() > weekAgo)
-  const prevWeek = rows.filter(r => {
-    const t = new Date(r.created_at).getTime()
-    return t > weekAgo - 7 * 86_400_000 && t <= weekAgo
-  })
-
-  const avg       = rows.length ? Math.round(rows.reduce((s, r) => s + r.score, 0) / rows.length) : 0
-  const prevAvg   = prevWeek.length ? Math.round(prevWeek.reduce((s, r) => s + r.score, 0) / prevWeek.length) : avg
-  const avgDelta  = Math.abs(avg - prevAvg)
-
-  // Overall accuracy from correct / total questions
-  const totalCorrect = rows.reduce((s, r) => s + (r.correct_count ?? 0), 0)
-  const totalQs      = rows.reduce((s, r) => s + (r.questions_count ?? 0), 0)
-  const accuracy     = totalQs ? Math.round(totalCorrect / totalQs * 100) : 0
-
-  return [
-    {
-      label: 'Avg Score',
-      value: avg + '%',
-      delta: avgDelta + '%',
-      up:    avg >= prevAvg,
-      icon:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="15" height="15"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
-    },
-    {
-      label: 'Exams This Week',
-      value: thisWeek.length.toString(),
-      delta: thisWeek.length >= prevWeek.length
-        ? `${thisWeek.length - prevWeek.length} more`
-        : `${prevWeek.length - thisWeek.length} less`,
-      up:   thisWeek.length >= prevWeek.length,
-      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="15" height="15"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`,
-    },
-    {
-      label: 'Accuracy',
-      value: accuracy + '%',
-      delta: accuracy >= 70 ? 'Good' : accuracy >= 50 ? 'Fair' : 'Needs work',
-      up:    accuracy >= 60,
-      icon:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="15" height="15"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>`,
-    },
-    {
-      label: 'National Rank',
-      value: userRank.value ? `#${userRank.value}` : '—',
-      delta: 'Leaderboard',
-      up:    true,
-      icon:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="15" height="15"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>`,
-    },
-  ]
-})
-
-// ── Difficulty breakdown ──────────────────────────────────────
-/**
- * Aggregates difficulty_breakdown JSONB across all exam_results in period.
- * Shape per row: { easy: { correct, total }, medium: {...}, hard: {...} }
- */
-const diffStats = computed(() => {
-  const totals = {
-    easy:   { correct: 0, total: 0 },
-    medium: { correct: 0, total: 0 },
-    hard:   { correct: 0, total: 0 },
-  }
-
-  periodFilteredResults.value.forEach(r => {
-    const bd = r.difficulty_breakdown
-    if (!bd) return
-    ;(['easy', 'medium', 'hard'] as const).forEach(level => {
-      if (bd[level]) {
-        totals[level].correct += bd[level].correct ?? 0
-        totals[level].total   += bd[level].total   ?? 0
-      }
-    })
-  })
-
-  return [
-    { label: 'Easy',   cls: 'easy',   ...totals.easy   },
-    { label: 'Medium', cls: 'medium', ...totals.medium  },
-    { label: 'Hard',   cls: 'hard',   ...totals.hard    },
-  ]
-})
-
-// ── Top subjects (best mastery — sorted desc) ─────────────────
-const topSubjects = computed(() =>
-  [...subjectMastery.value]
-    .sort((a, b) => b.mastery - a.mastery)
-    .slice(0, 4)
+const avgScore = computed(() =>
+  Math.round(scoreTrend.value.reduce((s, e) => s + e.score, 0) / scoreTrend.value.length)
 )
 
-// ── Activity heatmap ──────────────────────────────────────────
+const subjectMastery = [
+  { name: 'Physics',          stream: 'HSC',     mastery: 82, exams: 12, questions: 480, trend: +6,
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>` },
+  { name: 'Mathematics',      stream: 'HSC',     mastery: 76, exams: 10, questions: 360, trend: +4,
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` },
+  { name: 'Chemistry',        stream: 'HSC',     mastery: 58, exams: 8,  questions: 290, trend: -2,
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v11l-5 7h16l-5-7V3"/></svg>` },
+  { name: 'English',          stream: 'BCS',     mastery: 71, exams: 7,  questions: 220, trend: +3,
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>` },
+  { name: 'Bangladesh Aff.',  stream: 'BCS',     mastery: 44, exams: 5,  questions: 180, trend: +1,
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>` },
+  { name: 'Biology',          stream: 'Medical', mastery: 63, exams: 6,  questions: 210, trend: +5,
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>` },
+]
+
+const weakTopics = [
+  { name: 'Electrochemistry',   subject: 'Chemistry · HSC',     mastery: 28 },
+  { name: 'Optics & Waves',     subject: 'Physics · HSC',       mastery: 35 },
+  { name: 'Bangladesh Affairs', subject: 'BCS General',         mastery: 42 },
+  { name: 'Integration',        subject: 'Math · HSC',          mastery: 48 },
+  { name: 'Organic Chemistry',  subject: 'Chemistry · HSC',     mastery: 51 },
+  { name: 'Complex Numbers',    subject: 'Higher Math · BUET',  mastery: 54 },
+]
+
+const examHistory = [
+  { id: 1,  title: 'HSC Physics Mock',      subject: 'Physics',    score: 88, questions: 30, date: 'Apr 23', type: 'Mock',     status: 'passed' },
+  { id: 2,  title: 'BCS General Practice',  subject: 'BCS',        score: 72, questions: 50, date: 'Apr 21', type: 'Practice', status: 'passed' },
+  { id: 3,  title: 'HSC Chemistry Full',    subject: 'Chemistry',  score: 55, questions: 30, date: 'Apr 19', type: 'Mock',     status: 'failed' },
+  { id: 4,  title: 'HSC Math Practice',     subject: 'Math',       score: 91, questions: 20, date: 'Apr 17', type: 'Practice', status: 'passed' },
+  { id: 5,  title: 'Bank English Mock',     subject: 'English',    score: 79, questions: 30, date: 'Apr 15', type: 'Mock',     status: 'passed' },
+  { id: 6,  title: 'SSC Science Mock',      subject: 'Science',    score: 62, questions: 30, date: 'Apr 13', type: 'Mock',     status: 'passed' },
+  { id: 7,  title: 'BUET Physics',          subject: 'Physics',    score: 65, questions: 40, date: 'Apr 11', type: 'Mock',     status: 'passed' },
+  { id: 8,  title: 'BCS Bangla Practice',   subject: 'Bangla',     score: 48, questions: 30, date: 'Apr 9',  type: 'Practice', status: 'failed' },
+]
+
+const filteredHistory = computed(() => {
+  if (historyFilter.value === 'All') return examHistory
+  return examHistory.filter(e => e.type === historyFilter.value)
+})
+
+const headerStats = computed(() => [
+  { label: 'Avg Score',    value: avgScore.value + '%', cls: 'high' },
+  { label: 'Exams Taken',  value: examHistory.length,   cls: '' },
+  { label: 'Questions',    value: '2.4K',               cls: '' },
+  { label: 'Rank',         value: '#142',               cls: '' },
+])
+
+const snapshotStats = [
+  { label: 'Avg Score',      value: '74%',  delta: '2.4%',  up: true,
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="15" height="15"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>` },
+  { label: 'Exams This Week', value: '5',   delta: '2 more', up: true,
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="15" height="15"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>` },
+  { label: 'Accuracy',       value: '78%',  delta: '3%',    up: true,
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="15" height="15"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>` },
+  { label: 'National Rank',  value: '#142', delta: '8 spots', up: true,
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="15" height="15"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>` },
+]
+
+const diffStats = [
+  { label: 'Easy',   cls: 'easy',   correct: 142, total: 160 },
+  { label: 'Medium', cls: 'medium', correct: 98,  total: 140 },
+  { label: 'Hard',   cls: 'hard',   correct: 44,  total: 80  },
+]
+
+const topSubjects = computed(() =>
+  [...subjectMastery].sort((a, b) => b.mastery - a.mastery).slice(0, 4)
+)
+
+// ── Heatmap ────────────────────────────────────────────────
 const heatmapDays = computed(() => {
-  const days: { date: string; count: number }[] = []
+  const days = []
   const today = new Date()
   for (let i = 83; i >= 0; i--) {
     const d = new Date(today)
     d.setDate(today.getDate() - i)
     const key = d.toISOString().slice(0, 10)
-    days.push({ date: key, count: activityMap.value[key] ?? 0 })
+    const count = i < 14
+      ? Math.floor(Math.random() * 60) + 5
+      : Math.random() > 0.35
+        ? Math.floor(Math.random() * 40)
+        : 0
+    days.push({ date: key, count })
   }
   return days
 })
 
-// ── Utility functions ─────────────────────────────────────────
 function heatLevel(count: number) {
   if (count === 0) return 'level-0'
   if (count < 10)  return 'level-1'
@@ -707,36 +474,6 @@ function masteryClass(pct: number) {
   if (pct >= 70) return 'high'
   if (pct >= 45) return 'mid'
   return 'low'
-}
-
-function examTypeLabel(type: string) {
-  const map: Record<string, string> = {
-    mock: 'Mock', practice: 'Practice', admission: 'Admission',
-    engineering: 'Engineering', hsc_ssc: 'Test',
-  }
-  return map[type] ?? 'Test'
-}
-
-/**
- * Returns a subject-appropriate SVG icon string.
- * Matches on common Bangladeshi exam subject names (English).
- */
-function subjectIcon(name: string): string {
-  const n = name.toLowerCase()
-  if (n.includes('physics'))
-    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`
-  if (n.includes('math') || n.includes('calculus') || n.includes('algebra'))
-    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`
-  if (n.includes('chem'))
-    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v11l-5 7h16l-5-7V3"/></svg>`
-  if (n.includes('english') || n.includes('bangla') || n.includes('language'))
-    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>`
-  if (n.includes('bio') || n.includes('health'))
-    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`
-  if (n.includes('bcs') || n.includes('general') || n.includes('affairs') || n.includes('bangladesh'))
-    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`
-  // Default
-  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>`
 }
 </script>
 

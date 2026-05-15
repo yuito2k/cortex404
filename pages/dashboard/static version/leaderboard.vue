@@ -11,7 +11,7 @@
       <div class="header-right">
         <div class="your-rank-card">
           <span class="yr-label">Your Rank</span>
-          <span class="yr-rank">{{ yourEntry ? '#' + yourEntry.rank : '—' }}</span>
+          <span class="yr-rank">#{{ userRank }}</span>
           <span class="yr-meta">Top {{ topPercent }}% · {{ totalStudents }} students</span>
           <div class="yr-bar-wrap">
             <div class="yr-bar-fill" :style="{ width: (100 - rankPercent) + '%' }" />
@@ -115,94 +115,90 @@
             <span class="lth-change">Change</span>
           </div>
 
-          <!-- Loading state -->
-          <div v-if="loading" class="table-section-label" style="padding: 2rem; text-align: center;">
-            Loading rankings…
+          <!-- Top 3 separator -->
+          <div class="table-section-label">Top 3 — Podium</div>
+
+          <div
+            v-for="(entry, i) in filteredEntries.slice(0, 3)"
+            :key="entry.id"
+            class="lb-row podium-row"
+            :class="{ 'is-you': entry.isYou, expanded: expandedId === entry.id }"
+            @click="expandEntry(entry)"
+          >
+            <span class="lr-rank">
+              <span class="rank-num top" :class="`rank-${entry.rank}`">{{ entry.rank }}</span>
+            </span>
+            <span class="lr-student">
+              <span class="lr-avatar">{{ entry.initials }}</span>
+              <span class="lr-name">{{ entry.name }}<span v-if="entry.isYou" class="you-tag">YOU</span></span>
+            </span>
+            <span class="lr-stream">{{ entry.stream }}</span>
+            <span class="lr-score">{{ entry.score.toLocaleString() }}</span>
+            <span class="lr-exams">{{ entry.exams }}</span>
+            <span class="lr-accuracy">{{ entry.accuracy }}%</span>
+            <span class="lr-streak">🔥 {{ entry.streak }}</span>
+            <span class="lr-change" :class="entry.change > 0 ? 'up' : entry.change < 0 ? 'down' : 'same'">
+              {{ entry.change > 0 ? '↑' + entry.change : entry.change < 0 ? '↓' + Math.abs(entry.change) : '—' }}
+            </span>
           </div>
 
-          <template v-else>
-            <!-- Top 3 separator -->
-            <div class="table-section-label">Top 3 — Podium</div>
+          <div class="table-section-label">Ranks 4–{{ filteredEntries.slice(3, showAllRows ? undefined : 3 + pageSize).length + 3 }}</div>
 
+          <div
+            v-for="entry in filteredEntries.slice(3, showAllRows ? undefined : 3 + pageSize)"
+            :key="entry.id"
+            class="lb-row"
+            :class="{ 'is-you': entry.isYou, expanded: expandedId === entry.id }"
+            @click="expandEntry(entry)"
+          >
+            <span class="lr-rank">
+              <span class="rank-num">{{ entry.rank }}</span>
+            </span>
+            <span class="lr-student">
+              <span class="lr-avatar" :class="{ 'you-avatar': entry.isYou }">{{ entry.initials }}</span>
+              <span class="lr-name">{{ entry.name }}<span v-if="entry.isYou" class="you-tag">YOU</span></span>
+            </span>
+            <span class="lr-stream">{{ entry.stream }}</span>
+            <span class="lr-score">{{ entry.score.toLocaleString() }}</span>
+            <span class="lr-exams">{{ entry.exams }}</span>
+            <span class="lr-accuracy">{{ entry.accuracy }}%</span>
+            <span class="lr-streak">🔥 {{ entry.streak }}</span>
+            <span class="lr-change" :class="entry.change > 0 ? 'up' : entry.change < 0 ? 'down' : 'same'">
+              {{ entry.change > 0 ? '↑' + entry.change : entry.change < 0 ? '↓' + Math.abs(entry.change) : '—' }}
+            </span>
+          </div>
+
+          <!-- Your rank row if not visible -->
+          <template v-if="!yourEntryVisible">
+            <div class="ellipsis-row">
+              <span>···</span>
+            </div>
             <div
-              v-for="entry in filteredEntries.slice(0, 3)"
-              :key="entry.id"
-              class="lb-row podium-row"
-              :class="{ 'is-you': entry.isYou, expanded: expandedId === entry.id }"
-              @click="expandEntry(entry)"
+              class="lb-row is-you highlight-you"
+              @click="expandEntry(yourEntry)"
             >
-              <span class="lr-rank">
-                <span class="rank-num top" :class="`rank-${entry.rank}`">{{ entry.rank }}</span>
-              </span>
+              <span class="lr-rank"><span class="rank-num">{{ yourEntry.rank }}</span></span>
               <span class="lr-student">
-                <span class="lr-avatar" :class="{ 'you-avatar': entry.isYou }">{{ entry.initials }}</span>
-                <span class="lr-name">{{ entry.name }}<span v-if="entry.isYou" class="you-tag">YOU</span></span>
+                <span class="lr-avatar you-avatar">{{ yourEntry.initials }}</span>
+                <span class="lr-name">{{ yourEntry.name }}<span class="you-tag">YOU</span></span>
               </span>
-              <span class="lr-stream">{{ entry.stream }}</span>
-              <span class="lr-score">{{ entry.score.toLocaleString() }}</span>
-              <span class="lr-exams">{{ entry.exams }}</span>
-              <span class="lr-accuracy">{{ entry.accuracy }}%</span>
-              <span class="lr-streak">🔥 {{ entry.streak }}</span>
-              <span class="lr-change" :class="entry.change > 0 ? 'up' : entry.change < 0 ? 'down' : 'same'">
-                {{ entry.change > 0 ? '↑' + entry.change : entry.change < 0 ? '↓' + Math.abs(entry.change) : '—' }}
+              <span class="lr-stream">{{ yourEntry.stream }}</span>
+              <span class="lr-score">{{ yourEntry.score.toLocaleString() }}</span>
+              <span class="lr-exams">{{ yourEntry.exams }}</span>
+              <span class="lr-accuracy">{{ yourEntry.accuracy }}%</span>
+              <span class="lr-streak">🔥 {{ yourEntry.streak }}</span>
+              <span class="lr-change" :class="yourEntry.change > 0 ? 'up' : 'down'">
+                {{ yourEntry.change > 0 ? '↑' + yourEntry.change : '↓' + Math.abs(yourEntry.change) }}
               </span>
-            </div>
-
-            <div class="table-section-label">
-              Ranks 4–{{ Math.min(filteredEntries.length, showAllRows ? filteredEntries.length : 3 + pageSize) }}
-            </div>
-
-            <div
-              v-for="entry in filteredEntries.slice(3, showAllRows ? undefined : 3 + pageSize)"
-              :key="entry.id"
-              class="lb-row"
-              :class="{ 'is-you': entry.isYou, expanded: expandedId === entry.id }"
-              @click="expandEntry(entry)"
-            >
-              <span class="lr-rank">
-                <span class="rank-num">{{ entry.rank }}</span>
-              </span>
-              <span class="lr-student">
-                <span class="lr-avatar" :class="{ 'you-avatar': entry.isYou }">{{ entry.initials }}</span>
-                <span class="lr-name">{{ entry.name }}<span v-if="entry.isYou" class="you-tag">YOU</span></span>
-              </span>
-              <span class="lr-stream">{{ entry.stream }}</span>
-              <span class="lr-score">{{ entry.score.toLocaleString() }}</span>
-              <span class="lr-exams">{{ entry.exams }}</span>
-              <span class="lr-accuracy">{{ entry.accuracy }}%</span>
-              <span class="lr-streak">🔥 {{ entry.streak }}</span>
-              <span class="lr-change" :class="entry.change > 0 ? 'up' : entry.change < 0 ? 'down' : 'same'">
-                {{ entry.change > 0 ? '↑' + entry.change : entry.change < 0 ? '↓' + Math.abs(entry.change) : '—' }}
-              </span>
-            </div>
-
-            <!-- Your rank row if not visible in current slice -->
-            <template v-if="yourEntry && !yourEntryVisible">
-              <div class="ellipsis-row"><span>···</span></div>
-              <div class="lb-row is-you highlight-you" @click="expandEntry(yourEntry)">
-                <span class="lr-rank"><span class="rank-num">{{ yourEntry.rank }}</span></span>
-                <span class="lr-student">
-                  <span class="lr-avatar you-avatar">{{ yourEntry.initials }}</span>
-                  <span class="lr-name">{{ yourEntry.name }}<span class="you-tag">YOU</span></span>
-                </span>
-                <span class="lr-stream">{{ yourEntry.stream }}</span>
-                <span class="lr-score">{{ yourEntry.score.toLocaleString() }}</span>
-                <span class="lr-exams">{{ yourEntry.exams }}</span>
-                <span class="lr-accuracy">{{ yourEntry.accuracy }}%</span>
-                <span class="lr-streak">🔥 {{ yourEntry.streak }}</span>
-                <span class="lr-change" :class="yourEntry.change > 0 ? 'up' : yourEntry.change < 0 ? 'down' : 'same'">
-                  {{ yourEntry.change > 0 ? '↑' + yourEntry.change : yourEntry.change < 0 ? '↓' + Math.abs(yourEntry.change) : '—' }}
-                </span>
-              </div>
-            </template>
-
-            <!-- Show more -->
-            <div v-if="!showAllRows && filteredEntries.length > 3 + pageSize" class="show-more-row">
-              <button class="iso-btn iso-btn--ghost show-more-btn" @click="showAllRows = true">
-                Show All {{ filteredEntries.length }} Students →
-              </button>
             </div>
           </template>
+
+          <!-- Show more -->
+          <div v-if="!showAllRows && filteredEntries.length > 3 + pageSize" class="show-more-row">
+            <button class="iso-btn iso-btn--ghost show-more-btn" @click="showAllRows = true">
+              Show All {{ filteredEntries.length }} Students →
+            </button>
+          </div>
         </div>
       </div>
 
@@ -213,22 +209,17 @@
         <div class="side-panel">
           <div class="panel-header"><span class="panel-tag">Climb the Ranks</span></div>
           <div class="climb-list">
-            <template v-if="climbTargets.length">
-              <div v-for="target in climbTargets" :key="target.rank" class="climb-row">
-                <div class="cr-left">
-                  <span class="cr-rank">#{{ target.rank }}</span>
-                  <span class="cr-name">{{ target.name }}</span>
-                </div>
-                <div class="cr-right">
-                  <span class="cr-gap">+{{ (target.score - (yourEntry?.score ?? 0)).toLocaleString() }} pts</span>
-                  <div class="cr-bar-wrap">
-                    <div class="cr-bar-fill" :style="{ width: ((yourEntry?.score ?? 0) / target.score * 100) + '%' }" />
-                  </div>
+            <div v-for="target in climbTargets" :key="target.rank" class="climb-row">
+              <div class="cr-left">
+                <span class="cr-rank">#{{ target.rank }}</span>
+                <span class="cr-name">{{ target.name }}</span>
+              </div>
+              <div class="cr-right">
+                <span class="cr-gap">+{{ (target.score - yourEntry.score).toLocaleString() }} pts</span>
+                <div class="cr-bar-wrap">
+                  <div class="cr-bar-fill" :style="{ width: (yourEntry.score / target.score * 100) + '%' }" />
                 </div>
               </div>
-            </template>
-            <div v-else class="climb-row" style="color: var(--gray); font-size: 0.72rem;">
-              You're near the top — keep going!
             </div>
           </div>
         </div>
@@ -260,7 +251,7 @@
                 <div
                   class="sdb-bar-fill"
                   :class="{ 'you-bucket': b.isYou }"
-                  :style="{ width: maxBucketCount ? (b.count / maxBucketCount * 100) + '%' : '0%' }"
+                  :style="{ width: (b.count / maxBucketCount * 100) + '%' }"
                 />
               </div>
               <span class="sdb-count">{{ b.count }}</span>
@@ -321,305 +312,150 @@ definePageMeta({ middleware: 'auth', layout: 'dashboard' })
 
 // ── Types ──────────────────────────────────────────────────
 interface Entry {
-  id:        string
-  rank:      number
-  name:      string
-  initials:  string
-  stream:    string
-  score:     number
-  exams:     number
-  accuracy:  number
-  streak:    number
-  change:    number
-  isYou?:    boolean
+  id: number
+  rank: number
+  name: string
+  initials: string
+  stream: string
+  score: number
+  exams: number
+  accuracy: number
+  streak: number
+  change: number
+  isYou?: boolean
 }
 
-// ── Supabase ───────────────────────────────────────────────
-const supabase = useSupabaseClient()
-const user     = useSupabaseUser()
-
-// ── UI state ───────────────────────────────────────────────
-const loading        = ref(true)
+// ── State ──────────────────────────────────────────────────
 const selectedStream = ref('All')
 const selectedPeriod = ref('all')
-const sortBy         = ref('score')
-const searchQuery    = ref('')
-const showAllRows    = ref(false)
-const expandedId     = ref<string | null>(null)
-const expandedEntry  = ref<Entry | null>(null)
-const pageSize       = 17
-
-// ── Raw DB data ────────────────────────────────────────────
-const rawEntries   = ref<Entry[]>([])   // full leaderboard from DB
-const totalStudents = ref('—')
+const sortBy = ref('score')
+const searchQuery = ref('')
+const showAllRows = ref(false)
+const expandedId = ref<number | null>(null)
+const expandedEntry = ref<Entry | null>(null)
+const pageSize = 17
 
 // ── Constants ──────────────────────────────────────────────
-const streams = ['All', 'HSC', 'SSC', 'BUET', 'Medical', 'BCS', 'Bank']
-const periods = [
-  { val: 'week',  label: 'This Week'  },
+const streams  = ['All', 'HSC', 'SSC', 'BUET', 'Medical', 'BCS', 'Bank']
+const periods  = [
+  { val: 'week',  label: 'This Week' },
   { val: 'month', label: 'This Month' },
-  { val: 'all',   label: 'All Time'   },
+  { val: 'all',   label: 'All Time' },
 ]
 const sortOptions = [
-  { val: 'score',    label: 'Score'    },
+  { val: 'score',    label: 'Score' },
   { val: 'accuracy', label: 'Accuracy' },
-  { val: 'exams',    label: 'Exams'    },
-  { val: 'streak',   label: 'Streak'   },
+  { val: 'exams',    label: 'Exams' },
+  { val: 'streak',   label: 'Streak' },
 ]
 
-// ── Fetch leaderboard ──────────────────────────────────────
-/**
- * Fetches all leaderboard rows in one query (the table is at most
- * one row per user and is already pre-aggregated by the DB function
- * recalculate_leaderboard()).
- *
- * Columns used:
- *   id, user_id, display_name, initials, stream,
- *   total_score, score_this_week, score_this_month,
- *   exams_count, accuracy, streak, rank, rank_change
- */
-const fetchLeaderboard = async () => {
-  loading.value = true
+// ── Demo data ──────────────────────────────────────────────
+const allEntries: Entry[] = [
+  { id: 1,  rank: 1,   name: 'Farhan Rahman',      initials: 'FR', stream: 'BUET',    score: 18420, exams: 94,  accuracy: 91, streak: 42, change: 0   },
+  { id: 2,  rank: 2,   name: 'Nusrat Jahan',        initials: 'NJ', stream: 'Medical', score: 17850, exams: 88,  accuracy: 89, streak: 38, change: +1  },
+  { id: 3,  rank: 3,   name: 'Sabbir Ahmed',        initials: 'SA', stream: 'HSC',     score: 17200, exams: 76,  accuracy: 87, streak: 31, change: -1  },
+  { id: 4,  rank: 4,   name: 'Mim Akter',           initials: 'MA', stream: 'BCS',     score: 16780, exams: 82,  accuracy: 85, streak: 28, change: +2  },
+  { id: 5,  rank: 5,   name: 'Riyadh Islam',        initials: 'RI', stream: 'BUET',    score: 16100, exams: 71,  accuracy: 88, streak: 25, change: -1  },
+  { id: 6,  rank: 6,   name: 'Tasnuva Hoque',       initials: 'TH', stream: 'Medical', score: 15840, exams: 68,  accuracy: 86, streak: 22, change: +3  },
+  { id: 7,  rank: 7,   name: 'Mahfuz Alam',         initials: 'MA', stream: 'HSC',     score: 15490, exams: 65,  accuracy: 84, streak: 20, change: 0   },
+  { id: 8,  rank: 8,   name: 'Riya Sultana',        initials: 'RS', stream: 'BCS',     score: 15100, exams: 72,  accuracy: 82, streak: 18, change: +1  },
+  { id: 9,  rank: 9,   name: 'Asif Hossain',        initials: 'AH', stream: 'BUET',    score: 14800, exams: 60,  accuracy: 83, streak: 17, change: -2  },
+  { id: 10, rank: 10,  name: 'Lamia Chowdhury',     initials: 'LC', stream: 'HSC',     score: 14520, exams: 58,  accuracy: 81, streak: 15, change: +4  },
+  { id: 11, rank: 11,  name: 'Imran Hasan',         initials: 'IH', stream: 'Medical', score: 14200, exams: 55,  accuracy: 80, streak: 14, change: +2  },
+  { id: 12, rank: 12,  name: 'Sharmin Nahar',       initials: 'SN', stream: 'BCS',     score: 13950, exams: 62,  accuracy: 79, streak: 13, change: -1  },
+  { id: 13, rank: 13,  name: 'Rakibul Islam',       initials: 'RI', stream: 'HSC',     score: 13700, exams: 50,  accuracy: 78, streak: 12, change: 0   },
+  { id: 14, rank: 14,  name: 'Farzana Begum',       initials: 'FB', stream: 'SSC',     score: 13400, exams: 48,  accuracy: 77, streak: 11, change: +1  },
+  { id: 15, rank: 15,  name: 'Nahid Hasan',         initials: 'NH', stream: 'Bank',    score: 13100, exams: 54,  accuracy: 76, streak: 10, change: -3  },
+  { id: 16, rank: 16,  name: 'Sadia Islam',         initials: 'SI', stream: 'Medical', score: 12800, exams: 46,  accuracy: 75, streak: 9,  change: +5  },
+  { id: 17, rank: 17,  name: 'Maruf Ahmed',         initials: 'MA', stream: 'BUET',    score: 12500, exams: 44,  accuracy: 74, streak: 8,  change: 0   },
+  { id: 18, rank: 18,  name: 'Jesmin Akter',        initials: 'JA', stream: 'BCS',     score: 12200, exams: 52,  accuracy: 73, streak: 8,  change: +2  },
+  { id: 19, rank: 19,  name: 'Tanvir Rahman',       initials: 'TR', stream: 'HSC',     score: 11900, exams: 42,  accuracy: 72, streak: 7,  change: -2  },
+  { id: 20, rank: 20,  name: 'Popy Khatun',         initials: 'PK', stream: 'SSC',     score: 11600, exams: 40,  accuracy: 71, streak: 7,  change: 0   },
+  { id: 142,rank: 142, name: 'You',                 initials: 'ME', stream: 'HSC',     score: 9240,  exams: 38,  accuracy: 74, streak: 14, change: +8, isYou: true },
+]
 
-  const { data, count } = await supabase
-    .from('leaderboard')
-    .select('id, user_id, display_name, initials, stream, total_score, score_this_week, score_this_month, exams_count, accuracy, streak, rank, rank_change', { count: 'exact' })
-    .order('rank', { ascending: true })
+const yourEntry = allEntries.find(e => e.isYou)! as Entry
+const userRank = ref(yourEntry.rank)
+const totalStudents = ref('82,400')
+const rankPercent = computed(() => Math.round(yourEntry.rank / 82400 * 100))
+const topPercent = computed(() => rankPercent.value < 1 ? '<1' : rankPercent.value)
 
-  if (!data?.length) {
-    rawEntries.value  = getDemoEntries()
-    totalStudents.value = '82,400'
-    loading.value = false
-    return
-  }
-
-  totalStudents.value = count != null
-    ? count >= 1000
-      ? (count / 1000).toFixed(1) + 'K'
-      : count.toString()
-    : data.length.toString()
-
-  rawEntries.value = data.map(r => ({
-    id:       r.id,
-    rank:     r.rank ?? 0,
-    name:     r.display_name,
-    initials: r.initials ?? r.display_name.slice(0, 2).toUpperCase(),
-    stream:   r.stream ?? 'HSC',
-    // Score shown depends on selected period (resolved in scoreForPeriod)
-    score:     r.total_score,
-    _week:     r.score_this_week,
-    _month:    r.score_this_month,
-    _total:    r.total_score,
-    exams:     r.exams_count,
-    accuracy:  r.accuracy,
-    streak:    r.streak,
-    change:    r.rank_change ?? 0,
-    isYou:     r.user_id === user.value?.id,
-  } as any))
-
-  loading.value = false
-}
-
-// Re-fetch when user is available
-watch(() => user.value, u => { if (u) fetchLeaderboard() }, { immediate: true })
-
-// ── Period-aware score resolution ─────────────────────────
-/**
- * Returns the score field name matching the selected period.
- * The leaderboard table stores total_score, score_this_week,
- * score_this_month as separate columns (per schema).
- */
-const scoreKey = computed(() => {
-  if (selectedPeriod.value === 'week')  return '_week'
-  if (selectedPeriod.value === 'month') return '_month'
-  return '_total'
-})
-
-// Map rawEntries to period-aware score, then filter + sort
-const allEntriesWithScore = computed<Entry[]>(() =>
-  rawEntries.value.map(r => ({
-    ...r,
-    score: (r as any)[scoreKey.value] ?? r.score,
-  }))
-)
-
-// ── Derived: current user's entry ─────────────────────────
-const yourEntry = computed<Entry | undefined>(() =>
-  allEntriesWithScore.value.find(e => e.isYou)
-)
-
-// ── Filtered + sorted list ────────────────────────────────
-const filteredEntries = computed<Entry[]>(() => {
-  let list = [...allEntriesWithScore.value]
-
-  if (selectedStream.value !== 'All')
-    list = list.filter(e => e.stream === selectedStream.value)
-
+// ── Filtered / sorted ──────────────────────────────────────
+const filteredEntries = computed(() => {
+  let list = [...allEntries]
+  if (selectedStream.value !== 'All') list = list.filter(e => e.stream === selectedStream.value)
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase()
     list = list.filter(e => e.name.toLowerCase().includes(q))
   }
-
   list.sort((a, b) => {
     if (sortBy.value === 'accuracy') return b.accuracy - a.accuracy
-    if (sortBy.value === 'exams')    return b.exams    - a.exams
-    if (sortBy.value === 'streak')   return b.streak   - a.streak
+    if (sortBy.value === 'exams')    return b.exams - a.exams
+    if (sortBy.value === 'streak')   return b.streak - a.streak
     return b.score - a.score
   })
-
-  // Re-number display ranks after filter/sort
+  // Reassign display ranks after filter
   return list.map((e, i) => ({ ...e, rank: i + 1 }))
 })
 
-// ── Rank card ─────────────────────────────────────────────
-const userRank = computed(() => yourEntry.value?.rank ?? 0)
-const totalCount = computed(() => rawEntries.value.length || 82400)
-const rankPercent = computed(() =>
-  userRank.value ? Math.round(userRank.value / totalCount.value * 100) : 100
-)
-const topPercent = computed(() =>
-  rankPercent.value < 1 ? '<1' : rankPercent.value
-)
-
-// ── Your entry visible in current slice? ──────────────────
 const yourEntryVisible = computed(() => {
   const slice = filteredEntries.value.slice(0, showAllRows.value ? undefined : 3 + pageSize)
   return slice.some(e => e.isYou)
 })
 
-// ── Climb targets sidebar ─────────────────────────────────
-/**
- * Shows the 4 ranks just above the current user that they can realistically
- * catch. Picks entries with score > yourScore, takes the nearest 4.
- */
-const climbTargets = computed<Entry[]>(() => {
-  if (!yourEntry.value) return []
+// ── Sidebar data ───────────────────────────────────────────
+const climbTargets = computed(() => {
   return filteredEntries.value
-    .filter(e => !e.isYou && e.score > yourEntry.value!.score)
+    .filter(e => !e.isYou && e.score > yourEntry.score)
     .slice(-4)
     .reverse()
     .slice(0, 4)
 })
 
-// ── Stream distribution sidebar ───────────────────────────
-/**
- * Derived from rawEntries so it reflects the full leaderboard,
- * not just the current filter view.
- */
-const streamDist = computed(() => {
-  const counts: Record<string, number> = {}
-  const all = rawEntries.value
-  all.forEach(e => {
-    const s = e.stream || 'Other'
-    counts[s] = (counts[s] ?? 0) + 1
-  })
-  const total = all.length || 1
-  return Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
-    .map(([name, count]) => ({
-      name,
-      count,
-      pct: Math.round(count / total * 100),
-    }))
-})
+const streamDist = [
+  { name: 'HSC',     count: 28400, pct: 34 },
+  { name: 'BCS',     count: 18200, pct: 22 },
+  { name: 'SSC',     count: 14800, pct: 18 },
+  { name: 'Medical', count: 9900,  pct: 12 },
+  { name: 'BUET',    count: 6600,  pct: 8  },
+  { name: 'Bank',    count: 4500,  pct: 6  },
+]
 
-// ── Score distribution sidebar ────────────────────────────
-/**
- * Buckets based on total_score across the full leaderboard.
- * The "isYou" bucket is determined by where yourEntry.score falls.
- */
-const scoreBuckets = computed(() => {
-  const buckets = [
-    { label: '15K+',   min: 15000, max: Infinity },
-    { label: '12–15K', min: 12000, max: 15000    },
-    { label: '9–12K',  min: 9000,  max: 12000    },
-    { label: '6–9K',   min: 6000,  max: 9000     },
-    { label: '3–6K',   min: 3000,  max: 6000     },
-    { label: '0–3K',   min: 0,     max: 3000     },
-  ]
-  const myScore = yourEntry.value?.score ?? 0
-  const all = rawEntries.value
+const scoreBuckets = [
+  { label: '15K+',      count: 142,   isYou: false },
+  { label: '12–15K',    count: 890,   isYou: false },
+  { label: '9–12K',     count: 4200,  isYou: true  },
+  { label: '6–9K',      count: 12400, isYou: false },
+  { label: '3–6K',      count: 31000, isYou: false },
+  { label: '0–3K',      count: 33768, isYou: false },
+]
+const maxBucketCount = Math.max(...scoreBuckets.map(b => b.count))
 
-  return buckets.map(b => {
-    const count = all.filter(e => {
-      const s = (e as any)._total ?? e.score
-      return s >= b.min && s < b.max
-    }).length
-    const isYou = myScore >= b.min && myScore < b.max
-    return { label: b.label, count, isYou }
-  })
-})
-
-const maxBucketCount = computed(() =>
-  Math.max(...scoreBuckets.value.map(b => b.count), 1)
-)
-
-// ── Static: climb tips ────────────────────────────────────
 const climbTips = [
-  {
-    label: 'Daily Mock Exams',
-    desc:  'Take one timed exam every day — scores compound fast.',
-    icon:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`,
-  },
-  {
-    label: 'Drill Weak Topics',
-    desc:  'Your bottom 3 subjects are pulling your rank down.',
-    icon:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
-  },
-  {
-    label: 'Maintain Streak',
-    desc:  'Top 10 all have 30+ day streaks. Consistency wins.',
-    icon:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
-  },
-  {
-    label: 'Hard Questions',
-    desc:  'Only 15% of students attempt hard-mode. Be one of them.',
-    icon:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>`,
-  },
+  { label: 'Daily Mock Exams',    desc: 'Take one timed exam every day — scores compound fast.',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>` },
+  { label: 'Drill Weak Topics',   desc: 'Your bottom 3 subjects are pulling your rank down.',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>` },
+  { label: 'Maintain Streak',     desc: 'Top 10 all have 30+ day streaks. Consistency wins.',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>` },
+  { label: 'Hard Questions',      desc: 'Only 15% of students attempt hard-mode. Be one of them.',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>` },
 ]
 
 // ── Methods ────────────────────────────────────────────────
 function expandEntry(entry: Entry | undefined) {
   if (!entry) return
-  expandedId.value    = expandedEntry.value?.id === entry.id ? null : entry.id
   expandedEntry.value = expandedEntry.value?.id === entry.id ? null : entry
 }
 
 function entryStats(entry: Entry) {
   return [
-    { label: 'Score',    value: entry.score.toLocaleString()                         },
-    { label: 'Rank',     value: '#' + entry.rank                                     },
-    { label: 'Exams',    value: entry.exams                                          },
-    { label: 'Accuracy', value: entry.accuracy + '%'                                 },
-    { label: 'Streak',   value: '🔥 ' + entry.streak                                 },
-    { label: 'Change',   value: entry.change >= 0 ? '↑' + entry.change : '↓' + Math.abs(entry.change) },
-  ]
-}
-
-// ── Demo fallback ──────────────────────────────────────────
-function getDemoEntries(): Entry[] {
-  return [
-    { id: '1',   rank: 1,   name: 'Farhan Rahman',   initials: 'FR', stream: 'BUET',    score: 18420, exams: 94, accuracy: 91, streak: 42, change: 0   },
-    { id: '2',   rank: 2,   name: 'Nusrat Jahan',    initials: 'NJ', stream: 'Medical', score: 17850, exams: 88, accuracy: 89, streak: 38, change: +1  },
-    { id: '3',   rank: 3,   name: 'Sabbir Ahmed',    initials: 'SA', stream: 'HSC',     score: 17200, exams: 76, accuracy: 87, streak: 31, change: -1  },
-    { id: '4',   rank: 4,   name: 'Mim Akter',       initials: 'MA', stream: 'BCS',     score: 16780, exams: 82, accuracy: 85, streak: 28, change: +2  },
-    { id: '5',   rank: 5,   name: 'Riyadh Islam',    initials: 'RI', stream: 'BUET',    score: 16100, exams: 71, accuracy: 88, streak: 25, change: -1  },
-    { id: '6',   rank: 6,   name: 'Tasnuva Hoque',   initials: 'TH', stream: 'Medical', score: 15840, exams: 68, accuracy: 86, streak: 22, change: +3  },
-    { id: '7',   rank: 7,   name: 'Mahfuz Alam',     initials: 'MA', stream: 'HSC',     score: 15490, exams: 65, accuracy: 84, streak: 20, change: 0   },
-    { id: '8',   rank: 8,   name: 'Riya Sultana',    initials: 'RS', stream: 'BCS',     score: 15100, exams: 72, accuracy: 82, streak: 18, change: +1  },
-    { id: '9',   rank: 9,   name: 'Asif Hossain',    initials: 'AH', stream: 'BUET',    score: 14800, exams: 60, accuracy: 83, streak: 17, change: -2  },
-    { id: '10',  rank: 10,  name: 'Lamia Chowdhury', initials: 'LC', stream: 'HSC',     score: 14520, exams: 58, accuracy: 81, streak: 15, change: +4  },
-    { id: '11',  rank: 11,  name: 'Imran Hasan',     initials: 'IH', stream: 'Medical', score: 14200, exams: 55, accuracy: 80, streak: 14, change: +2  },
-    { id: '12',  rank: 12,  name: 'Sharmin Nahar',   initials: 'SN', stream: 'BCS',     score: 13950, exams: 62, accuracy: 79, streak: 13, change: -1  },
-    { id: '13',  rank: 13,  name: 'Rakibul Islam',   initials: 'RI', stream: 'HSC',     score: 13700, exams: 50, accuracy: 78, streak: 12, change: 0   },
-    { id: '14',  rank: 14,  name: 'Farzana Begum',   initials: 'FB', stream: 'SSC',     score: 13400, exams: 48, accuracy: 77, streak: 11, change: +1  },
-    { id: '15',  rank: 15,  name: 'Nahid Hasan',     initials: 'NH', stream: 'Bank',    score: 13100, exams: 54, accuracy: 76, streak: 10, change: -3  },
-    { id: '16',  rank: 16,  name: 'Sadia Islam',     initials: 'SI', stream: 'Medical', score: 12800, exams: 46, accuracy: 75, streak: 9,  change: +5  },
-    { id: '17',  rank: 17,  name: 'Maruf Ahmed',     initials: 'MA', stream: 'BUET',    score: 12500, exams: 44, accuracy: 74, streak: 8,  change: 0   },
-    { id: '18',  rank: 18,  name: 'Jesmin Akter',    initials: 'JA', stream: 'BCS',     score: 12200, exams: 52, accuracy: 73, streak: 8,  change: +2  },
-    { id: '19',  rank: 19,  name: 'Tanvir Rahman',   initials: 'TR', stream: 'HSC',     score: 11900, exams: 42, accuracy: 72, streak: 7,  change: -2  },
-    { id: '20',  rank: 20,  name: 'Popy Khatun',     initials: 'PK', stream: 'SSC',     score: 11600, exams: 40, accuracy: 71, streak: 7,  change: 0   },
-    { id: '142', rank: 142, name: 'You',             initials: 'ME', stream: 'HSC',     score: 9240,  exams: 38, accuracy: 74, streak: 14, change: +8, isYou: true },
+    { label: 'Score',    value: entry.score.toLocaleString() },
+    { label: 'Rank',     value: '#' + entry.rank             },
+    { label: 'Exams',    value: entry.exams                  },
+    { label: 'Accuracy', value: entry.accuracy + '%'         },
+    { label: 'Streak',   value: '🔥 ' + entry.streak         },
+    { label: 'Change',   value: (entry.change >= 0 ? '↑' : '↓') + Math.abs(entry.change) },
   ]
 }
 </script>
