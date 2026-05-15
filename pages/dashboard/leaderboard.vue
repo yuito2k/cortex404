@@ -551,7 +551,7 @@ function entryStats(entry: Entry) {
 }
 .filter-search {
   display: flex; align-items: center; gap: 8px;
-  padding: 0.8rem 1.2rem; flex: 1; min-width: 0;
+  padding: 0.8rem 1.2rem; flex: 1; min-width: 160px;
   color: var(--gray);
 }
 .search-input {
@@ -565,11 +565,7 @@ function entryStats(entry: Entry) {
 .lb-body {
   display: grid; grid-template-columns: 1fr 280px;
   gap: 1.5rem; align-items: start;
-  min-width: 0;
 }
-
-/* ── Left main area ── */
-.lb-main { min-width: 0; overflow-x: hidden; }
 
 /* ── Podium ──────────────────────────────────────────────── */
 .podium {
@@ -578,7 +574,6 @@ function entryStats(entry: Entry) {
   border: 1px solid var(--border);
   box-shadow: 4px 4px 0 0 rgba(240,240,234,0.04);
   margin-bottom: 1.5rem;
-  min-width: 0; overflow-x: hidden;
 }
 .podium-card {
   flex: 1; display: flex; flex-direction: column; align-items: center;
@@ -623,7 +618,6 @@ function entryStats(entry: Entry) {
   border: 1px solid var(--border); background: #0a0a0a;
   box-shadow: 4px 4px 0 0 rgba(240,240,234,0.04);
   display: flex; flex-direction: column;
-  min-width: 0; overflow-x: hidden;
 }
 
 .lb-table-header {
@@ -874,20 +868,18 @@ function entryStats(entry: Entry) {
   .page-header { padding: 1.2rem; }
   .page-title { font-size: 1.4rem; }
   .filter-pills { flex-wrap: wrap; }
-  .podium-card { padding: 1rem 0.4rem; min-width: 0; }
-  .pod-name { font-size: 0.6rem; word-break: break-word; }
-  .pod-score { font-size: 0.72rem; }
+  .podium-card { padding: 1rem 0.5rem; }
+  .pod-name { font-size: 0.62rem; }
   .lb-table-header,
-  .lb-row { grid-template-columns: 32px 1fr 68px 52px; padding: 0.6rem 0.6rem; gap: 4px; }
+  .lb-row { grid-template-columns: 36px 1fr 72px 58px; padding: 0.6rem 0.75rem; gap: 4px; }
   .lb-table-header { font-size: 0.5rem; }
-  .lr-score { font-size: 0.7rem; }
-  .lr-change { font-size: 0.62rem; }
-  .lr-avatar { width: 22px; height: 22px; font-size: 0.5rem; }
-  .lr-name { font-size: 0.75rem; }
+  .lr-score { font-size: 0.72rem; }
+  .lr-change { font-size: 0.65rem; }
   .your-rank-card { padding: 1rem 1.2rem; }
   .yr-rank { font-size: 2rem; }
-  .side-panel { overflow-x: hidden; min-width: 0; }
-  .lb-sidebar { min-width: 0; overflow-x: hidden; }
+  .side-panel { overflow-x: hidden; }
+  .climb-row { overflow-x: hidden; }
+  .cr-name { max-width: 100px; }
   .modal-header { padding: 1rem; gap: 10px; }
   .modal-rank-badge { font-size: 1rem; }
   .modal-footer { padding: 1rem; flex-wrap: wrap; }
