@@ -1,30 +1,38 @@
-// supabase/functions/delete-account/index.ts
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
 Deno.serve(async (req) => {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) return new Response('Unauthorized', { status: 401 })
+  // ++ Add this block
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
 
-    // Create a client with the USER's JWT to verify identity
-    const supabase = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_ANON_KEY')!,
-        { global: { headers: { Authorization: authHeader } } }
-    )
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader) return new Response('Unauthorized', { status: 401, headers: corsHeaders }) // ++ headers
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) return new Response('Unauthorized', { status: 401 })
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_ANON_KEY')!,
+    { global: { headers: { Authorization: authHeader } } }
+  )
 
-    // Use the service_role client to actually delete
-    const adminClient = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) return new Response('Unauthorized', { status: 401, headers: corsHeaders }) // ++ headers
 
-    const { error } = await adminClient.auth.admin.deleteUser(user.id)
-    if (error) return new Response(error.message, { status: 500 })
+  const adminClient = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
 
-    return new Response(JSON.stringify({ success: true }), {
-        headers: { 'Content-Type': 'application/json' },
-    })
+  const { error } = await adminClient.auth.admin.deleteUser(user.id)
+  if (error) return new Response(error.message, { status: 500, headers: corsHeaders }) // ++ headers
+
+  return new Response(JSON.stringify({ success: true }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }, // ++ spread corsHeaders
+  })
 })

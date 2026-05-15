@@ -604,7 +604,7 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'auth', layout: 'dashboard' })
 
-const { user, updatePassword, signOut } = useAuth()
+const { user, updatePassword, signOut, deleteOwnAccount } = useAuth()
 const supabase = useSupabaseClient()
 
 // ── User info ──────────────────────────────────────────────
@@ -889,16 +889,14 @@ async function signOutAllSessions() {
 async function deleteAccount() {
   if (deleteConfirmText.value !== 'DELETE') return
   
-  const { error } = await supabase.functions.invoke('delete-account')
+  const { error } = await deleteOwnAccount()  // from useAuth
 
   if (error) {
     showToast('Failed to delete account: ' + error.message, 'error')
     return
   }
 
-  showToast('Account deleted.', 'error')
   showDeleteConfirm.value = false
-  await navigateTo('/auth/login')
 }
 
 // ── Load profile from Supabase on mount ───────────────────

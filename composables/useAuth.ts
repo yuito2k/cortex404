@@ -45,6 +45,24 @@ export const useAuth = () => {
     return { error }
   }
 
+  const deleteOwnAccount = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (!session) return { error: new Error('No active session') }
+
+    const { data, error } = await supabase.functions.invoke('delete-account', {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    })
+
+    if (error) return { error }
+
+    await supabase.auth.signOut()
+    await navigateTo('/auth/login')
+    return { error: null }
+  }
+
   const resetPassword = async (email: string) => {
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${siteUrl}/auth/reset-password`,
@@ -65,6 +83,7 @@ export const useAuth = () => {
     signIn,
     signInWithGoogle,
     signOut,
+    deleteOwnAccount,
     resetPassword,
     updatePassword,
   }
