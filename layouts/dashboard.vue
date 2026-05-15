@@ -3,7 +3,7 @@
     <!-- Sidebar -->
     <DashboardDashSidebar
       :collapsed="sidebarCollapsed"
-      :mobile-open="mobileMenuOpen"
+      :mobileOpen="mobileMenuOpen"
       @toggle="sidebarCollapsed = !sidebarCollapsed"
       @close-mobile="mobileMenuOpen = false"
     />
@@ -90,7 +90,8 @@ const streak = ref(14)
 .overlay-fade-leave-to     { opacity: 0; }
 
 @media (max-width: 768px) {
-  .dash-main { margin-left: 0 !important; }
+  .dash-main { margin-left: 0; }
+  .dash-main.sidebar-collapsed { margin-left: 0; }
   .dash-content { padding: 1.2rem; }
 }
 </style>
