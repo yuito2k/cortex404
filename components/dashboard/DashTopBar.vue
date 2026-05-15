@@ -125,7 +125,9 @@ defineEmits(['openMobileMenu'])
 .topbar-cta:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 0 rgba(240,240,234,0.1); }
 
 @media (max-width: 768px) {
-  .mobile-menu-btn { display: flex; }
+  .mobile-menu-btn { display: flex; margin-left: -18px; }
+  .topbar-breadcrumb { gap: 4px; margin-left: -15px; }
+  .streak-pill { padding: 6px 4px; margin-left: 40px; }
   .streak-pill .streak-label { display: none; }
   .topbar-cta { display: none; }
 }
