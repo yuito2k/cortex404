@@ -4,9 +4,7 @@ definePageMeta({ middleware: 'auth', layout: 'admin' })
 const { data: profile } = await useSupabaseClient().from('profiles').select('role').single()
 if (profile?.role !== 'admin') navigateTo('/dashboard')
 
-import { ref, reactive, computed, watch, nextTick } from 'vue'
-import { curriculum } from '~/utils/curriculum'
-
+import { ref, reactive, computed } from 'vue'
 const supabaseHSC = useSupabaseHSC()
 const supabaseMedical = useSupabaseMedical()
 
@@ -19,23 +17,9 @@ let subjectBN = ref('')
 let chapterEN = ref('')
 let chapterBN = ref('')
 
-let streamEN = ref('')
-let sourceEN = ref('')
-let sourceBN = ref('')
-
-// ─── Curriculum-driven subject / chapter computed ─────────────
-const availableSubjects = computed(() =>
-  streamEN.value ? (curriculum[streamEN.value] ?? []) : []
-)
-const availableChapters = computed(() =>
-  availableSubjects.value.find(s => s.en === subjectEN.value)?.chapters ?? []
-)
-
-// Clear downstream selections when parent changes
-watch(subjectEN, () => { chapterEN.value = ''; chapterBN.value = '' })
-watch(streamEN,  () => { subjectEN.value = ''; subjectBN.value = ''; chapterEN.value = ''; chapterBN.value = '' })
-
 let yearEN = ref('')
+
+let streamEN = ref('')
 
 let difficultyEN = ref('')
 
@@ -65,45 +49,39 @@ function onImgFileChange(e) {
 }
 
 async function extractFromImage() {
-  if (!imgFile.value || !streamEN.value) return
+  if (!imgFile.value) return
   imgExtracting.value = true
   imgError.value = ''
 
   try {
-    // Single call — image + stream go to analyze-question, Gemini does everything
+    // 1. Extract raw text from image via Nuxt API (Gemini)
     const formData = new FormData()
     formData.append('image', imgFile.value)
-    formData.append('stream', streamEN.value)
+    const raw = await $fetch('/api/extract-text', { method: 'POST', body: formData })
+    const rawText = raw.text || ''
 
-    const raw = await $fetch('/api/analyze-question', { method: 'POST', body: formData })
-    const parsed = JSON.parse(raw.result)
+    const res = await fetch('/api/parse-question', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: rawText })
+    })
+    const data = await res.json()
+    const jsonStr = data.result || ''
 
-    // Fill question + options + answer + explanation
-    questionBN.value    = parsed.questionBN    || ''
-    questionEN.value    = parsed.questionEN    || ''
-    optionsBN.value     = parsed.optionsBN     || ['', '', '', '']
-    optionsEN.value     = parsed.optionsEN     || ['', '', '', '']
-    answerEN.value      = parsed.answerEN      || 'A'
-    explanationBN.value = parsed.explanationBN || ''
-    explanationEN.value = parsed.explanationEN || ''
-    statusQuestion.value = 'Published'
+    let parsed
+    try { parsed = JSON.parse(jsonStr) }
+    catch { throw new Error('Claude returned invalid JSON. Raw: ' + jsonStr.slice(0, 200)) }
 
-    // Fill metadata
-    yearEN.value       = parsed.year       || ''
-    difficultyEN.value = parsed.difficulty || ''
-    if (parsed.sourceEN) sourceEN.value = parsed.sourceEN
-    if (parsed.sourceBN) sourceBN.value = parsed.sourceBN
+    // 3. Auto-fill all form fields
+    questionBN.value     = parsed.questionBN  || ''
+    questionEN.value     = parsed.questionEN  || ''
+    optionsBN.value      = parsed.optionsBN   || ['','','','']
+    optionsEN.value      = parsed.optionsEN   || ['','','','']
+    answerEN.value       = parsed.answerEN    || 'A'
+    explanationBN.value  = parsed.explanationBN || ''
+    explanationEN.value  = parsed.explanationEN || ''
 
-    // Subject first — triggers availableChapters to recompute
-    subjectEN.value = parsed.subjectEN || ''
-    subjectBN.value = parsed.subjectBN || ''
-
-    // Wait one tick so availableChapters updates before setting chapter
-    await nextTick()
-    chapterEN.value = parsed.chapterEN || ''
-    chapterBN.value = parsed.chapterBN || ''
-
-    imgPanelOpen.value = false
+    imgPanelOpen.value = false   // collapse the upload panel after success
     showToast('Fields auto-filled from image ✓')
 
   } catch (err) {
@@ -308,21 +286,6 @@ function toBengaliDigits(str) {
   return str.replace(/[0-9]/g, d => '০১২৩৪৫৬৭৮৯'[d])
 }
 
-function resetQuestionForm() {
-  questionEN.value = '';    questionBN.value = ''
-  subjectEN.value = '';     subjectBN.value = ''
-  chapterEN.value = '';     chapterBN.value = ''
-  yearEN.value = '';        sourceEN.value = ''
-  difficultyEN.value = '';  streamEN.value = ''
-  optionsEN.value = [];     optionsBN.value = []
-  answerEN.value = '';      statusQuestion.value = ''
-  explanationEN.value = ''; explanationBN.value = ''
-  // Image extractor
-  imgFile.value = null;     imgPreview.value = ''
-  imgError.value = '';      imgPanelOpen.value = false
-  sourceEN.value = '';      sourceBN.value = ''
-}
-
 async function saveQuestion() {
   // Map answer letter to index
   const answerIndexMap = { A: 0, B: 1, C: 2, D: 3 }
@@ -366,16 +329,9 @@ async function saveQuestion() {
       bangla: difficultyBanglaMap[difficultyEN.value] || null,
     },
 
-    source: {
-      english: sourceEN.value,
-      bangla: sourceBN.value || null,
-    },
-
     year: yearEN.value
       ? { english: yearEN.value, bangla: toBengaliDigits(yearEN.value) }
       : null,
-
-    is_verified: true,
 
     correct_index: correctIndex,
     difficulty_level: difficultyEN.value?.toLowerCase() || 'medium',  // scalar col too
@@ -411,7 +367,6 @@ async function saveQuestion() {
       return
     }
     showToast('Question saved.')
-    resetQuestionForm()
   }
 }
 
@@ -1139,11 +1094,11 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                   <div class="img-extract-actions">
                     <button
                       class="iso-btn iso-btn--fill img-extract-btn"
-                      :disabled="!imgFile || imgExtracting || !streamEN"
+                      :disabled="!imgFile || imgExtracting"
                       @click="extractFromImage"
                     >
                       <span v-if="imgExtracting" class="img-spinner">◌</span>
-                      {{ imgExtracting ? 'Extracting & Translating…' : !streamEN ? 'Select a stream first' : '⚡ Extract & Auto-fill Fields' }}
+                      {{ imgExtracting ? 'Extracting & Translating…' : '⚡ Extract & Auto-fill Fields' }}
                     </button>
                     <button
                       v-if="imgFile"
@@ -1180,62 +1135,34 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                 <input v-model="yearEN" class="mf-input" placeholder="Year" />
               </div>
               <div class="mf-group">
-                <label class="mf-label">SOURCE (English)</label>
+                <label class="mf-label">SOURCE</label>
                 <input v-model="sourceEN" class="mf-input" placeholder="Source (e.g. Board or School name)" />
-              </div>
-              <div class="mf-group">
-                <label class="mf-label">SOURCE (Bengali)</label>
-                <input v-model="sourceBN" class="mf-input" placeholder="Source (e.g. Board or School name)" />
               </div>
               <div class="mf-row">
                 <div class="mf-group">
                   <label class="mf-label">SUBJECT (English)</label>
-                  <select
-                    v-model="subjectEN"
-                    class="mf-input mf-select"
-                    :disabled="!availableSubjects.length"
-                    @change="() => { const m = availableSubjects.find(x => x.en === subjectEN); subjectBN = m?.bn ?? '' }"
-                  >
-                    <option value="" disabled>{{ streamEN ? 'Select subject…' : 'Select stream first' }}</option>
-                    <option v-for="s in availableSubjects" :key="s.en" :value="s.en">{{ s.en }}</option>
+                  <select v-model="subjectEN" class="mf-input mf-select">
+                    <option v-for="s in ['Physics','Chemistry','Math','Biology','English','Bangla','General Knowledge']" :key="s">{{ s }}</option>
                   </select>
                 </div>
                 <div class="mf-group">
                   <label class="mf-label">SUBJECT (Bangla)</label>
-                  <select
-                    v-model="subjectBN"
-                    class="mf-input mf-select"
-                    :disabled="!availableSubjects.length"
-                    @change="() => { const m = availableSubjects.find(x => x.bn === subjectBN); subjectEN = m?.en ?? '' }"
-                  >
-                    <option value="" disabled>{{ streamEN ? 'Select subject…' : 'Select stream first' }}</option>
-                    <option v-for="s in availableSubjects" :key="s.bn" :value="s.bn">{{ s.bn }}</option>
+                  <select v-model="subjectBN" class="mf-input mf-select">
+                    <option v-for="s in ['পদার্থবিজ্ঞান','রসায়ন','গণিত','জীববিজ্ঞান','ইংরেজি','বাংলা','সাধারণ জ্ঞান']" :key="s">{{ s }}</option>
                   </select>
                 </div>
               </div>
               <div class="mf-row">
                 <div class="mf-group">
                   <label class="mf-label">CHAPTER (English)</label>
-                  <select
-                    v-model="chapterEN"
-                    class="mf-input mf-select"
-                    :disabled="!availableChapters.length"
-                    @change="() => { const m = availableChapters.find(c => c.en === chapterEN); chapterBN = m?.bn ?? '' }"
-                  >
-                    <option value="" disabled>{{ subjectEN ? 'Select chapter…' : 'Select subject first' }}</option>
-                    <option v-for="c in availableChapters" :key="c.en" :value="c.en">{{ c.en }}</option>
+                  <select v-model="chapterEN" class="mf-input mf-select">
+                    <option v-for="s in ['Newtonian Mechanics','Thermodynamics','Waves','Optics','Modern Physics','Electricity and Magnetism','Modern Physics','Electricity and Magnetism']" :key="s">{{ s }}</option>
                   </select>
                 </div>
                 <div class="mf-group">
                   <label class="mf-label">CHAPTER (Bangla)</label>
-                  <select
-                    v-model="chapterBN"
-                    class="mf-input mf-select"
-                    :disabled="!availableChapters.length"
-                    @change="() => { const m = availableChapters.find(c => c.bn === chapterBN); chapterEN = m?.en ?? '' }"
-                  >
-                    <option value="" disabled>{{ subjectEN ? 'Select chapter…' : 'Select subject first' }}</option>
-                    <option v-for="c in availableChapters" :key="c.bn" :value="c.bn">{{ c.bn }}</option>
+                  <select v-model="chapterBN" class="mf-input mf-select">
+                    <option v-for="s in ['নিউটনিয়ান মেকানিক্স','তাপগতিবিদ্যা','তরঙ্গ','আলোকবিজ্ঞান','আধুনিক পদার্থবিজ্ঞান','তড়িৎ ও চুম্বকত্ব','আধুনিক পদার্থবিজ্ঞান','তড়িৎ ও চুম্বকত্ব']" :key="s">{{ s }}</option>
                   </select>
                 </div>
               </div>

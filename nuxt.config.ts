@@ -23,7 +23,12 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
+      geminiAPIKey: process.env.GEMINI_API_KEY,
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? 'http://localhost:3000',
+      supabaseCortexHSC_URL: process.env.SUPABASE_CORTEX_HSC_URL,
+      supabaseCortexHSC_KEY: process.env.SUPABASE_CORTEX_HSC_KEY,
+      supabaseCortexMedical_URL: process.env.SUPABASE_CORTEX_MEDICAL_URL,
+      supabaseCortexMedical_KEY: process.env.SUPABASE_CORTEX_MEDICAL_KEY,
     },
   },
 

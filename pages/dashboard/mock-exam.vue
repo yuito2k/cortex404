@@ -697,7 +697,7 @@ const lastResult = pastResults[0]
 const questionBank: Question[] = [
   {
     id: 1, exam: 'HSC',
-    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
+    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' },
     chapter: { english: 'Optics', bangla: 'আলোকবিজ্ঞান' },
     difficulty: { english: 'hard', bangla: 'কঠিন' }, 
     year: { english: '2023', bangla: '২০২৩' },

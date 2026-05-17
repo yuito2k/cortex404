@@ -24,6 +24,36 @@
   --btn-shadow-color: rgba(240, 240, 234, 0.18);
 }
 
+/* ── Custom Scrollbar ─────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(240, 240, 234, 0.12);
+  border-radius: 0;
+  /* keep it sharp — no rounded corners in your system */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(240, 240, 234, 0.28);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(240, 240, 234, 0.12) transparent;
+}
+
 html {
   scroll-behavior: smooth;
 }

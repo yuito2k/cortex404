@@ -927,31 +927,55 @@ function logColor(type) {
             </div>
             <div class="modal-body">
               <div class="mf-group">
-                <label class="mf-label">QUESTION TEXT *</label>
+                <label class="mf-label">QUESTION TEXT (English)</label>
+                <textarea class="mf-input mf-textarea" v-model="newQ.text" rows="3" placeholder="Write the full question…" />
+                <label class="mf-label">QUESTION TEXT (Bengali)</label>
                 <textarea class="mf-input mf-textarea" v-model="newQ.text" rows="3" placeholder="Write the full question…" />
               </div>
+              <br>
               <div class="mf-row">
                 <div class="mf-group">
-                  <label class="mf-label">STREAM *</label>
+                  <label class="mf-label">STREAM</label>
                   <select class="mf-input mf-select" v-model="newQ.stream">
                     <option v-for="s in ['SSC','HSC','BUET','Medical','DU','BCS','Bank']" :key="s">{{ s }}</option>
                   </select>
+                  <label class="mf-label">YEAR</label>
+                  <input class="mf-input" v-model="newQ.year" placeholder="e.g. 2023" />
+                  <br>
                 </div>
+                <br>
                 <div class="mf-group">
-                  <label class="mf-label">SUBJECT *</label>
+                  <label class="mf-label">SUBJECT (English)</label>
+                  <input class="mf-input" v-model="newQ.subject" placeholder="e.g. Physics, Math…" />
+                  <label class="mf-label">SUBJECT (Bengali)</label>
+                  <input class="mf-input" v-model="newQ.subject" placeholder="e.g. Physics, Math…" />
+                </div>
+                <br>
+                <div class="mf-group">
+                  <label class="mf-label">CHAPTER (English)</label>
+                  <input class="mf-input" v-model="newQ.subject" placeholder="e.g. Physics, Math…" />
+                  <label class="mf-label">CHAPTER (Bengali)</label>
                   <input class="mf-input" v-model="newQ.subject" placeholder="e.g. Physics, Math…" />
                 </div>
               </div>
+              <br>
               <div class="mf-group">
-                <label class="mf-label">OPTIONS *</label>
-                <input class="mf-input"    v-model="newQ.optA" placeholder="A — Option A" />
-                <input class="mf-input mt4" v-model="newQ.optB" placeholder="B — Option B" />
-                <input class="mf-input mt4" v-model="newQ.optC" placeholder="C — Option C (optional)" />
-                <input class="mf-input mt4" v-model="newQ.optD" placeholder="D — Option D (optional)" />
+                <label class="mf-label">OPTIONS (English)</label>
+                <input class="mf-input"    v-model="newQ.optA" placeholder="Option A" />
+                <input class="mf-input mt4" v-model="newQ.optB" placeholder="Option B" />
+                <input class="mf-input mt4" v-model="newQ.optC" placeholder="Option C" />
+                <input class="mf-input mt4" v-model="newQ.optD" placeholder="Option D" />
+                <br>
+                <label class="mf-label">OPTIONS (Bengali)</label>
+                <input class="mf-input"    v-model="newQ.optA" placeholder="Option A" />
+                <input class="mf-input mt4" v-model="newQ.optB" placeholder="Option B" />
+                <input class="mf-input mt4" v-model="newQ.optC" placeholder="Option C" />
+                <input class="mf-input mt4" v-model="newQ.optD" placeholder="Option D" />
               </div>
+              <br>
               <div class="mf-row">
                 <div class="mf-group">
-                  <label class="mf-label">CORRECT ANSWER *</label>
+                  <label class="mf-label">CORRECT ANSWER </label>
                   <select class="mf-input mf-select" v-model="newQ.answer">
                     <option>A</option><option>B</option><option>C</option><option>D</option>
                   </select>
@@ -963,8 +987,11 @@ function logColor(type) {
                   </select>
                 </div>
               </div>
+              <br>
               <div class="mf-group">
-                <label class="mf-label">EXPLANATION (optional)</label>
+                <label class="mf-label">EXPLANATION (optional) (English)</label>
+                <textarea class="mf-input mf-textarea" v-model="newQ.explanation" rows="2" placeholder="Explain why the answer is correct…" />
+                <label class="mf-label">EXPLANATION (optional) (Bengali)</label>
                 <textarea class="mf-input mf-textarea" v-model="newQ.explanation" rows="2" placeholder="Explain why the answer is correct…" />
               </div>
               <div class="submit-note">
@@ -1366,7 +1393,7 @@ function logColor(type) {
 .modal-close:hover { color: var(--white); }
 .modal-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
 .modal-field { display: flex; align-items: center; gap: 12px; }
-.mf-label { font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.14em; color: var(--gray); width: 100px; flex-shrink: 0; }
+.mf-label { font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.14em; color: var(--gray); width: 100px; flex-shrink: 0; white-space: nowrap; }
 .mf-val   { font-size: 0.8rem; color: var(--white); }
 .mf-group { display: flex; flex-direction: column; gap: 5px; }
 .mf-input {

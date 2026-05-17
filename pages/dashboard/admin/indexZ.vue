@@ -4,9 +4,7 @@ definePageMeta({ middleware: 'auth', layout: 'admin' })
 const { data: profile } = await useSupabaseClient().from('profiles').select('role').single()
 if (profile?.role !== 'admin') navigateTo('/dashboard')
 
-import { ref, reactive, computed, watch, nextTick } from 'vue'
-import { curriculum } from '~/utils/curriculum'
-
+import { ref, reactive, computed } from 'vue'
 const supabaseHSC = useSupabaseHSC()
 const supabaseMedical = useSupabaseMedical()
 
@@ -19,23 +17,9 @@ let subjectBN = ref('')
 let chapterEN = ref('')
 let chapterBN = ref('')
 
-let streamEN = ref('')
-let sourceEN = ref('')
-let sourceBN = ref('')
-
-// ─── Curriculum-driven subject / chapter computed ─────────────
-const availableSubjects = computed(() =>
-  streamEN.value ? (curriculum[streamEN.value] ?? []) : []
-)
-const availableChapters = computed(() =>
-  availableSubjects.value.find(s => s.en === subjectEN.value)?.chapters ?? []
-)
-
-// Clear downstream selections when parent changes
-watch(subjectEN, () => { chapterEN.value = ''; chapterBN.value = '' })
-watch(streamEN,  () => { subjectEN.value = ''; subjectBN.value = ''; chapterEN.value = ''; chapterBN.value = '' })
-
 let yearEN = ref('')
+
+let streamEN = ref('')
 
 let difficultyEN = ref('')
 
@@ -48,71 +32,6 @@ let explanationEN = ref('')
 let explanationBN = ref('')
 
 let statusQuestion = ref('')
-
-// ─── Image extraction ─────────────────────────────────────────
-const imgFile        = ref(null)
-const imgPreview     = ref('')
-const imgExtracting  = ref(false)
-const imgError       = ref('')
-const imgPanelOpen   = ref(false)
-
-function onImgFileChange(e) {
-  const f = e.target.files?.[0]
-  if (!f) return
-  imgFile.value    = f
-  imgPreview.value = URL.createObjectURL(f)
-  imgError.value   = ''
-}
-
-async function extractFromImage() {
-  if (!imgFile.value || !streamEN.value) return
-  imgExtracting.value = true
-  imgError.value = ''
-
-  try {
-    // Single call — image + stream go to analyze-question, Gemini does everything
-    const formData = new FormData()
-    formData.append('image', imgFile.value)
-    formData.append('stream', streamEN.value)
-
-    const raw = await $fetch('/api/analyze-question', { method: 'POST', body: formData })
-    const parsed = JSON.parse(raw.result)
-
-    // Fill question + options + answer + explanation
-    questionBN.value    = parsed.questionBN    || ''
-    questionEN.value    = parsed.questionEN    || ''
-    optionsBN.value     = parsed.optionsBN     || ['', '', '', '']
-    optionsEN.value     = parsed.optionsEN     || ['', '', '', '']
-    answerEN.value      = parsed.answerEN      || 'A'
-    explanationBN.value = parsed.explanationBN || ''
-    explanationEN.value = parsed.explanationEN || ''
-    statusQuestion.value = 'Published'
-
-    // Fill metadata
-    yearEN.value       = parsed.year       || ''
-    difficultyEN.value = parsed.difficulty || ''
-    if (parsed.sourceEN) sourceEN.value = parsed.sourceEN
-    if (parsed.sourceBN) sourceBN.value = parsed.sourceBN
-
-    // Subject first — triggers availableChapters to recompute
-    subjectEN.value = parsed.subjectEN || ''
-    subjectBN.value = parsed.subjectBN || ''
-
-    // Wait one tick so availableChapters updates before setting chapter
-    await nextTick()
-    chapterEN.value = parsed.chapterEN || ''
-    chapterBN.value = parsed.chapterBN || ''
-
-    imgPanelOpen.value = false
-    showToast('Fields auto-filled from image ✓')
-
-  } catch (err) {
-    console.error(err)
-    imgError.value = err.message || 'Extraction failed. Check console.'
-  } finally {
-    imgExtracting.value = false
-  }
-}
 
 // ─── Sidebar & layout ────────────────────────────────────────
 const sidebarCollapsed = ref(
@@ -308,21 +227,6 @@ function toBengaliDigits(str) {
   return str.replace(/[0-9]/g, d => '০১২৩৪৫৬৭৮৯'[d])
 }
 
-function resetQuestionForm() {
-  questionEN.value = '';    questionBN.value = ''
-  subjectEN.value = '';     subjectBN.value = ''
-  chapterEN.value = '';     chapterBN.value = ''
-  yearEN.value = '';        sourceEN.value = ''
-  difficultyEN.value = '';  streamEN.value = ''
-  optionsEN.value = [];     optionsBN.value = []
-  answerEN.value = '';      statusQuestion.value = ''
-  explanationEN.value = ''; explanationBN.value = ''
-  // Image extractor
-  imgFile.value = null;     imgPreview.value = ''
-  imgError.value = '';      imgPanelOpen.value = false
-  sourceEN.value = '';      sourceBN.value = ''
-}
-
 async function saveQuestion() {
   // Map answer letter to index
   const answerIndexMap = { A: 0, B: 1, C: 2, D: 3 }
@@ -366,16 +270,9 @@ async function saveQuestion() {
       bangla: difficultyBanglaMap[difficultyEN.value] || null,
     },
 
-    source: {
-      english: sourceEN.value,
-      bangla: sourceBN.value || null,
-    },
-
     year: yearEN.value
       ? { english: yearEN.value, bangla: toBengaliDigits(yearEN.value) }
       : null,
-
-    is_verified: true,
 
     correct_index: correctIndex,
     difficulty_level: difficultyEN.value?.toLowerCase() || 'medium',  // scalar col too
@@ -411,7 +308,6 @@ async function saveQuestion() {
       return
     }
     showToast('Question saved.')
-    resetQuestionForm()
   }
 }
 
@@ -1102,60 +998,6 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
               <button class="modal-close" @click="closeModal()">×</button>
             </div>
             <div class="modal-form">
-
-              <!-- ── Image Extractor ───────────────────────── -->
-              <div class="img-extract-panel">
-                <button class="img-extract-toggle" @click="imgPanelOpen = !imgPanelOpen">
-                  <span class="img-extract-icon">⬆</span>
-                  <span>Extract from Image (Bengali OCR → Auto-fill)</span>
-                  <span class="img-extract-chevron" :class="{ open: imgPanelOpen }">▾</span>
-                </button>
-
-                <div v-if="imgPanelOpen" class="img-extract-body">
-                  <div
-                    class="img-drop-zone"
-                    :class="{ 'has-file': imgPreview }"
-                    @click="$refs.imgInput.click()"
-                    @dragover.prevent
-                    @drop.prevent="e => { imgFile = e.dataTransfer.files[0]; imgPreview = URL.createObjectURL(imgFile); imgError = '' }"
-                  >
-                    <img v-if="imgPreview" :src="imgPreview" class="img-preview" />
-                    <div v-else class="img-drop-hint">
-                      <span class="img-drop-icon">🖼</span>
-                      <span>Click or drag &amp; drop a question image</span>
-                      <span class="mono dim" style="font-size:0.62rem">PNG, JPG, WEBP supported</span>
-                    </div>
-                    <input
-                      ref="imgInput"
-                      type="file"
-                      accept="image/*"
-                      style="display:none"
-                      @change="onImgFileChange"
-                    />
-                  </div>
-
-                  <div v-if="imgError" class="img-error">⚠ {{ imgError }}</div>
-
-                  <div class="img-extract-actions">
-                    <button
-                      class="iso-btn iso-btn--fill img-extract-btn"
-                      :disabled="!imgFile || imgExtracting || !streamEN"
-                      @click="extractFromImage"
-                    >
-                      <span v-if="imgExtracting" class="img-spinner">◌</span>
-                      {{ imgExtracting ? 'Extracting & Translating…' : !streamEN ? 'Select a stream first' : '⚡ Extract & Auto-fill Fields' }}
-                    </button>
-                    <button
-                      v-if="imgFile"
-                      class="iso-btn iso-btn--ghost"
-                      @click="imgFile = null; imgPreview = ''; imgError = ''"
-                      style="font-size:0.72rem"
-                    >Clear</button>
-                  </div>
-                </div>
-              </div>
-              <!-- ── / Image Extractor ──────────────────────── -->
-
               <div class="mf-group">
                 <label class="mf-label">QUESTION TEXT (English)</label>
                 <textarea v-model="questionEN" class="mf-input mf-textarea" placeholder="Enter question…" rows="3"></textarea>
@@ -1180,62 +1022,34 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                 <input v-model="yearEN" class="mf-input" placeholder="Year" />
               </div>
               <div class="mf-group">
-                <label class="mf-label">SOURCE (English)</label>
+                <label class="mf-label">SOURCE</label>
                 <input v-model="sourceEN" class="mf-input" placeholder="Source (e.g. Board or School name)" />
-              </div>
-              <div class="mf-group">
-                <label class="mf-label">SOURCE (Bengali)</label>
-                <input v-model="sourceBN" class="mf-input" placeholder="Source (e.g. Board or School name)" />
               </div>
               <div class="mf-row">
                 <div class="mf-group">
                   <label class="mf-label">SUBJECT (English)</label>
-                  <select
-                    v-model="subjectEN"
-                    class="mf-input mf-select"
-                    :disabled="!availableSubjects.length"
-                    @change="() => { const m = availableSubjects.find(x => x.en === subjectEN); subjectBN = m?.bn ?? '' }"
-                  >
-                    <option value="" disabled>{{ streamEN ? 'Select subject…' : 'Select stream first' }}</option>
-                    <option v-for="s in availableSubjects" :key="s.en" :value="s.en">{{ s.en }}</option>
+                  <select v-model="subjectEN" class="mf-input mf-select">
+                    <option v-for="s in ['Physics','Chemistry','Math','Biology','English','Bangla','General Knowledge']" :key="s">{{ s }}</option>
                   </select>
                 </div>
                 <div class="mf-group">
                   <label class="mf-label">SUBJECT (Bangla)</label>
-                  <select
-                    v-model="subjectBN"
-                    class="mf-input mf-select"
-                    :disabled="!availableSubjects.length"
-                    @change="() => { const m = availableSubjects.find(x => x.bn === subjectBN); subjectEN = m?.en ?? '' }"
-                  >
-                    <option value="" disabled>{{ streamEN ? 'Select subject…' : 'Select stream first' }}</option>
-                    <option v-for="s in availableSubjects" :key="s.bn" :value="s.bn">{{ s.bn }}</option>
+                  <select v-model="subjectBN" class="mf-input mf-select">
+                    <option v-for="s in ['পদার্থবিজ্ঞান','রসায়ন','গণিত','জীববিজ্ঞান','ইংরেজি','বাংলা','সাধারণ জ্ঞান']" :key="s">{{ s }}</option>
                   </select>
                 </div>
               </div>
               <div class="mf-row">
                 <div class="mf-group">
                   <label class="mf-label">CHAPTER (English)</label>
-                  <select
-                    v-model="chapterEN"
-                    class="mf-input mf-select"
-                    :disabled="!availableChapters.length"
-                    @change="() => { const m = availableChapters.find(c => c.en === chapterEN); chapterBN = m?.bn ?? '' }"
-                  >
-                    <option value="" disabled>{{ subjectEN ? 'Select chapter…' : 'Select subject first' }}</option>
-                    <option v-for="c in availableChapters" :key="c.en" :value="c.en">{{ c.en }}</option>
+                  <select v-model="chapterEN" class="mf-input mf-select">
+                    <option v-for="s in ['Newtonian Mechanics','Thermodynamics','Waves','Optics','Modern Physics','Electricity and Magnetism','Modern Physics','Electricity and Magnetism']" :key="s">{{ s }}</option>
                   </select>
                 </div>
                 <div class="mf-group">
                   <label class="mf-label">CHAPTER (Bangla)</label>
-                  <select
-                    v-model="chapterBN"
-                    class="mf-input mf-select"
-                    :disabled="!availableChapters.length"
-                    @change="() => { const m = availableChapters.find(c => c.bn === chapterBN); chapterEN = m?.en ?? '' }"
-                  >
-                    <option value="" disabled>{{ subjectEN ? 'Select chapter…' : 'Select subject first' }}</option>
-                    <option v-for="c in availableChapters" :key="c.bn" :value="c.bn">{{ c.bn }}</option>
+                  <select v-model="chapterBN" class="mf-input mf-select">
+                    <option v-for="s in ['নিউটনিয়ান মেকানিক্স','তাপগতিবিদ্যা','তরঙ্গ','আলোকবিজ্ঞান','আধুনিক পদার্থবিজ্ঞান','তড়িৎ ও চুম্বকত্ব','আধুনিক পদার্থবিজ্ঞান','তড়িৎ ও চুম্বকত্ব']" :key="s">{{ s }}</option>
                   </select>
                 </div>
               </div>
@@ -1831,57 +1645,6 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
   /* System sidebar stacks */
   .system-layout { grid-template-columns: 1fr; }
 }
-
-/* ═══════════════════════════════════════════════════════════════
-   IMAGE EXTRACTOR PANEL (inside addQuestion modal)
-═══════════════════════════════════════════════════════════════ */
-.img-extract-panel {
-  border: 1px solid var(--border);
-  background: rgba(240,240,234,0.02);
-}
-.img-extract-toggle {
-  width: 100%; display: flex; align-items: center; gap: 8px;
-  padding: 10px 14px; background: none; border: none; cursor: pointer;
-  color: var(--white); font-family: var(--font-mono); font-size: 0.7rem;
-  letter-spacing: 0.1em; text-align: left;
-  transition: background 0.15s;
-}
-.img-extract-toggle:hover { background: rgba(240,240,234,0.04); }
-.img-extract-icon  { font-size: 0.85rem; opacity: 0.7; }
-.img-extract-chevron { margin-left: auto; transition: transform 0.2s; display: inline-block; }
-.img-extract-chevron.open { transform: rotate(180deg); }
-
-.img-extract-body {
-  padding: 12px 14px; border-top: 1px solid var(--border);
-  display: flex; flex-direction: column; gap: 10px;
-}
-.img-drop-zone {
-  border: 1px dashed var(--border-bright); cursor: pointer;
-  min-height: 110px; display: flex; align-items: center; justify-content: center;
-  transition: border-color 0.15s; overflow: hidden;
-  position: relative;
-}
-.img-drop-zone:hover { border-color: rgba(240,240,234,0.5); }
-.img-drop-zone.has-file { min-height: unset; }
-.img-drop-hint {
-  display: flex; flex-direction: column; align-items: center; gap: 5px;
-  color: var(--gray); font-family: var(--font-sans); font-size: 0.74rem;
-  padding: 18px;
-}
-.img-drop-icon { font-size: 1.6rem; }
-.img-preview   { max-width: 100%; max-height: 220px; display: block; object-fit: contain; }
-
-.img-error {
-  font-family: var(--font-mono); font-size: 0.66rem; color: rgba(255,100,100,0.85);
-  border: 1px solid rgba(255,100,100,0.25); padding: 6px 10px;
-}
-.img-extract-actions { display: flex; gap: 8px; align-items: center; }
-.img-extract-btn     { font-size: 0.72rem !important; padding: 8px 16px !important; }
-.img-spinner {
-  display: inline-block; animation: spin 0.9s linear infinite;
-  margin-right: 4px;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Small mobile ≤ 480px ─────────────────────────────────── */
 @media (max-width: 480px) {
