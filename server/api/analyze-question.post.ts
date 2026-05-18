@@ -40,8 +40,8 @@ The JSON must follow this exact shape:
   "explanationBN": "<explanation in Bengali if not present, give a very short explanation in Bengali>",
   "explanationEN": "<English translation of explanation if not present, give a very short explanation in English>",
   "year":          "<4-digit year if visible in image, otherwise empty string>",
-  "sourceEN":        "<board, school, or college name in English if visible anywhere in image, otherwise empty string>",
-  "sourceBN":        "<board, school, or college name in Bengali if visible anywhere in image, otherwise empty string>",
+  "sourceBN":      "<array of board/school/institution names in Bengali if visible — e.g. [\"ঢাকা বোর্ড\", \"রাজশাহী বোর্ড\"]. Single source still goes in an array: [\"ঢাকা বোর্ড\"]. Empty array [] if none found>",
+  "sourceEN":      "<array of the same sources translated to English — e.g. [\"Dhaka Board\", \"Rajshahi Board\"]. Must match sourceBN order. Empty array [] if none found>",
   "subjectEN":     "<pick the single closest match from the subject list below>",
   "subjectBN":     "<the Bengali name of the chosen subject, exactly as shown in the list>",
   "chapterEN":     "<pick the single closest matching chapter for the chosen subject from the list below>",
@@ -52,6 +52,8 @@ The JSON must follow this exact shape:
 Rules:
 - subjectEN and chapterEN MUST be chosen exactly from the list below. Do not invent values.
 - If fewer than 4 options exist in the image, fill remaining optionsBN/optionsEN with empty strings.
+- sourceBN and sourceEN are always arrays. Even a single source must be wrapped: ["ঢাকা বোর্ড"]. Never a plain string.
+- If the image contains a mix of board exams and school/college test papers, include all institution names found.
 - Return ONLY the JSON object.
 
 Valid subjects and chapters for ${stream}:

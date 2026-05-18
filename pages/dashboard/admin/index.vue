@@ -114,6 +114,119 @@ async function extractFromImage() {
   }
 }
 
+// ─── Add Question modal tab ───────────────────────────────────
+const addQuestionTab = ref('single') // 'single' | 'bulk'
+
+// ─── Bulk import ──────────────────────────────────────────────
+const bulkImgFile        = ref(null)
+const bulkImgPreview     = ref('')
+const bulkParsing        = ref(false)
+const bulkError          = ref('')
+const bulkResults        = ref([])      // array of parsed question objects
+const bulkSelected       = ref([])      // parallel boolean array for checkboxes
+const bulkExpanded       = ref([])      // parallel boolean array for row expand
+const bulkRedDotDetected = ref(false)
+const bulkTotalFound     = ref(0)
+const bulkSaving         = ref(false)
+
+function onBulkFileChange(e) {
+  const f = e.target.files?.[0]
+  if (!f) return
+  bulkImgFile.value    = f
+  bulkImgPreview.value = URL.createObjectURL(f)
+  bulkError.value      = ''
+  bulkResults.value    = []
+  bulkSelected.value   = []
+  bulkExpanded.value   = []
+}
+
+function resetBulk() {
+  bulkImgFile.value        = null
+  bulkImgPreview.value     = ''
+  bulkError.value          = ''
+  bulkResults.value        = []
+  bulkSelected.value       = []
+  bulkExpanded.value       = []
+  bulkRedDotDetected.value = false
+  bulkTotalFound.value     = 0
+  streamEN.value = ''
+}
+
+const bulkSelectedCount = computed(() => bulkSelected.value.filter(Boolean).length)
+
+function toggleBulkAll(val) {
+  bulkSelected.value = bulkSelected.value.map(() => val)
+}
+
+async function parseBulk() {
+  if (!bulkImgFile.value || !streamEN.value) return
+  bulkParsing.value = true
+  bulkError.value   = ''
+  bulkResults.value = []
+
+  try {
+    const formData = new FormData()
+    formData.append('image', bulkImgFile.value)
+    formData.append('stream', streamEN.value)
+
+    const raw = await $fetch('/api/analyze-question-bulk', { method: 'POST', body: formData })
+    const parsed = JSON.parse(raw.result)
+
+    bulkRedDotDetected.value = parsed.redDotDetected ?? false
+    bulkTotalFound.value     = parsed.totalFound     ?? parsed.questions?.length ?? 0
+    bulkResults.value        = parsed.questions      ?? []
+    bulkSelected.value       = bulkResults.value.map(() => true)   // all checked by default
+    bulkExpanded.value       = bulkResults.value.map(() => false)
+
+  } catch (err) {
+    console.error(err)
+    bulkError.value = err.message || 'Bulk parse failed. Check console.'
+  } finally {
+    bulkParsing.value = false
+  }
+}
+
+async function saveBulk() {
+  const toSave = bulkResults.value.filter((_, i) => bulkSelected.value[i])
+  if (!toSave.length) return
+  bulkSaving.value = true
+
+  const answerIndexMap    = { A: 0, B: 1, C: 2, D: 3 }
+  const difficultyBanglaMap = { Easy: 'সহজ', Medium: 'মাধ্যম', Hard: 'কঠিন' }
+
+  const payloads = toSave.map(q => ({
+    exam: streamEN.value,
+    question:    { english: q.questionEN, bangla: q.questionBN || null },
+    options:     { english: q.optionsEN,  bangla: q.optionsBN  || [] },
+    explanation: (q.explanationEN || q.explanationBN)
+      ? { english: q.explanationEN || null, bangla: q.explanationBN || null }
+      : null,
+    subject:     { english: q.subjectEN,   bangla: q.subjectBN   || null },
+    chapter:     { english: q.chapterEN,   bangla: q.chapterBN   || null },
+    difficulty:  { english: q.difficulty,  bangla: difficultyBanglaMap[q.difficulty] || null },
+    year: q.year ? { english: q.year || null, bangla: toBengaliDigits(q.year) } : null,
+    source:      { english: q.sourceEN || null,    bangla: q.sourceBN || null },
+    correct_index:    answerIndexMap[q.answerEN] ?? 0,
+    is_verified: true,
+    difficulty_level: q.difficulty?.toLowerCase() || 'medium',
+    status: 'published',
+  }))
+
+  try {
+    const supabase = streamEN.value === 'HSC' ? supabaseHSC : supabaseMedical
+    const { error } = await supabase.from('questions').insert(payloads)
+    if (error) throw new Error(error.message)
+    showToast(`${payloads.length} question${payloads.length > 1 ? 's' : ''} saved ✓`)
+    resetBulk()
+    closeModal()
+  } catch (err) {
+    console.error(err)
+    bulkError.value = err.message || 'Save failed. Check console.'
+  } finally {
+    bulkSaving.value = false
+  }
+}
+
 // ─── Sidebar & layout ────────────────────────────────────────
 const sidebarCollapsed = ref(
   typeof window !== 'undefined' && window.innerWidth <= 1024
@@ -367,12 +480,12 @@ async function saveQuestion() {
     },
 
     source: {
-      english: sourceEN.value,
+      english: sourceEN.value || null,
       bangla: sourceBN.value || null,
     },
 
     year: yearEN.value
-      ? { english: yearEN.value, bangla: toBengaliDigits(yearEN.value) }
+      ? { english: yearEN.value || null, bangla: toBengaliDigits(yearEN.value) }
       : null,
 
     is_verified: true,
@@ -411,7 +524,6 @@ async function saveQuestion() {
       return
     }
     showToast('Question saved.')
-    resetQuestionForm()
   }
 }
 
@@ -1101,7 +1213,25 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
               <span class="panel-title">{{ modal.type === 'addQuestion' ? 'ADD QUESTION' : 'EDIT QUESTION' }}</span>
               <button class="modal-close" @click="closeModal()">×</button>
             </div>
-            <div class="modal-form">
+
+            <!-- ── Tab switcher (hidden on editQuestion) ──── -->
+            <div v-if="modal.type === 'addQuestion'" class="aq-tabs">
+              <button
+                class="aq-tab"
+                :class="{ active: addQuestionTab === 'single' }"
+                @click="addQuestionTab = 'single'"
+              >Single Question</button>
+              <button
+                class="aq-tab"
+                :class="{ active: addQuestionTab === 'bulk' }"
+                @click="addQuestionTab = 'bulk'"
+              >Bulk Import</button>
+            </div>
+
+            <!-- ══════════════════════════════════════════════
+                 SINGLE QUESTION TAB
+            ══════════════════════════════════════════════ -->
+            <div v-if="modal.type === 'editQuestion' || addQuestionTab === 'single'" class="modal-form">
 
               <!-- ── Image Extractor ───────────────────────── -->
               <div class="img-extract-panel">
@@ -1265,9 +1395,177 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                 <textarea v-model="explanationBN" class="mf-input mf-textarea" rows="2" placeholder="Explain the answer…"></textarea>
               </div>
             </div>
-            <div class="modal-actions">
+            <div v-if="modal.type === 'editQuestion' || addQuestionTab === 'single'" class="modal-actions">
               <button class="iso-btn iso-btn--ghost" @click="closeModal()">Cancel</button>
-              <button class="iso-btn iso-btn--fill" @click="saveQuestion(); closeModal()">Save Question</button>
+              <button class="iso-btn iso-btn--fill" @click="saveQuestion(); resetQuestionForm(); closeModal()">Save Question</button>
+            </div>
+
+            <!-- ══════════════════════════════════════════════
+                 BULK IMPORT TAB
+            ══════════════════════════════════════════════ -->
+            <div v-if="addQuestionTab === 'bulk' && modal.type === 'addQuestion'" class="modal-form bulk-form">
+
+              <!-- Stream selector (shared ref) -->
+              <div class="mf-row">
+                <div class="mf-group">
+                  <label class="mf-label">STREAM (required)</label>
+                  <select v-model="streamEN" class="mf-input mf-select">
+                    <option value="" disabled>Select stream…</option>
+                    <option v-for="s in ['SSC','HSC','BUET','Medical','DU','BCS','Bank']" :key="s">{{ s }}</option>
+                  </select>
+                </div>
+                <div class="mf-group" style="justify-content:flex-end; padding-top:18px;">
+                  <span v-if="bulkRedDotDetected" class="bulk-mode-badge red-dot-badge">🔴 Red-dot mode</span>
+                  <span v-else-if="bulkResults.length" class="bulk-mode-badge">All questions mode</span>
+                </div>
+              </div>
+
+              <!-- Upload zone -->
+              <div
+                class="img-drop-zone bulk-drop-zone"
+                :class="{ 'has-file': bulkImgPreview }"
+                @click="$refs.bulkImgInput.click()"
+                @dragover.prevent
+                @drop.prevent="e => { const f = e.dataTransfer.files[0]; if(f){ bulkImgFile = f; bulkImgPreview = URL.createObjectURL(f); bulkError = ''; bulkResults = [] } }"
+              >
+                <img v-if="bulkImgPreview" :src="bulkImgPreview" class="img-preview bulk-img-preview" />
+                <div v-else class="img-drop-hint">
+                  <span class="img-drop-icon">📄</span>
+                  <span>Click or drag &amp; drop a question sheet image</span>
+                  <span class="mono dim" style="font-size:0.62rem">Up to 30 questions parsed · Red dots respected</span>
+                </div>
+                <input ref="bulkImgInput" type="file" accept="image/*" style="display:none" @change="onBulkFileChange" />
+              </div>
+
+              <div v-if="bulkError" class="img-error">⚠ {{ bulkError }}</div>
+
+              <!-- Parse button -->
+              <div class="img-extract-actions">
+                <button
+                  class="iso-btn iso-btn--fill img-extract-btn"
+                  :disabled="!bulkImgFile || bulkParsing || !streamEN"
+                  @click="parseBulk"
+                >
+                  <span v-if="bulkParsing" class="img-spinner">◌</span>
+                  {{ bulkParsing ? 'Analyzing image…' : !streamEN ? 'Select a stream first' : '⚡ Parse Questions' }}
+                </button>
+                <button v-if="bulkImgFile" class="iso-btn iso-btn--ghost" @click="resetBulk" style="font-size:0.72rem">Clear</button>
+              </div>
+
+              <!-- ── Review table ─────────────────────────── -->
+              <div v-if="bulkResults.length" class="bulk-review">
+
+                <div class="bulk-review-header">
+                  <span class="bulk-review-title">
+                    REVIEW — {{ bulkResults.length }} QUESTION{{ bulkResults.length > 1 ? 'S' : '' }} FOUND
+                    <span v-if="bulkRedDotDetected" style="color:rgba(255,100,100,0.8)"> · 🔴 Red-dot filtered</span>
+                  </span>
+                  <div class="bulk-review-controls">
+                    <button class="iso-btn iso-btn--ghost" style="font-size:0.65rem; padding:4px 10px" @click="toggleBulkAll(true)">Select All</button>
+                    <button class="iso-btn iso-btn--ghost" style="font-size:0.65rem; padding:4px 10px" @click="toggleBulkAll(false)">Deselect All</button>
+                  </div>
+                </div>
+
+                <div class="bulk-table">
+                  <!-- Header row -->
+                  <div class="bulk-table-head">
+                    <span class="btc-check"></span>
+                    <span class="btc-num">#</span>
+                    <span class="btc-q">Question (English)</span>
+                    <span class="btc-meta">Subject / Chapter</span>
+                    <span class="btc-ans">Ans</span>
+                    <span class="btc-diff">Diff</span>
+                    <span class="btc-expand"></span>
+                  </div>
+
+                  <!-- Data rows -->
+                  <div
+                    v-for="(q, i) in bulkResults"
+                    :key="i"
+                    class="bulk-row"
+                    :class="{ 'bulk-row--unchecked': !bulkSelected[i], 'bulk-row--expanded': bulkExpanded[i] }"
+                  >
+                    <!-- Main row -->
+                    <div class="bulk-row-main">
+                      <span class="btc-check">
+                        <input type="checkbox" v-model="bulkSelected[i]" class="bulk-checkbox" />
+                      </span>
+                      <span class="btc-num">
+                        {{ i + 1 }}
+                        <span v-if="q.redDot" class="reddot-badge">🔴</span>
+                      </span>
+                      <span class="btc-q bulk-q-text">{{ q.questionEN }}</span>
+                      <span class="btc-meta bulk-meta-text">
+                        <span class="bulk-subject">{{ q.subjectEN || '—' }}</span>
+                        <span class="bulk-chapter">{{ q.chapterEN || '—' }}</span>
+                      </span>
+                      <span class="btc-ans">
+                        <span class="bulk-answer-badge">{{ q.answerEN }}</span>
+                      </span>
+                      <span class="btc-diff">
+                        <span class="bulk-diff-badge" :class="'diff-' + (q.difficulty || 'medium').toLowerCase()">{{ q.difficulty }}</span>
+                      </span>
+                      <span class="btc-expand">
+                        <button class="bulk-expand-btn" @click="bulkExpanded[i] = !bulkExpanded[i]">
+                          {{ bulkExpanded[i] ? '▲' : '▼' }}
+                        </button>
+                      </span>
+                    </div>
+
+                    <!-- Expanded detail -->
+                    <div v-if="bulkExpanded[i]" class="bulk-row-detail">
+                      <div class="brd-section">
+                        <span class="brd-label">English Question</span>
+                        <span class="brd-text">{{ q.questionEN || '—' }} <span class="brd-text" style="font-size:0.7rem; opacity:0.7">({{ q.questionBN || '—' }})</span></span>
+                      </div>
+                      <div class="brd-section">
+                        <span class="brd-label">Options</span>
+                        <div class="brd-options">
+                          <span v-for="(opt, oi) in ['A','B','C','D']" :key="oi" class="brd-option" :class="{ 'brd-option--correct': q.answerEN === opt }">
+                            <b>{{ opt }}.</b> {{ q.optionsEN[oi] || '—' }}
+                            <span v-if="q.optionsBN[oi]" class="brd-option-bn bn-text"> / {{ q.optionsBN[oi] }}</span>
+                          </span>
+                        </div>
+                      </div>
+                      <div v-if="q.explanationEN || q.explanationBN" class="brd-section">
+                        <span class="brd-label">Explanation</span>
+                        <span v-if="q.explanationEN" class="brd-text">{{ q.explanationEN }} <span v-if="q.explanationBN" class="brd-text" style="font-size:0.7rem; opacity:0.7">({{ q.explanationBN }})</span></span>
+                      </div>
+                      <div class="brd-section brd-meta-row">
+                        <span v-if="q.year"><b>Year:</b> {{ q.year }}</span>
+                        <span v-if="q.sourceEN?.length">
+                          <b>Source: </b>
+                          <span v-for="(s, si) in q.sourceEN" :key="si" class="bn-text">{{ s }}{{ si < q.sourceEN.length - 1 ? ' · ' : '' }}</span>
+                        </span>
+                        <span v-if="q.sourceBN?.length" style="font-size:0.65rem; opacity:0.7">
+                          ({{ q.sourceBN.join(' · ') }})
+                        </span>
+                        <span v-if="q.subjectEN" class="bn-text"><b>Subject:</b> {{ q.subjectEN }} <span v-if="q.subjectBN" style="font-size:0.65rem; opacity:0.7">({{ q.subjectBN }})</span></span>
+                        <span v-if="q.chapterEN" class="bn-text"><b>Chapter:</b> {{ q.chapterEN }} <span v-if="q.chapterBN" style="font-size:0.65rem; opacity:0.7">({{ q.chapterBN }})</span></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Save bar -->
+                <div class="bulk-save-bar">
+                  <span class="bulk-save-info">{{ bulkSelectedCount }} of {{ bulkResults.length }} selected</span>
+                  <button
+                    class="iso-btn iso-btn--fill"
+                    :disabled="!bulkSelectedCount || bulkSaving"
+                    @click="saveBulk"
+                  >
+                    <span v-if="bulkSaving" class="img-spinner">◌</span>
+                    {{ bulkSaving ? 'Saving…' : `Save Selected (${bulkSelectedCount})` }}
+                  </button>
+                </div>
+
+              </div>
+              <!-- ── / Review table ───────────────────────── -->
+
+            </div>
+            <div v-if="addQuestionTab === 'bulk' && modal.type === 'addQuestion' && !bulkResults.length" class="modal-actions">
+              <button class="iso-btn iso-btn--ghost" @click="closeModal()">Cancel</button>
             </div>
           </template>
 
@@ -1891,5 +2189,175 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
   .page-chip   { font-size: 0.55rem; padding: 4px 10px; }
   .hsc-value   { font-size: 1.6rem; }
   .modal-stats-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ADD QUESTION MODAL TABS
+═══════════════════════════════════════════════════════════════ */
+.aq-tabs {
+  display: flex; border-bottom: 1px solid var(--border);
+}
+.aq-tab {
+  flex: 1; padding: 10px 0;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--gray); font-family: var(--font-mono); font-size: 0.68rem;
+  letter-spacing: 0.1em; cursor: pointer; transition: all 0.15s;
+  margin-bottom: -1px;
+}
+.aq-tab:hover  { color: var(--white); }
+.aq-tab.active { color: var(--white); border-bottom-color: var(--white); }
+
+/* ═══════════════════════════════════════════════════════════════
+   BULK IMPORT
+═══════════════════════════════════════════════════════════════ */
+.bulk-form { gap: 14px; }
+
+.bulk-drop-zone  { min-height: 130px; }
+.bulk-img-preview { max-height: 160px; }
+
+.bulk-mode-badge {
+  font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.08em;
+  padding: 3px 9px; border: 1px solid var(--border-bright);
+  color: var(--gray); align-self: center;
+}
+.red-dot-badge { border-color: rgba(255,100,100,0.4); color: rgba(255,140,140,0.9); }
+
+/* Review table */
+.bulk-review { display: flex; flex-direction: column; gap: 0; margin-top: 4px; }
+
+.bulk-review-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0; margin-bottom: 4px; gap: 8px; flex-wrap: wrap;
+}
+.bulk-review-title {
+  font-family: var(--font-mono); font-size: 0.62rem;
+  letter-spacing: 0.12em; color: var(--gray);
+}
+.bulk-review-controls { display: flex; gap: 6px; }
+
+.bulk-table { border: 1px solid var(--border); }
+
+.bulk-table-head {
+  display: grid;
+  grid-template-columns: 28px 36px 1fr 160px 36px 60px 28px;
+  gap: 0; padding: 6px 10px;
+  background: rgba(240,240,234,0.04);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: 0.58rem;
+  letter-spacing: 0.1em; color: var(--gray);
+  align-items: center;
+}
+
+.bulk-row { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+.bulk-row:last-child { border-bottom: none; }
+.bulk-row:hover { background: rgba(240,240,234,0.02); }
+.bulk-row--unchecked { opacity: 0.4; }
+
+.bulk-row-main {
+  display: grid;
+  grid-template-columns: 28px 36px 1fr 160px 36px 60px 28px;
+  gap: 0; padding: 8px 10px; align-items: center;
+}
+
+.btc-check { display: flex; align-items: center; }
+.bulk-checkbox { accent-color: var(--white); cursor: pointer; width: 13px; height: 13px; }
+
+.btc-num {
+  font-family: var(--font-mono); font-size: 0.65rem;
+  color: var(--gray); display: flex; align-items: center; gap: 3px;
+}
+.reddot-badge { font-size: 0.55rem; }
+
+.btc-q {}
+.bulk-q-text {
+  font-family: var(--font-sans); font-size: 0.76rem; color: var(--white);
+  line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden;
+}
+
+.btc-meta {}
+.bulk-meta-text {
+  display: flex; flex-direction: column; gap: 2px; padding: 0 6px;
+}
+.bulk-subject {
+  font-family: var(--font-mono); font-size: 0.6rem;
+  color: var(--white); letter-spacing: 0.05em;
+}
+.bulk-chapter {
+  font-family: var(--font-sans); font-size: 0.62rem;
+  color: var(--gray); line-height: 1.2;
+  display: -webkit-box; -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical; overflow: hidden;
+}
+
+.btc-ans { display: flex; align-items: center; justify-content: center; }
+.bulk-answer-badge {
+  font-family: var(--font-mono); font-size: 0.68rem; font-weight: 600;
+  width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-bright); color: var(--white);
+}
+
+.btc-diff { display: flex; align-items: center; }
+.bulk-diff-badge {
+  font-family: var(--font-mono); font-size: 0.58rem; padding: 2px 7px;
+  border: 1px solid var(--border);
+}
+.bulk-diff-badge.diff-easy   { border-color: rgba(120,230,120,0.3); color: rgba(120,230,120,0.8); }
+.bulk-diff-badge.diff-medium { border-color: rgba(255,200,80,0.3);  color: rgba(255,200,80,0.8);  }
+.bulk-diff-badge.diff-hard   { border-color: rgba(255,100,100,0.3); color: rgba(255,100,100,0.8); }
+
+.btc-expand { display: flex; align-items: center; justify-content: center; }
+.bulk-expand-btn {
+  background: none; border: none; color: var(--gray); cursor: pointer;
+  font-size: 0.6rem; padding: 2px 4px; transition: color 0.15s;
+}
+.bulk-expand-btn:hover { color: var(--white); }
+
+/* Expanded detail */
+.bulk-row-detail {
+  padding: 10px 12px 14px 74px;
+  border-top: 1px solid var(--border);
+  background: rgba(240,240,234,0.02);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.brd-section { display: flex; flex-direction: column; gap: 4px; }
+.brd-label {
+  font-family: var(--font-mono); font-size: 0.56rem;
+  letter-spacing: 0.12em; color: var(--gray);
+}
+.brd-text {
+  font-family: var(--font-sans); font-size: 0.78rem;
+  color: var(--white); line-height: 1.4;
+}
+.brd-options { display: flex; flex-direction: column; gap: 4px; }
+.brd-option {
+  font-family: var(--font-sans); font-size: 0.74rem;
+  color: var(--gray); line-height: 1.3;
+}
+.brd-option--correct { color: rgba(120,230,120,0.9); }
+.brd-option-bn { opacity: 0.7; }
+.brd-meta-row {
+  flex-direction: row; flex-wrap: wrap; gap: 12px;
+  font-family: var(--font-sans); font-size: 0.7rem; color: var(--gray);
+}
+.bn-text { font-family: 'Noto Sans Bengali', sans-serif; }
+
+/* Save bar */
+.bulk-save-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0 0; gap: 10px;
+}
+.bulk-save-info {
+  font-family: var(--font-mono); font-size: 0.66rem; color: var(--gray);
+}
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .bulk-table-head,
+  .bulk-row-main {
+    grid-template-columns: 24px 28px 1fr 36px 50px 24px;
+  }
+  .btc-meta { display: none; }
+  .bulk-row-detail { padding-left: 12px; }
 }
 </style>
