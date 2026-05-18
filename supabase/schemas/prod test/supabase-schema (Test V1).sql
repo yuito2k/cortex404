@@ -131,7 +131,7 @@ create table if not exists public.questions (
   difficulty_level  text not null default 'medium' check (difficulty_level in ('easy','medium','hard')),
 
   -- Optional metadata
-  source            text,             -- e.g. "BUET 2023 Question Paper"
+  source            jsonb,             -- e.g. "BUET 2023 Question Paper"
   --has_image         boolean not null default false,
   --image_url         text,             -- image for the question if any
   --tags              text[],           -- freeform tags for cross-topic search

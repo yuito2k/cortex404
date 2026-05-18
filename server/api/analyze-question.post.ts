@@ -46,7 +46,8 @@ The JSON must follow this exact shape:
   "subjectBN":     "<the Bengali name of the chosen subject, exactly as shown in the list>",
   "chapterEN":     "<pick the single closest matching chapter for the chosen subject from the list below>",
   "chapterBN":     "<the Bengali name of the chosen chapter, exactly as shown in the list>",
-  "difficulty":    "<Easy | Medium | Hard — judge by question complexity>"
+  "difficulty":    "<Easy | Medium | Hard — judge by question complexity>",
+  "lowConfidence": <true if the text was blurry, partially cut off, handwritten, or you were uncertain about any field — else false>
 }
 
 Rules:
@@ -54,6 +55,7 @@ Rules:
 - If fewer than 4 options exist in the image, fill remaining optionsBN/optionsEN with empty strings.
 - sourceBN and sourceEN are always arrays. Even a single source must be wrapped: ["ঢাকা বোর্ড"]. Never a plain string.
 - If the image contains a mix of board exams and school/college test papers, include all institution names found.
+- Set lowConfidence: true if the image quality was poor for that question, text was ambiguous, correct answer was unclear, or you had to guess any field.
 - Return ONLY the JSON object.
 
 Valid subjects and chapters for ${stream}:

@@ -60,7 +60,8 @@ Return ONLY a valid JSON object with NO markdown, NO explanation, NO code fences
       "chapterEN":     "<pick the single closest matching chapter for the chosen subject>",
       "chapterBN":     "<Bengali name of chosen chapter exactly as in the list>",
       "difficulty":    "<Easy | Medium | Hard>",
-      "redDot":        <true if this specific question had a red dot, else false>
+      "redDot":        <true if this specific question had a red dot, else false>,
+      "lowConfidence": <true if the text was blurry, partially cut off, handwritten, or you were uncertain about any field — else false>
     }
   ]
 }
@@ -71,6 +72,7 @@ Rules:
 - year and source may be shared across all questions if printed once at the top of the sheet.
 - sourceBN and sourceEN are always arrays. Even a single source must be wrapped: ["ঢাকা বোর্ড"]. Never a plain string.
 - If the image contains a mix of board exams and school/college test papers, include all institution names found.
+- Set lowConfidence: true if the image quality was poor for that question, text was ambiguous, correct answer was unclear, or you had to guess any field.
 - Return ONLY the JSON object.
 
 Valid subjects and chapters for ${stream}:

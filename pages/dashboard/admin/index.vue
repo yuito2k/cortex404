@@ -152,6 +152,36 @@ function resetBulk() {
   streamEN.value = ''
 }
 
+//async function checkDuplicates(questions) {
+//  const supabase = streamEN.value === 'HSC' ? supabaseHSC : supabaseMedical
+//  // const texts = questions.map(q => q.questionEN).filter(Boolean)
+//  const texts = questions.map(q => q.questionBN).filter(Boolean)
+//  if (!texts.length) return new Set()
+//
+//  const { data } = await supabase
+//    .from('questions')
+//    .select('question')
+//    .in('question->>bangla', texts) //.in('question->>english', texts)
+//
+//
+//  //const foundTexts = new Set((data || []).map(row => row.question?.english))
+//  const foundTexts = new Set((data || []).map(row => row.question?.bangla))
+//  return foundTexts
+//}
+
+async function checkDuplicates(questions) {
+  const raw = await $fetch('/api/check-duplicates', {
+    method: 'POST',
+    body: { questions, stream: streamEN.value}
+  })
+
+  return new Set(
+    raw.results
+      .filter(r => r.isDuplicate)
+      .map(r => r.questionBN)
+  )
+}
+
 const bulkSelectedCount = computed(() => bulkSelected.value.filter(Boolean).length)
 
 function toggleBulkAll(val) {
@@ -174,8 +204,13 @@ async function parseBulk() {
 
     bulkRedDotDetected.value = parsed.redDotDetected ?? false
     bulkTotalFound.value     = parsed.totalFound     ?? parsed.questions?.length ?? 0
-    bulkResults.value        = parsed.questions      ?? []
-    bulkSelected.value       = bulkResults.value.map(() => true)   // all checked by default
+    const questions          = parsed.questions ?? []
+    const duplicates         = await checkDuplicates(questions)
+    bulkResults.value        = questions.map(q => ({
+      ...q,
+      isDuplicate: duplicates.has(q.questionBN)
+    }))
+    bulkSelected.value       = bulkResults.value.map(q => !q.isDuplicate) // uncheck duplicates by default
     bulkExpanded.value       = bulkResults.value.map(() => false)
 
   } catch (err) {
@@ -1471,6 +1506,7 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                   <div class="bulk-table-head">
                     <span class="btc-check"></span>
                     <span class="btc-num">#</span>
+                    <span class="btc-flags"></span>
                     <span class="btc-q">Question (English)</span>
                     <span class="btc-meta">Subject / Chapter</span>
                     <span class="btc-ans">Ans</span>
@@ -1492,7 +1528,11 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                       </span>
                       <span class="btc-num">
                         {{ i + 1 }}
-                        <span v-if="q.redDot" class="reddot-badge">🔴</span>
+                        <span v-if="q.redDot" class="reddot-badge" title="Red dot marked">🔴</span>
+                      </span>
+                      <span class="btc-flags">
+                        <span v-if="q.lowConfidence" class="flag-badge flag-warn" title="Low confidence — review carefully">⚠</span>
+                        <span v-if="q.isDuplicate"   class="flag-badge flag-dup"  title="Already exists in database">DUP</span>
                       </span>
                       <span class="btc-q bulk-q-text">{{ q.questionEN }}</span>
                       <span class="btc-meta bulk-meta-text">
@@ -2239,7 +2279,7 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
 
 .bulk-table-head {
   display: grid;
-  grid-template-columns: 28px 36px 1fr 160px 36px 60px 28px;
+  grid-template-columns: 28px 36px 40px 1fr 160px 36px 60px 28px;
   gap: 0; padding: 6px 10px;
   background: rgba(240,240,234,0.04);
   border-bottom: 1px solid var(--border);
@@ -2255,7 +2295,7 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
 
 .bulk-row-main {
   display: grid;
-  grid-template-columns: 28px 36px 1fr 160px 36px 60px 28px;
+  grid-template-columns: 28px 36px 40px 1fr 160px 36px 60px 28px;
   gap: 0; padding: 8px 10px; align-items: center;
 }
 
@@ -2351,11 +2391,20 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
   font-family: var(--font-mono); font-size: 0.66rem; color: var(--gray);
 }
 
+.btc-flags { display: flex; align-items: center; gap: 3px; }
+.flag-badge {
+  font-family: var(--font-mono); font-size: 0.55rem;
+  padding: 1px 5px; border: 1px solid;
+  line-height: 1.4; white-space: nowrap;
+}
+.flag-warn { border-color: rgba(255,200,80,0.4);  color: rgba(255,200,80,0.9);  }
+.flag-dup  { border-color: rgba(255,100,100,0.4); color: rgba(255,100,100,0.9); }
+
 /* ── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 600px) {
   .bulk-table-head,
   .bulk-row-main {
-    grid-template-columns: 24px 28px 1fr 36px 50px 24px;
+    grid-template-columns: 24px 28px 32px 1fr 36px 50px 24px;
   }
   .btc-meta { display: none; }
   .bulk-row-detail { padding-left: 12px; }
