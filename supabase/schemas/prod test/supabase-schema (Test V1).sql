@@ -30,9 +30,11 @@ create table if not exists public.profiles (
   status           text not null default 'unverified'   check (status in ('active','banned','unverified')),
 
   -- Academic context (settings.vue profile tab)
-  primary_stream   text default 'HSC',            -- HSC | SSC | BUET | Medical | BCS | Bank
+  primary_stream   text default 'HSC Science',            -- HSC | SSC | BUET | Medical | BCS | Bank
   institution      text,                          -- school / college name
   district         text,                          -- Bangladesh district
+  heard_from       text,                          -- how user heard about cortex404
+  onboarding_completed boolean not null default false, -- whether user has completed onboarding
 
   -- Appearance preference
   --theme            text not null default 'dark',  -- dark | light | system
@@ -41,7 +43,7 @@ create table if not exists public.profiles (
   -- Shape: { stream, questionCount, duration, difficulty, shuffle,
   --          negativeMarking, qbPageSize, autoExpand }
   exam_prefs       jsonb not null default '{
-    "stream":          "HSC",
+    "stream":          "HSC Science",
     "questionCount":   30,
     "duration":        30,
     "difficulty":      "balanced",
