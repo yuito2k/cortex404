@@ -180,20 +180,23 @@
             :key="q.id"
             class="question-card"
             :id="`q-${q.id}`"
-            :class="{ expanded: expandedId === q.id, solved: solvedIds.has(q.id) }"
+            :class="{ expanded: expandedId === q.id, solved: solvedIds.has(q.id), wrong: wrongIds.has(q.id) }"
             :style="{ animationDelay: i * 0.04 + 's' }"
           >
             <!-- Card header -->
             <div class="qcard-header" @click="toggleExpand(q.id)">
               <div class="qcard-meta">
                 <span class="q-index">#{{ (currentPage - 1) * pageSize + i + 1 }}</span>
-                <span class="q-diff-badge" :class="q.difficultyLevel">{{ q.difficulty[selectedLang] }}</span>
+                <span class="q-diff-badge" :class="q.difficulty_level">{{ q.difficulty[selectedLang] }}</span>
                 <span class="q-subject-tag">{{ q.subject[selectedLang] }}</span>
                 <span class="q-chapter-tag">{{ q.chapter[selectedLang] }}</span>
-                <span v-if="q.year" class="q-year-tag">{{ q.year[selectedLang] }}</span>
+                <span v-if="q.years?.length" class="q-year-tag">
+                  {{ q.years[0][selectedLang] }}
+                </span>
               </div>
               <div class="qcard-actions">
-                <span v-if="solvedIds.has(q.id)" class="solved-badge">✓ Solved</span>
+                <span v-if="solvedIds.has(q.id) && !wrongIds.has(q.id)" class="solved-badge">✓ Solved</span>
+                <span v-if="wrongIds.has(q.id)" class="wrong-badge">✗ Wrong</span>
                 <span v-if="bookmarkedIds.has(q.id)" class="bookmark-active">
                   <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" width="14" height="14">
                     <path d="M5 3h14a1 1 0 0 1 1 1v17l-7-3.5L6 21V4a1 1 0 0 1 1-1z"/>
@@ -223,16 +226,16 @@
                     class="option-btn"
                     :class="{
                       selected: selectedAnswers[q.id] === oi,
-                      correct: showAnswer[q.id] && oi === q.correctIndex,
-                      wrong: showAnswer[q.id] && selectedAnswers[q.id] === oi && oi !== q.correctIndex,
+                      correct: showAnswer[q.id] && oi === q.correct_index,
+                      wrong: showAnswer[q.id] && selectedAnswers[q.id] === oi && oi !== q.correct_index,
                     }"
                     :disabled="showAnswer[q.id]"
                     @click.stop="selectAnswer(q.id, oi)"
                   >
                     <span class="opt-letter">{{ optLetters[oi] }}</span>
                     <span class="opt-text">{{ opt }}</span>
-                    <span v-if="showAnswer[q.id] && oi === q.correctIndex" class="opt-check">✓</span>
-                    <span v-else-if="showAnswer[q.id] && selectedAnswers[q.id] === oi && oi !== q.correctIndex" class="opt-x">✗</span>
+                    <span v-if="showAnswer[q.id] && oi === q.correct_index" class="opt-check">✓</span>
+                    <span v-else-if="showAnswer[q.id] && selectedAnswers[q.id] === oi && oi !== q.correct_index" class="opt-x">✗</span>
                   </button>
                 </div>
 
@@ -347,7 +350,7 @@
         </div>
 
         <!-- Bookmarks -->
-        <div class="side-panel">
+        <!--<div class="side-panel">
           <div class="panel-header">
             <span class="panel-tag">Bookmarked</span>
             <span class="panel-count">{{ bookmarkedIds.size }}</span>
@@ -364,6 +367,29 @@
             >
               <span class="bm-hash">#{{ allQuestions.findIndex(q => q.id === id) + 1 }}</span>
               <span class="bm-text">{{ allQuestions.find(q => q.id === id)?.question[selectedLang].slice(0, 55) }}…</span>
+            </div>
+            <span v-if="bookmarkedIds.size > 5" class="bm-more">+{{ bookmarkedIds.size - 5 }} more</span>
+          </div>
+        </div>-->
+
+        <!-- Bookmarks -->
+        <div class="side-panel">
+          <div class="panel-header">
+            <span class="panel-tag">Bookmarked</span>
+            <span class="panel-count">{{ bookmarkedIds.size }}</span>
+          </div>
+          <div v-if="!bookmarkedIds.size" class="side-empty">
+            Bookmark questions to review later.
+          </div>
+          <div v-else class="bookmark-list">
+            <div
+              v-for="(bq, i) in bookmarkedQuestions.slice(0, 5)"
+              :key="bq.id"
+              class="bookmark-row"
+              @click="jumpToQuestion(bq.id)"
+            >
+              <span class="bm-hash">#{{ i + 1 }}</span>
+              <span class="bm-text">{{ bq.question[selectedLang]?.slice(0, 55) }}…</span>
             </div>
             <span v-if="bookmarkedIds.size > 5" class="bm-more">+{{ bookmarkedIds.size - 5 }} more</span>
           </div>
@@ -422,21 +448,78 @@
 
 <script setup lang="ts">
 definePageMeta({ middleware: 'auth', layout: 'dashboard' })
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = useSupabaseClient()
+const session = useSupabaseSession()
+
+const config = useRuntimeConfig()
+
+const bookmarkedQuestions = ref<{ id: number; question: any }[]>([])
+
+//async function fetchBookmarks() {
+//  if (!session.value) return
+//  const { data } = await supabase
+//    .from('bookmarks')
+//    .select('question_id')
+//    .eq('user_id', session.value.user.id)
+//
+//  bookmarkedIds.value = new Set((data ?? []).map(r => r.question_id))
+//  bookmarkedQuestions.value = (data ?? []).map(r => r.questions).filter(Boolean)
+//}
+
+async function fetchBookmarks() {
+  if (!session.value) return
+
+  const { data: bms } = await supabase
+    .from('bookmarks')
+    .select('question_id')
+    .eq('user_id', session.value.user.id)
+    .order('created_at', { ascending: false })
+
+  if (!bms?.length) {
+    bookmarkedIds.value = new Set()
+    bookmarkedQuestions.value = []
+    return
+  }
+
+  const ids = bms.map(r => r.question_id)
+  bookmarkedIds.value = new Set(ids)
+
+  const supabaseStream = createClient(
+        selectedExam.value.startsWith('HSC') ? config.public.supabaseCortexHSC_URL : config.public.supabaseCortexMedical_URL,
+        selectedExam.value.startsWith('HSC') ? config.public.supabaseCortexHSC_KEY : config.public.supabaseCortexMedical_KEY
+  )
+
+  const { data: qs } = await supabaseStream
+    .from('questions')        // ← replace with your actual table name if different
+    .select('id, question')
+    .in('id', ids)
+
+  const qMap = Object.fromEntries((qs ?? []).map(q => [String(q.id), q]))
+  bookmarkedQuestions.value = ids.map(id => qMap[String(id)]).filter(Boolean)
+}
+
+onMounted(fetchBookmarks)
 
 // ── Types ──────────────────────────────────────────────────
 interface Question {
   id: number
   question: string | { english: string; bangla: string }
+  question_image?: string | null        // ADD
+  stimulus?: { english: string; bangla: string } | null   // ADD
+  stimulus_image?: string | null        // ADD
+  stimulus_hash?: string | null   // ADD — links questions sharing same stimulus
   options?: string[] | { english: string[]; bangla: string[] }
-  correctIndex?: number  // unchanged — index is language-agnostic
+  correct_index?: number  // unchanged — index is language-agnostic
   explanation: string | { english: string; bangla: string }
   subject: string | { english: string; bangla: string }
   chapter: string | { english: string; bangla: string }
   exam: string
   difficulty: string | { english: string; bangla: string }
-  difficultyLevel: 'easy' | 'medium' | 'hard'
-  year?: string | { english: string; bangla: string }
-  yearEn?: number
+  difficulty_level: 'easy' | 'medium' | 'hard'
+  years?: { english: string; bangla: string }[]
+  yearEN?: number
 }
 
 const { tm, isBn } = useI18n()
@@ -445,7 +528,7 @@ let selectedLang = computed(() => isBn.value ? 'bangla' : 'english')
 // ── Constants ──────────────────────────────────────────────
 const optLetters = ['A', 'B', 'C', 'D', 'E']
 
-const examStreams = ['All', 'HSC', 'SSC', 'BUET', 'Medical', 'DU', 'BCS', 'Bank']
+const examStreams = ['All', 'HSC Science', 'HSC Arts', 'HSC Commerce', 'SSC', 'BUET', 'Medical', 'DU', 'BCS', 'Bank']
 
 const subjectMap = computed<Record<string, string[]>>(
   () => tm('qBank.subjectMap') as Record<string, string[]>
@@ -475,7 +558,7 @@ const bankStats = [
 // ── State ──────────────────────────────────────────────────
 const loading = ref(true)
 const searchQuery = ref('')
-const selectedExam = ref('All')
+const selectedExam = ref('HSC Science')
 const selectedSubject = ref('All')
 const selectedDiff = ref('all')
 const selectedChapter = ref('')
@@ -488,503 +571,43 @@ const selectedAnswers = ref<Record<number, number>>({})
 const showAnswer = ref<Record<number, boolean>>({})
 const bookmarkedIds = ref<Set<number>>(new Set())
 const solvedIds = ref<Set<number>>(new Set())
+const wrongIds = ref<Set<number>>(new Set())
 const sessionStats = ref({ attempted: 0, correct: 0, wrong: 0 })
 
 // ── Demo question bank ─────────────────────────────────────
 const allQuestions = ref<Question[]>([])
-
-const demoQuestions: Question[] = [
-  // HSC Physics
-  {
-    id: 1, exam: 'HSC', 
-    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
-    chapter: { english: 'Optics & Wave', bangla: 'আলোকবিজ্ঞান ও তরঙ্গ' }, 
-    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
-    year: { english: '2023', bangla: '২০২৩' },
-    difficultyLevel: 'hard',
-    yearEn: 2023,
-    question: {
-      english: 'A convex lens of focal length 20 cm is placed coaxially with a concave lens of focal length 40 cm. The combination behaves as:',
-      bangla: '২০ সেমি ফোকাস দূরত্বের একটি উত্তল লেন্স ৪০ সেমি ফোকাস দূরত্বের একটি অবতল লেন্সের সাথে সমাক্ষীয়ভাবে স্থাপিত। সমন্বয়টি কাজ করে:'
-    },
-    options: {
-      english: ['Converging lens of f = 40 cm', 'Diverging lens of f = 40 cm', 'Converging lens of f = 20 cm', 'Plane glass'],
-      bangla: ['f = ৪০ সেমি অভিসারী লেন্স', 'f = ৪০ সেমি অপসারী লেন্স', 'f = ২০ সেমি অভিসারী লেন্স', 'সমতল কাচ']
-    },
-    correctIndex: 0,
-    explanation: {
-      english: 'For combination: 1/f = 1/f₁ + 1/f₂ = 1/20 + 1/(−40) = 1/40. So f = 40 cm converging.',
-      bangla: 'সমন্বয়ের ক্ষেত্রে: ১/f = ১/f₁ + ১/f₂ = ১/২০ + ১/(−৪০) = ১/৪০। সুতরাং f = ৪০ সেমি অভিসারী।'
-    }
-  },
-
-  {
-    id: 2, exam: 'HSC', 
-    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
-    chapter: { english: 'Electricity', bangla: 'তড়িৎ' }, 
-    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
-    year: { english: '2022', bangla: '২০২২' },
-    difficultyLevel: 'medium',
-    yearEn: 2022,
-    question: {
-      english: 'Two resistors of 4Ω and 6Ω are connected in parallel. The equivalent resistance is:',
-      bangla: '৪Ω এবং ৬Ω এর দুটি রোধ সমান্তরালে সংযুক্ত। তুল্য রোধ কত?'
-    },
-    options: {
-      english: ['10Ω', '2.4Ω', '5Ω', '1.67Ω'],
-      bangla: ['১০Ω', '২.৪Ω', '৫Ω', '১.৬৭Ω']
-    },
-    correctIndex: 1,
-    explanation: {
-      english: '1/R = 1/4 + 1/6 = 5/12. So R = 12/5 = 2.4Ω.',
-      bangla: '১/R = ১/৪ + ১/৬ = ৫/১২। সুতরাং R = ১২/৫ = ২.৪Ω।'
-    }
-  },
-
-  {
-    id: 3, exam: 'HSC', 
-    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
-    chapter: { english: 'Motion', bangla: 'গতি' }, 
-    difficulty: { english: 'easy', bangla: 'সহজ' }, 
-    year: { english: '2021', bangla: '২০২১' },
-    difficultyLevel: 'easy',
-    yearEn: 2021,
-    question: {
-      english: "A body at rest is said to be in uniform motion with zero acceleration. According to Newton's first law, what keeps it in that state?",
-      bangla: "স্থির বস্তু শূন্য ত্বরণে সুষম গতিতে আছে বলা হয়। নিউটনের প্রথম সূত্র অনুসারে, কোন ধর্ম বস্তুটিকে এই অবস্থায় রাখে?"
-    },
-    options: {
-      english: ['Gravity', 'Inertia', 'Friction', 'Net force'],
-      bangla: ['মহাকর্ষ', 'জড়তা', 'ঘর্ষণ', 'নিট বল']
-    },
-    correctIndex: 1,
-    explanation: {
-      english: "Newton's first law states that a body remains at rest or in uniform motion unless acted upon by an external net force. Inertia is the property responsible.",
-      bangla: "নিউটনের প্রথম সূত্র অনুযায়ী, বাহ্যিক বল প্রয়োগ না করলে বস্তু যে অবস্থায় আছে সে অবস্থাতেই থাকতে চায়। জড়তা হলো সেই ধর্ম।"
-    }
-  },
-
-  // HSC Chemistry
-  {
-    id: 4, exam: 'HSC', 
-    subject: { english: 'Chemistry', bangla: 'রসায়ন' }, 
-    chapter: { english: 'Electrochemistry', bangla: 'তড়িৎ রসায়ন' }, 
-    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
-    year: { english: '2023', bangla: '২০২৩' },
-    difficultyLevel: 'hard',
-    yearEn: 2023,
-    question: {
-      english: 'During electrolysis of dilute H₂SO₄, which gas is liberated at the anode?',
-      bangla: 'লঘু H₂SO₄ এর তড়িৎ বিশ্লেষণের সময় অ্যানোডে কোন গ্যাসটি মুক্ত হয়?'
-    },
-    options: {
-      english: ['Hydrogen', 'Oxygen', 'Sulphur dioxide', 'Ozone'],
-      bangla: ['হাইড্রোজেন', 'অক্সিজেন', 'সালফার ডাই অক্সাইড', 'ওজোন']
-    },
-    correctIndex: 1,
-    explanation: {
-      english: 'At the anode (oxidation), water is oxidized: 2H₂O → O₂ + 4H⁺ + 4e⁻. Oxygen is liberated.',
-      bangla: 'অ্যানোডে (জারণ) পানি জারিত হয়: 2H₂O → O₂ + 4H⁺ + 4e⁻। ফলে অক্সিজেন মুক্ত হয়।'
-    }
-  },
-
-  {
-    id: 5, exam: 'HSC', 
-    subject: { english: 'Chemistry', bangla: 'রসায়ন' }, 
-    chapter: { english: 'Periodic Table', bangla: 'পর্যায় সারণি' }, 
-    difficulty: { english: 'easy', bangla: 'সহজ' }, 
-    year: { english: '2022', bangla: '২০২২' },
-    difficultyLevel: 'easy',
-    yearEn: 2022,
-    question: {
-      english: 'Which of the following has the highest electronegativity?',
-      bangla: 'নিচের কোনটির তড়িৎ ঋণাত্মকতা সবচেয়ে বেশি?'
-    },
-    options: {
-      english: ['Chlorine (Cl)', 'Fluorine (F)', 'Oxygen (O)', 'Nitrogen (N)'],
-      bangla: ['ক্লোরিন (Cl)', 'ফ্লোরিন (F)', 'অক্সিজেন (O)', 'নাইট্রোজেন (N)']
-    },
-    correctIndex: 1,
-    explanation: {
-      english: 'Fluorine has the highest electronegativity (3.98 on Pauling scale) of all elements.',
-      bangla: 'ফ্লোরিন এর তড়িৎ ঋণাত্মকতা সবচেয়ে বেশি (পাউলিং স্কেলে ৩.৯৮)।'
-    }
-  },
-
-  {
-    id: 6, exam: 'HSC', 
-    subject: { english: 'Chemistry', bangla: 'রসায়ন' }, 
-    chapter: { english: 'Organic Chemistry', bangla: 'জৈব রসায়ন' }, 
-    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
-    year: { english: '2023', bangla: '২০২৩' },
-    difficultyLevel: 'medium',
-    yearEn: 2023,
-    question: {
-      english: 'Which functional group is present in ethanol?',
-      bangla: 'ইথানলে কোন কার্যকরী মূলক উপস্থিত থাকে?'
-    },
-    options: {
-      english: ['Aldehyde –CHO', 'Carboxyl –COOH', 'Hydroxyl –OH', 'Ketone C=O'],
-      bangla: ['অ্যালডিহাইড –CHO', 'কার্বক্সিল –COOH', 'হাইড্রোক্সিল –OH', 'কিটোন C=O']
-    },
-    correctIndex: 2,
-    explanation: {
-      english: 'Ethanol (C₂H₅OH) is an alcohol. It contains the hydroxyl functional group (–OH).',
-      bangla: 'ইথানল (C₂H₅OH) একটি অ্যালকোহল। এতে হাইড্রোক্সিল (–OH) কার্যকরী মূলক থাকে।'
-    }
-  },
-
-  // HSC Math
-  {
-    id: 7, exam: 'HSC', 
-    subject: { english: 'Math', bangla: 'গণিত' }, 
-    chapter: { english: 'Integration', bangla: 'যোগজীকরণ' }, 
-    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
-    year: { english: '2022', bangla: '২০২২' },
-    difficultyLevel: 'hard',
-    yearEn: 2022,
-    question: {
-      english: 'Evaluate: ∫(x² + 3x + 2)dx from x=0 to x=1',
-      bangla: 'মান নির্ণয় করো: ∫(x² + 3x + 2)dx (সীমা x=০ থেকে x=১)'
-    },
-    options: {
-      english: ['23/6', '5/2', '7/3', '3/2'],
-      bangla: ['২৩/৬', '৫/২', '৭/৩', '৩/২']
-    },
-    correctIndex: 0,
-    explanation: {
-      english: '∫(x²+3x+2)dx = [x³/3 + 3x²/2 + 2x] from 0 to 1 = 1/3 + 3/2 + 2 = 23/6.',
-      bangla: '∫(x²+3x+2)dx = [x³/৩ + ৩x²/২ + ২x] (০ থেকে ১ সীমা) = ১/৩ + ৩/২ + ২ = ২৩/৬।'
-    }
-  },
-
-  {
-    id: 8, exam: 'HSC', 
-    subject: { english: 'Math', bangla: 'গণিত' }, 
-    chapter: { english: 'Trigonometry', bangla: 'ত্রিকোণমিতি' }, 
-    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
-    year: { english: '2021', bangla: '২০২১' },
-    difficultyLevel: 'medium',
-    yearEn: 2021,
-    question: {
-      english: 'If sin θ = 3/5, what is the value of cos θ (assuming 0 < θ < π/2)?',
-      bangla: 'যদি sin θ = ৩/৫ হয়, তবে cos θ এর মান কত? (ধরি ০ < θ < π/২)'
-    },
-    options: {
-      english: ['4/5', '3/4', '5/4', '1/2'],
-      bangla: ['৪/৫', '৩/৪', '৫/৪', '১/২']
-    },
-    correctIndex: 0,
-    explanation: {
-      english: 'cos²θ = 1 − 9/25 = 16/25, so cosθ = 4/5.',
-      bangla: 'cos²θ = ১ − ৯/২৫ = ১৬/২৫, সুতরাং cosθ = ৪/৫।'
-    }
-  },
-
-  // BUET
-  {
-    id: 9, exam: 'BUET', 
-    subject: { english: 'Higher Math', bangla: 'উচ্চতর গণিত' }, 
-    chapter: { english: 'Complex Numbers', bangla: 'জটিল সংখ্যা' }, 
-    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
-    year: { english: '2023', bangla: '২০২৩' },
-    difficultyLevel: 'hard',
-    yearEn: 2023,
-    question: {
-      english: 'The modulus of the complex number (1 + i)⁸ is:',
-      bangla: '(1 + i)⁸ জটিল সংখ্যাটির পরম মান (modulus) কত?'
-    },
-    options: {
-      english: ['4', '8', '16', '32'],
-      bangla: ['৪', '৮', '১৬', '৩২']
-    },
-    correctIndex: 2,
-    explanation: {
-      english: '|1+i| = √2, so |(1+i)⁸| = (√2)⁸ = 2⁴ = 16.',
-      bangla: '|১+i| = √২, সুতরাং |(১+i)⁸| = (√২)⁸ = ২⁴ = ১৬।'
-    }
-  },
-
-  {
-    id: 10, exam: 'BUET', 
-    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
-    chapter: { english: 'Thermodynamics', bangla: 'তাপগতিবিদ্যা' }, 
-    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
-    year: { english: '2022', bangla: '২০২২' },
-    difficultyLevel: 'hard',
-    yearEn: 2022,
-    question: {
-      english: 'In an adiabatic process for an ideal gas, which quantity remains constant?',
-      bangla: 'আদর্শ গ্যাসের রুদ্ধতাপীয় প্রক্রিয়ায় কোন রাশিটি স্থির থাকে?'
-    },
-    options: {
-      english: ['Temperature', 'Pressure', 'Volume', 'PVγ'],
-      bangla: ['তাপমাত্রা', 'চাপ', 'আয়তন', 'PVγ']
-    },
-    correctIndex: 3,
-    explanation: {
-      english: 'In an adiabatic process, Q = 0. The relation PVγ = constant holds.',
-      bangla: 'রুদ্ধতাপীয় প্রক্রিয়ায় তাপের আদান-প্রদান হয় না (Q = ০)। এখানে PVγ = ধ্রুবক।'
-    }
-  },
-
-  // BCS
-  {
-    id: 11, exam: 'BCS', 
-    subject: { english: 'Bangladesh Affairs', bangla: 'বাংলাদেশ বিষয়াবলী' }, 
-    chapter: { english: 'Liberation War', bangla: 'মুক্তিযুদ্ধ' }, 
-    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
-    year: { english: '2023', bangla: '২০২৩' },
-    difficultyLevel: 'medium',
-    yearEn: 2023,
-    question: {
-      english: 'Bangladesh was recognized as an independent state by which country first after independence?',
-      bangla: 'স্বাধীনতার পর কোন দেশ প্রথম বাংলাদেশকে স্বাধীন রাষ্ট্র হিসেবে স্বীকৃতি দেয়?'
-    },
-    options: {
-      english: ['India', 'Soviet Union', 'Bhutan', 'Nepal'],
-      bangla: ['ভারত', 'সোভিয়েত ইউনিয়ন', 'ভুটান', 'নেপাল']
-    },
-    correctIndex: 2,
-    explanation: {
-      english: 'Bhutan was the first country to recognize Bangladesh on December 6, 1971.',
-      bangla: '৬ ডিসেম্বর, ১৯৭১ সালে ভুটান প্রথম দেশ হিসেবে বাংলাদেশকে স্বীকৃতি দেয়।'
-    }
-  },
-
-  {
-    id: 12, exam: 'BCS', 
-    subject: { english: 'English', bangla: 'ইংরেজি' }, 
-    chapter: { english: 'Grammar', bangla: 'ব্যাকরণ' }, 
-    difficulty: { english: 'easy', bangla: 'সহজ' }, 
-    year: { english: '2022', bangla: '২০২২' },
-    difficultyLevel: 'easy',
-    yearEn: 2022,
-    question: {
-      english: 'Choose the correct sentence:',
-      bangla: 'সঠিক বাক্যটি নির্বাচন করুন:'
-    },
-    options: {
-      english: [
-        'Neither the students nor the teacher were present.',
-        'Neither the students nor the teacher was present.',
-        'Neither the students nor the teacher are present.',
-        'Neither the students nor the teacher be present.'
-      ],
-      bangla: [
-        'Neither the students nor the teacher were present.',
-        'Neither the students nor the teacher was present.',
-        'Neither the students nor the teacher are present.',
-        'Neither the students nor the teacher be present.'
-      ]
-    },
-    correctIndex: 1,
-    explanation: {
-      english: 'When "neither…nor" connects two subjects, the verb agrees with the subject closest to it.',
-      bangla: '"Neither…nor" দ্বারা দুটি subject যুক্ত হলে verb নিকটবর্তী subject অনুযায়ী হয়।'
-    }
-  },
-
-  {
-    id: 13, exam: 'BCS', 
-    subject: { english: 'Math', bangla: 'গণিত' }, 
-    chapter: { english: 'Percentage', bangla: 'শতকরা' }, 
-    difficulty: { english: 'easy', bangla: 'সহজ' }, 
-    year: { english: '2021', bangla: '২০২১' },
-    difficultyLevel: 'easy',
-    yearEn: 2021,
-    question: {
-      english: 'A product is sold at 20% profit. If the cost price is Tk. 500, what is the selling price?',
-      bangla: 'একটি পণ্য ২০% লাভে বিক্রি করা হয়। ক্রয়মূল্য ৫০০ টাকা হলে বিক্রয়মূল্য কত?'
-    },
-    options: {
-      english: ['Tk. 580', 'Tk. 600', 'Tk. 520', 'Tk. 620'],
-      bangla: ['৫৮০ টাকা', '৬০০ টাকা', '৫২০ টাকা', '৬২০ টাকা']
-    },
-    correctIndex: 1,
-    explanation: {
-      english: 'Selling price = 500 × 1.20 = 600.',
-      bangla: 'বিক্রয়মূল্য = ৫০০ এর ১২০% = ৬০০ টাকা।'
-    }
-  },
-
-  // Medical
-  {
-    id: 14, exam: 'Medical', 
-    subject: { english: 'Biology', bangla: 'জীববিজ্ঞান' }, 
-    chapter: { english: 'Cell Biology', bangla: 'কোষ জীববিজ্ঞান' }, 
-    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
-    year: { english: '2023', bangla: '২০২৩' },
-    difficultyLevel: 'hard',
-    yearEn: 2023,
-    question: {
-      english: 'Which organelle is called the "powerhouse" of the cell and produces ATP?',
-      bangla: 'কোষের কোন অঙ্গাণুকে "পাওয়ার হাউস" বলা হয় এবং যা ATP তৈরি করে?'
-    },
-    options: {
-      english: ['Ribosome', 'Mitochondria', 'Chloroplast', 'Golgi apparatus'],
-      bangla: ['রাইবোসোম', 'মাইটোকন্ড্রিয়া', 'ক্লোরোপ্লাস্ট', 'গলজি বডি']
-    },
-    correctIndex: 1,
-    explanation: {
-      english: 'Mitochondria produce ATP via oxidative phosphorylation.',
-      bangla: 'মাইটোকন্ড্রিয়া অক্সিডেটিভ ফসফোরিলেশনের মাধ্যমে ATP তৈরি করে।'
-    }
-  },
-
-  {
-    id: 15, exam: 'Medical', 
-    subject: { english: 'Chemistry', bangla: 'রসায়ন' }, 
-    chapter: { english: 'Biochemistry', bangla: 'প্রাণরসায়ন' }, 
-    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
-    year: { english: '2022', bangla: '২০২২' },
-    difficultyLevel: 'medium',
-    yearEn: 2022,
-    question: {
-      english: 'The pH of human blood is maintained approximately at:',
-      bangla: 'মানুষের রক্তের pH সাধারণত কত থাকে?'
-    },
-    options: {
-      english: ['6.4–6.8', '7.0–7.2', '7.35–7.45', '7.8–8.0'],
-      bangla: ['৬.৪–৬.৮', '৭.০–৭.২', '৭.৩৫–৭.৪৫', '৭.৮–৮.০']
-    },
-    correctIndex: 2,
-    explanation: {
-      english: 'Normal human blood pH is maintained between 7.35 and 7.45.',
-      bangla: 'মানুষের রক্তের স্বাভাবিক pH ৭.৩৫ থেকে ৭.৪৫ এর মধ্যে থাকে।'
-    }
-  },
-
-  // SSC
-  {
-    id: 16, exam: 'SSC', 
-    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
-    chapter: { english: 'Force & Motion', bangla: 'বল ও গতি' }, 
-    difficulty: { english: 'easy', bangla: 'সহজ' }, 
-    year: { english: '2023', bangla: '২০২৩' },
-    difficultyLevel: 'easy',
-    yearEn: 2023,
-    question: {
-      english: 'What is the SI unit of force?',
-      bangla: 'বলের SI একক কী?'
-    },
-    options: {
-      english: ['Joule', 'Watt', 'Newton', 'Pascal'],
-      bangla: ['জুল', 'ওয়াট', 'নিউটন', 'প্যাসকেল']
-    },
-    correctIndex: 2,
-    explanation: {
-      english: 'The SI unit of force is the Newton (N).',
-      bangla: 'বলের আন্তর্জাতিক বা SI একক হলো নিউটন (N)।'
-    }
-  },
-
-  {
-    id: 17, exam: 'SSC', 
-    subject: { english: 'Math', bangla: 'গণিত' }, 
-    chapter: { english: 'Algebra', bangla: 'বীজগণিত' }, 
-    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
-    year: { english: '2022', bangla: '২০২২' },
-    difficultyLevel: 'medium',
-    yearEn: 2022,
-    question: {
-      english: 'If x + 1/x = 3, what is the value of x² + 1/x²?',
-      bangla: 'যদি x + ১/x = ৩ হয়, তবে x² + ১/x² এর মান কত?'
-    },
-    options: {
-      english: ['7', '9', '11', '5'],
-      bangla: ['৭', '৯', '১১', '৫']
-    },
-    correctIndex: 0,
-    explanation: {
-      english: '(x + 1/x)² − 2 = 3² − 2 = 7.',
-      bangla: '(x + ১/x)² − ২ = ৩² − ২ = ৭।'
-    }
-  },
-
-  // Bank
-  {
-    id: 18, exam: 'Bank', 
-    subject: { english: 'English', bangla: 'ইংরেজি' }, 
-    chapter: { english: 'Vocabulary', bangla: 'শব্দভাণ্ডার' }, 
-    difficulty: { english: 'easy', bangla: 'সহজ' }, 
-    year: { english: '2023', bangla: '২০২৩' },
-    difficultyLevel: 'easy',
-    yearEn: 2023,
-    question: {
-      english: 'The antonym of "Eloquent" is:',
-      bangla: '"Eloquent" শব্দটির বিপরীত শব্দ কোনটি?'
-    },
-    options: {
-      english: ['Fluent', 'Articulate', 'Inarticulate', 'Verbose'],
-      bangla: ['Fluent', 'Articulate', 'Inarticulate', 'Verbose']
-    },
-    correctIndex: 2,
-    explanation: {
-      english: 'Eloquent means fluent; inarticulate means unable to express clearly.',
-      bangla: 'Eloquent অর্থ সুবক্তা; Inarticulate অর্থ যে গুছিয়ে কথা বলতে পারে না।'
-    }
-  },
-
-  {
-    id: 19, exam: 'Bank', 
-    subject: { english: 'Math', bangla: 'গণিত' }, 
-    chapter: { english: 'Profit & Loss', bangla: 'লাভ-ক্ষতি' }, 
-    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
-    year: { english: '2022', bangla: '২০২২' },
-    difficultyLevel: 'medium',
-    yearEn: 2022,
-    question: {
-      english: 'A trader bought goods for Tk. 800 and sold them at a loss of 12.5%. Find the selling price.',
-      bangla: 'একজন বিক্রেতা ৮০০ টাকায় পণ্য কিনে ১২.৫% ক্ষতিতে বিক্রি করলেন। বিক্রয়মূল্য কত?'
-    },
-    options: {
-      english: ['Tk. 700', 'Tk. 650', 'Tk. 680', 'Tk. 720'],
-      bangla: ['৭০০ টাকা', '৬৫০ টাকা', '৬৮০ টাকা', '৭২০ টাকা']
-    },
-    correctIndex: 0,
-    explanation: {
-      english: 'Selling price = 800 − (800 × 0.125) = 700.',
-      bangla: 'বিক্রয়মূল্য = ৮০০ − (৮০০ এর ১২.৫%) = ৭০০ টাকা।'
-    }
-  },
-
-  {
-    id: 20, exam: 'HSC', 
-    subject: { english: 'ICT', bangla: 'আইসিটি' }, 
-    chapter: { english: 'Database', bangla: 'ডেটাবেজ' }, 
-    difficulty: { english: 'easy', bangla: 'সহজ' }, 
-    year: { english: '2023', bangla: '২০২৩' },
-    difficultyLevel: 'easy',
-    yearEn: 2023,
-    question: {
-      english: 'Which of the following is NOT a type of database management system?',
-      bangla: 'নিচের কোনটি ডেটাবেজ ম্যানেজমেন্ট সিস্টেমের (DBMS) প্রকারভেদ নয়?'
-    },
-    options: {
-      english: ['Relational', 'Hierarchical', 'Network', 'Sequential'],
-      bangla: ['Relational', 'Hierarchical', 'Network', 'Sequential']
-    },
-    correctIndex: 3,
-    explanation: {
-      english: 'The main types of DBMS include Relational, Hierarchical, and Network.',
-      bangla: 'DBMS-এর প্রধান প্রকারভেদগুলো হলো রিলেশনাল, হায়ারার্কিকাল এবং নেটওয়ার্ক।'
-    }
-  },
-]
 
 // ── Filtered / sorted data ─────────────────────────────────
 const filteredQuestions = ref<Question[]>([])
 
 const availableSubjects = computed(() => subjectMap.value[selectedExam.value] ?? ['All'])
 
-const chapterBreakdown = computed(() => {
-  const map: Record<string, number> = {}
-  filteredQuestions.value.forEach(q => {
-    map[q.chapter[selectedLang.value]] = (map[q.chapter[selectedLang.value]] ?? 0) + 1
-  })
-  return Object.entries(map).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
-})
+//const chapterBreakdown = computed(() => {
+//  const map: Record<string, number> = {}
+//  filteredQuestions.value.forEach(q => {
+//    map[q.chapter[selectedLang.value]] = (map[q.chapter[selectedLang.value]] ?? 0) + 1
+//  })
+//  return Object.entries(map).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
+//})
+
+const chapterBreakdown = ref<{ name: string; count: number }[]>([])
+
+watch([selectedExam, selectedSubject], async ([exam, subject]) => {
+  if (subject === 'All') { chapterBreakdown.value = []; return }
+  try {
+    const data = await $fetch<string[]>('/api/chapters', {
+      query: {
+        stream: exam !== 'All' ? exam : undefined,
+        subject,
+      }
+    })
+    // If your /api/chapters returns counts, map them; otherwise no count
+    //chapterBreakdown.value = (data ?? []).map(({ name, count }) => ({ name, count }))
+    chapterBreakdown.value = data ?? []
+  } catch (e) {
+    chapterBreakdown.value = []
+  }
+}, { immediate: false })
 
 const totalPages = computed(() => Math.ceil(filteredQuestions.value.length / pageSize))
 
@@ -1010,6 +633,31 @@ const sessionAccuracy = computed(() => {
   return Math.round((sessionStats.value.correct / sessionStats.value.attempted) * 100)
 })
 
+async function fetchSessionStats() {
+  if (!session.value) return
+
+  const today = new Date().toISOString().slice(0, 10) // "2026-06-06"
+
+  const { data } = await supabase
+    .from('question_attempts')
+    .select('is_correct')
+    .eq('user_id', session.value.user.id)
+    //.eq('source_type', 'qbank')
+    //.gte('created_at', today)
+
+  const attempted = data?.length ?? 0
+  const correct = data?.filter(r => r.is_correct === true).length ?? 0
+  const wrong = data?.filter(r => r.is_correct === false).length ?? 0
+
+  sessionStats.value = { attempted, correct, wrong }
+}
+
+onMounted(() => {
+  fetchBookmarks()
+  fetchSessionStats()
+  fetchSolvedIds()
+})
+
 // ── Filter logic ───────────────────────────────────────────
 function applyFilters() {
   let qs = [...allQuestions.value]
@@ -1017,7 +665,7 @@ function applyFilters() {
 
   if (selectedExam.value !== 'All') qs = qs.filter(q => q.exam === selectedExam.value)
   if (selectedSubject.value !== 'All') qs = qs.filter(q => q.subject[selectedLang.value] === selectedSubject.value)
-  if (selectedDiff.value !== 'all') qs = qs.filter(q => q.difficultyLevel === selectedDiff.value)
+  if (selectedDiff.value !== 'all') qs = qs.filter(q => q.difficulty_level === selectedDiff.value)
   if (selectedChapter.value) qs = qs.filter(q => q.chapter[selectedLang.value] === selectedChapter.value)
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase()
@@ -1029,26 +677,54 @@ function applyFilters() {
   }
 
   // Sort
-  if (sortBy.value === 'easy-first') qs.sort((a, b) => ['easy','medium','hard'].indexOf(a.difficultyLevel) - ['easy','medium','hard'].indexOf(b.difficultyLevel))
-  else if (sortBy.value === 'hard-first') qs.sort((a, b) => ['hard','medium','easy'].indexOf(a.difficultyLevel) - ['hard','medium','easy'].indexOf(b.difficultyLevel))
-  else if (sortBy.value === 'year') qs.sort((a, b) => (b.yearEn ?? '0').localeCompare(a.yearEn ?? '0'))
+  if (sortBy.value === 'easy-first') qs.sort((a, b) => ['easy','medium','hard'].indexOf(a.difficulty_level) - ['easy','medium','hard'].indexOf(b.difficulty_level))
+  else if (sortBy.value === 'hard-first') qs.sort((a, b) => ['hard','medium','easy'].indexOf(a.difficulty_level) - ['hard','medium','easy'].indexOf(b.difficulty_level))
+  else if (sortBy.value === 'year') qs.sort((a, b) => (b.years?.[0]?.english ?? '0').localeCompare(a.years?.[0]?.english ?? '0'))
 
   filteredQuestions.value = qs
   currentPage.value = 1
   expandedId.value = null
 }
 
+//function selectExam(exam: string) {
+//  selectedExam.value = exam
+//  selectedSubject.value = 'All'
+//  selectedChapter.value = ''
+//  applyFilters()
+//}
+//
+//function selectSubject(sub: string) {
+//  selectedSubject.value = sub
+//  selectedChapter.value = ''
+//  applyFilters()
+//}
+
+watch([selectedExam, selectedSubject], async ([exam, subject]) => {
+  loading.value = true
+  try {
+    const data = await $fetch<Question[]>('/api/qBank', {
+      query: {
+        stream: exam !== 'All' ? exam : undefined,
+        subject: subject !== 'All' ? subject : undefined,
+        //limit: 100,
+      }
+    })
+    allQuestions.value = data ?? []
+  } catch (e) {
+    console.error('Failed to reload questions:', e)
+  } finally {
+    loading.value = false
+  }
+  selectedChapter.value = ''
+  applyFilters()
+}, { immediate: false })
+
 function selectExam(exam: string) {
   selectedExam.value = exam
   selectedSubject.value = 'All'
-  selectedChapter.value = ''
-  applyFilters()
 }
-
 function selectSubject(sub: string) {
   selectedSubject.value = sub
-  selectedChapter.value = ''
-  applyFilters()
 }
 
 function selectDiff(d: string) {
@@ -1087,21 +763,88 @@ function selectAnswer(qId: number, optIdx: number) {
   selectedAnswers.value = { ...selectedAnswers.value, [qId]: optIdx }
 }
 
-function revealAnswer(qId: number) {
+//function revealAnswer(qId: number) {
+//  const q = allQuestions.value.find(x => x.id === qId)
+//  if (!q) return
+//  showAnswer.value = { ...showAnswer.value, [qId]: true }
+//  solvedIds.value.add(qId)
+//  if (selectedAnswers.value[qId] !== q.correct_index) {
+//    wrongIds.value.add(qId)
+//  }
+//
+//  const chosen = selectedAnswers.value[qId]
+//  if (chosen !== undefined) {
+//    sessionStats.value.attempted++
+//    if (chosen === q.correct_index) sessionStats.value.correct++
+//    else sessionStats.value.wrong++
+//  } else {
+//    // Revealed without selecting (non-MCQ)
+//    sessionStats.value.attempted++
+//    sessionStats.value.correct++
+//  }
+//}
+
+async function fetchSolvedIds() {
+  if (!session.value) return
+  const { data: correct_data } = await supabase
+    .from('question_attempts')
+    .select('question_id, is_correct, selected_index')
+    .eq('user_id', session.value.user.id)
+    //.eq('source_type', 'qbank')
+    //.eq('is_correct', true)
+
+    //solvedIds.value = new Set(correct_data.map(r => r.question_id))
+    solvedIds.value = new Set(
+      (correct_data ?? []).filter(r => r.is_correct === true).map(r => r.question_id)
+    )
+    wrongIds.value = new Set(
+      (correct_data ?? []).filter(r => r.is_correct === false).map(r => r.question_id)
+    )
+
+    // Restore which option the user selected + reveal answers
+    const answers: Record<number, number> = {}
+    const revealed: Record<number, boolean> = {}
+    ;(correct_data ?? []).forEach(r => {
+      if (r.selected_index !== null) {
+        answers[r.question_id] = r.selected_index
+        revealed[r.question_id] = true      // so the answer panel opens
+      }
+    })
+    selectedAnswers.value = answers
+    showAnswer.value = revealed
+}
+
+async function revealAnswer(qId: number) {
   const q = allQuestions.value.find(x => x.id === qId)
   if (!q) return
   showAnswer.value = { ...showAnswer.value, [qId]: true }
   solvedIds.value.add(qId)
 
   const chosen = selectedAnswers.value[qId]
+  const isCorrect = chosen !== undefined ? chosen === q.correctIndex : null
+
   if (chosen !== undefined) {
     sessionStats.value.attempted++
-    if (chosen === q.correctIndex) sessionStats.value.correct++
-    else sessionStats.value.wrong++
+    if (isCorrect) sessionStats.value.correct++
+    else {
+      sessionStats.value.wrong++
+      wrongIds.value.add(qId)
+    }
   } else {
-    // Revealed without selecting (non-MCQ)
     sessionStats.value.attempted++
     sessionStats.value.correct++
+  }
+
+  // Persist to DB
+  if (session.value) {
+    await supabase.from('question_attempts').insert({
+      user_id:        session.value.user.id,
+      question_id:    qId,
+      selected_index: chosen ?? null,
+      is_correct:     isCorrect,
+      correct_index:  q.correct_index,
+      source_type:    'qbank',
+    })
   }
 }
 
@@ -1114,11 +857,58 @@ function nextQuestion(currentIdx: number) {
   }
 }
 
-function toggleBookmark(id: number) {
+//function toggleBookmark(id: number) {
+//  const s = new Set(bookmarkedIds.value)
+//  s.has(id) ? s.delete(id) : s.add(id)
+//  bookmarkedIds.value = s
+//}
+
+async function toggleBookmark(id: number) {
+  if (!session.value) return
+  const isBookmarked = bookmarkedIds.value.has(id)
+
   const s = new Set(bookmarkedIds.value)
-  s.has(id) ? s.delete(id) : s.add(id)
+  isBookmarked ? s.delete(id) : s.add(id)
   bookmarkedIds.value = s
+
+  if (isBookmarked) {
+    bookmarkedQuestions.value = bookmarkedQuestions.value.filter(q => q.id !== id)
+    await supabase
+      .from('bookmarks')
+      .delete()
+      .eq('user_id', session.value.user.id)
+      .eq('question_id', id)
+  } else {
+    // Add the full question object so the sidebar can render it immediately
+    const q = allQuestions.value.find(x => x.id === id)
+    if (q) bookmarkedQuestions.value.unshift(q)
+    await supabase
+      .from('bookmarks')
+      .insert({ user_id: session.value.user.id, question_id: id })
+  }
 }
+
+//async function toggleBookmark(id: number) {
+//  if (!session.value) return
+//  const isBookmarked = bookmarkedIds.value.has(id)
+//
+//  // Optimistic update
+//  const s = new Set(bookmarkedIds.value)
+//  isBookmarked ? s.delete(id) : s.add(id)
+//  bookmarkedIds.value = s
+//
+//  if (isBookmarked) {
+//    await supabase
+//      .from('bookmarks')
+//      .delete()
+//      .eq('user_id', session.value.user.id)
+//      .eq('question_id', id)
+//  } else {
+//    await supabase
+//      .from('bookmarks')
+//      .insert({ user_id: session.value.user.id, question_id: id })
+//  }
+//}
 
 function jumpToQuestion(id: number) {
   const idx = filteredQuestions.value.findIndex(q => q.id === id)
@@ -1148,6 +938,7 @@ function resetSession() {
   selectedAnswers.value = {}
   showAnswer.value = {}
   solvedIds.value = new Set()
+  wrongIds.value = new Set()
 }
 
 function startMockWithFilters() { navigateTo('/dashboard/mock-exam') }
@@ -1155,14 +946,39 @@ function startPracticeMode() { /* future */ }
 function reviewWeakOnly() { selectedDiff.value = 'hard'; applyFilters() }
 
 // ── Init ───────────────────────────────────────────────────
-onMounted(async () => {
-  // Simulate network fetch
-  await new Promise(r => setTimeout(r, 600))
-  allQuestions.value = demoQuestions
-  applyFilters()
-  loading.value = false
+//onMounted(async () => {
+//  // Simulate network fetch
+//  await new Promise(r => setTimeout(r, 600))
+//  allQuestions.value = demoQuestions
+//  applyFilters()
+//  loading.value = false
+//
+//  // Handle URL query param ?topic=
+//  const route = useRoute()
+//  if (route.query.topic) {
+//    searchQuery.value = route.query.topic as string
+//    applyFilters()
+//  }
+//})
 
-  // Handle URL query param ?topic=
+onMounted(async () => {
+  loading.value = true
+  try {
+    const data = await $fetch<Question[]>('/api/qBank', {
+      query: {
+        stream: selectedExam.value !== 'All' ? selectedExam.value : undefined,
+        subject: selectedSubject.value !== 'All' ? selectedSubject.value : undefined,
+        //limit: 100,  // initial page load — tune as needed
+      }
+    })
+    allQuestions.value = data ?? []
+  } catch (e) {
+    console.error('Failed to load questions:', e)
+  } finally {
+    loading.value = false
+  }
+  applyFilters()
+
   const route = useRoute()
   if (route.query.topic) {
     searchQuery.value = route.query.topic as string
@@ -1436,6 +1252,7 @@ onMounted(async () => {
 .question-card:hover { background: #0f0f0f; border-left-color: var(--border-bright); }
 .question-card.expanded { background: #111; border-left-color: var(--white); }
 .question-card.solved { border-left-color: rgba(120,230,120,0.4); }
+.question-card.wrong { border-left-color: rgba(230,120,120,0.4) !important; }
 
 .qcard-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -1477,6 +1294,11 @@ onMounted(async () => {
 .solved-badge {
   font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.08em;
   color: rgba(120,230,120,0.8); border: 1px solid rgba(120,230,120,0.2);
+  padding: 2px 7px;
+}
+.wrong-badge {
+  font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.08em;
+  color: rgba(230,120,120,0.8); border: 1px solid rgba(230,120,120,0.2);
   padding: 2px 7px;
 }
 .bookmark-active { color: var(--white); display: flex; align-items: center; }

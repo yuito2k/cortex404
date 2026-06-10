@@ -118,13 +118,18 @@ create table if not exists public.questions (
 
   -- Bilingual text fields (JSONB with { "english": "...", "bangla": "..." })
   -- Null bangla is allowed for purely English content (e.g. English grammar Qs)
-  question          jsonb not null,   -- { english, bangla }
+  question          jsonb,            -- { english, bangla }
+  question_hash     text,             -- hash of the question text
+  question_image    text,             -- image for the question if any
+  stimulus          jsonb,            -- { english, bangla }
+  stimulus_hash     text,             -- hash of the stimuli text
+  stimulus_image    text,             -- image for the stimuli if any
   options           jsonb not null,   -- { english: [...], bangla: [...] }
   explanation       jsonb,            -- { english, bangla }
   subject           jsonb not null,   -- { english, bangla }
   chapter           jsonb not null,   -- { english, bangla }
   difficulty        jsonb not null,   -- { english: "hard", bangla: "কঠিন" }
-  year              jsonb,            -- { english: "2023", bangla: "২০২৩" }
+  years             jsonb,            -- { english: ["2023", "2024"], bangla: ["২০২৩", "২০২৪"] }
 
   -- Scalar fields
   correct_index     smallint not null check (correct_index between 0 and 4),
@@ -157,6 +162,28 @@ create index if not exists idx_questions_published        on public.questions(st
 create index if not exists idx_questions_subject_gin      on public.questions using gin(subject);
 create index if not exists idx_questions_chapter_gin      on public.questions using gin(chapter);
 --create index if not exists idx_questions_tags             on public.questions using gin(tags);
+
+
+CREATE OR REPLACE FUNCTION get_random_questions(
+  p_exam text,
+  p_subject text DEFAULT NULL,
+  p_chapter text DEFAULT NULL,
+  p_difficulty text DEFAULT NULL,
+  p_limit int DEFAULT 100
+)
+RETURNS SETOF questions AS $$
+BEGIN
+  RETURN QUERY
+  SELECT * FROM questions
+  WHERE status = 'published'
+    AND exam = p_exam
+    AND (p_subject IS NULL OR subject->>'english' = p_subject)
+    AND (p_chapter IS NULL OR chapter->>'english' = p_chapter)
+    -- AND (p_difficulty IS NULL OR difficulty_level = p_difficulty)
+  ORDER BY random()
+  LIMIT p_limit;
+END;
+$$ LANGUAGE plpgsql;
 
 
 -- ============================================================
@@ -222,7 +249,7 @@ create table if not exists public.exam_sessions (
 
 create index if not exists idx_sessions_user    on public.exam_sessions(user_id);
 create index if not exists idx_sessions_stream  on public.exam_sessions(stream);
-create index if not exists idx_sessions_chapter  on public.exam_sessions(chapter);
+create index if not exists idx_sessions_chapter on public.exam_sessions(chapter);
 create index if not exists idx_sessions_subject on public.exam_sessions(subject);
 create index if not exists idx_sessions_created on public.exam_sessions(completed_at desc);
 
@@ -232,9 +259,11 @@ create index if not exists idx_sessions_created on public.exam_sessions(complete
 create table if not exists public.question_attempts (
   id              uuid primary key default uuid_generate_v4(),
   user_id         uuid not null references auth.users(id) on delete cascade,
-  question_id     bigint not null references public.questions(id) on delete cascade,
+  -- question_id     bigint not null references public.questions(id) on delete cascade,
+  question_id     bigint not null, -- removed the relation for multi db
   selected_index  smallint,                        -- null = skipped
   is_correct      boolean,                         -- null = skipped
+  correct_index   smallint not null,               -- correct index of the question
   time_spent_m    int,                             -- time spent on the question in minutes
   source_type     text not null check (source_type in ('qbank','mock','practice', 'hsc', 'ssc','admission','engineering','bcs','buet','medical','du','ru','cu','ju','iu','sust','kuet')),   -- 'qbank' | 'mock' | 'practice' | 'admission'
   source_id       uuid references public.exam_sessions(id) on delete cascade,  -- foreign key to exam_sessions if applicable
@@ -721,12 +750,18 @@ create table if not exists public.question_submissions (
   -- Question content (mirrors questions table structure)
   -- Plain text used here — bilingual JSONB is handled on admin approval
   -- when the question is promoted to the main questions table.
-  question         jsonb not null,
-  year             jsonb not null,
+  question         jsonb,
+  question_hash    text,             -- hash of the question text
+  question_image   text,             -- image for the question if any
+  stimulus         jsonb,            -- { english, bangla }
+  stimulus_hash    text,             -- hash of the stimuli text
+  stimulus_image   text,             -- image for the stimuli if any
+  years            jsonb,
   difficulty       jsonb not null,
   stream           text not null,
   subject          jsonb not null,
   chapter          jsonb not null,
+  source           jsonb,             -- e.g. "BUET 2023 Question Paper"
   difficulty_level text not null default 'medium'
                      check (difficulty_level in ('easy','medium','hard')),
 

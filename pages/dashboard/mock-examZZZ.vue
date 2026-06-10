@@ -11,19 +11,10 @@
           <p class="page-sub">Set the exam type, subject, duration and question count. Then go.</p>
         </div>
         <div class="header-right">
-          <!--<div class="past-exams-teaser">
+          <div class="past-exams-teaser">
             <span class="teaser-label">Last Attempt</span>
             <span class="teaser-score" :class="scoreClass(lastResult.score)">{{ lastResult.score }}%</span>
             <span class="teaser-meta">{{ lastResult.subject }} · {{ lastResult.date }}</span>
-          </div>-->
-          <div v-if="lastResult" class="past-exams-teaser">
-            <span class="teaser-label">Last Attempt</span>
-            <span class="teaser-score" :class="scoreClass(lastResult.score)">{{ lastResult.score }}%</span>
-            <span class="teaser-meta">{{ lastResult.subject }} · {{ lastResult.date }}</span>
-          </div>
-
-          <div v-else class="past-exams-teaser">
-            <span class="teaser-label">No attempts yet</span>
           </div>
         </div>
       </div>
@@ -45,7 +36,7 @@
                 :key="s.id"
                 class="stream-card"
                 :class="{ active: config.stream === s.id }"
-                @click="config.stream = s.id; config.subject = 'All'; config.chapter = 'All'; if (['HSC Science','HSC Arts','HSC Commerce','SSC Science', 'SSC Arts', 'SSC Commerce'].includes(s.id)) config.negativeMarking = false"
+                @click="config.stream = s.id; config.subject = 'All'; config.chapter = 'All'; if (['HSC','SSC'].includes(s.id)) config.negativeMarking = false"
               >
                 <span class="stream-icon" v-html="s.icon" />
                 <span class="stream-name">{{ s.name }}</span>
@@ -177,13 +168,9 @@
 
           <!-- Start CTA -->
           <div class="setup-cta">
-            <!--<button class="iso-btn iso-btn--fill start-btn" @click="startExam">
+            <button class="iso-btn iso-btn--fill start-btn" @click="startExam">
               Start Exam →
-            </button>-->
-            <button class="iso-btn iso-btn--fill start-btn" @click="startExam" :disabled="isLoadingQuestions">
-              {{ isLoadingQuestions ? 'Loading…' : 'Start Exam →' }}
             </button>
-            <p v-if="questionLoadError" class="error-text">{{ questionLoadError }}</p>
             <div class="cta-meta">
               <span>{{ config.count }} questions</span>
               <span class="dot-sep">·</span>
@@ -196,34 +183,6 @@
 
         <!-- Right: info sidebar -->
         <aside class="setup-sidebar">
-          <!-- Past results -->
-          <div class="info-panel">
-            <div class="panel-header">
-              <span class="panel-tag">Recent Results</span>
-            </div>
-            <div class="results-list">
-              <!--<div v-for="r in pastResults" :key="r.id" class="result-row">
-                <div class="result-left">
-                  <span class="result-subject">{{ r.subject }}</span>
-                  <span class="result-meta">{{ r.count }}Q · {{ r.date }}</span>
-                </div>
-                <div class="result-score" :class="scoreClass(r.score)">{{ r.score }}%</div>
-              </div>-->
-
-              <div v-if="!pastResults.length" class="result-empty">
-                No past exams yet.
-              </div>
-
-              <div v-for="r in pastResults" :key="r.id" class="result-row">
-                <div class="result-left">
-                  <span class="result-subject">{{ r.subject }}</span>
-                  <span class="result-meta">{{ r.count }}Q · {{ r.date }}</span>
-                </div>
-                <div class="result-score" :class="scoreClass(r.score)">{{ r.score }}%</div>
-              </div>
-            </div>
-          </div>
-
           <!-- Tips -->
           <div class="info-panel">
             <div class="panel-header">
@@ -233,6 +192,22 @@
               <div v-for="tip in examTips" :key="tip" class="tip-row">
                 <span class="tip-bullet">→</span>
                 <span class="tip-text">{{ tip }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Past results -->
+          <div class="info-panel">
+            <div class="panel-header">
+              <span class="panel-tag">Recent Results</span>
+            </div>
+            <div class="results-list">
+              <div v-for="r in pastResults" :key="r.id" class="result-row">
+                <div class="result-left">
+                  <span class="result-subject">{{ r.subject }}</span>
+                  <span class="result-meta">{{ r.count }}Q · {{ r.date }}</span>
+                </div>
+                <div class="result-score" :class="scoreClass(r.score)">{{ r.score }}%</div>
               </div>
             </div>
           </div>
@@ -311,40 +286,20 @@
       <!-- Question list (scrollable) -->
       <div class="exam-body">
         <div class="exam-question-list">
-          <!-- <div
+          <div
             v-for="(q, i) in questions"
             :key="q.id"
             :id="`question-${i}`"
             class="exam-question-card"
             :class="{ 'card-flagged': flagged.has(q.id), 'card-answered': answers[q.id] !== undefined }"
-          > -->
-          <template v-for="group in questionGroups" :key="group.questions[0].id">
-
-          <!-- Stimulus block (shown once for the group) -->
-          <div v-if="group.stimulus || group.stimulus_image" class="eq-stimulus-block">
-            <p v-if="group.stimulus" class="eq-stimulus-label">{{ group.stimulus[selectedLang] }}</p>
-            <img v-if="group.stimulus_image" :src="group.stimulus_image" class="eq-img" alt="Stimulus" />
-          </div>
-        
-          <!-- Questions in this group -->
-          <div
-            v-for="(q, i) in group.questions"
-            :key="q.id"
-            :id="`question-${questions.indexOf(q)}`"
-            class="exam-question-card"
-            :class="{
-              'card-flagged': flagged.has(q.id),
-              'card-answered': answers[q.id] !== undefined,
-              'card-stimulus-child': !!group.stimulus || !!group.stimulus_image
-            }"
           >
             <div class="eq-header">
               <div class="eq-meta">
-                <span class="eq-num">Q{{ questions.indexOf(q) + 1 }}</span>
-                <span class="eq-diff" :class="q.difficulty_level">{{ q.difficulty[selectedLang] }}</span>
+                <span class="eq-num">Q{{ i + 1 }}</span>
+                <span class="eq-diff" :class="q.difficultyLevel">{{ q.difficulty[selectedLang] }}</span>
                 <span class="eq-subject">{{ q.subject[selectedLang] }}</span>
                 <span class="eq-chapter">{{ q.chapter[selectedLang] }}</span>
-                <span class="eq-chapter">{{ q.years?.[0]?.[selectedLang] }}</span>
+                <span class="eq-chapter">{{ q.year[selectedLang] }}</span>
               </div>
               <button class="flag-btn" :class="{ active: flagged.has(q.id) }" @click="toggleFlag(q.id)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14">
@@ -355,17 +310,7 @@
               </button>
             </div>
             <div class="eq-body">
-              <!-- Stimulus (context passage shown above the question) -->
-              <!--<div v-if="q.stimulus || q.stimulus_image" class="eq-stimulus">
-                <p class="eq-stimulus-label" v-if="q.stimulus">{{ q.stimulus[selectedLang] }}</p>
-                <img v-if="q.stimulus_image" :src="q.stimulus_image" class="eq-img" alt="Stimulus" />
-              </div>-->
-
-              <!-- Question text -->
               <p class="eq-text">{{ q.question[selectedLang] }}</p>
-
-              <!-- Question image -->
-              <img v-if="q.question_image" :src="q.question_image" class="eq-img" alt="Question diagram" />
             </div>
             <div class="eq-options">
               <button
@@ -385,7 +330,6 @@
               <span v-if="answers[q.id] !== undefined" class="answered-badge">Answered</span>
             </div>
           </div>
-          </template>
 
           <div class="exam-submit-bar">
             <button class="iso-btn iso-btn--fill submit-end-btn" @click="confirmEndExam">Submit Exam →</button>
@@ -533,63 +477,40 @@
             </div>
           </div>
 
-          <!--<div
+          <div
             v-for="(q, i) in filteredReview"
             :key="q.id"
             class="review-card"
             :class="reviewClass(q.id)"
-          >-->
-          <template v-for="group in filteredReviewGroups" :key="group.questions[0].id">
-          <!-- Stimulus shown once per group -->
-          <div v-if="group.stimulus || group.stimulus_image" class="eq-stimulus-block">
-            <p v-if="group.stimulus" class="eq-stimulus-label">{{ group.stimulus[selectedLang] }}</p>
-            <img v-if="group.stimulus_image" :src="group.stimulus_image" class="eq-img" alt="Stimulus" />
-          </div>
-        
-          <div
-            v-for="q in group.questions"
-            :key="q.id"
-            class="review-card"
-            :class="[reviewClass(q.id), { 'card-stimulus-child': !!group.stimulus || !!group.stimulus_image }]"
           >
             <div class="rc-header">
               <div class="rc-meta">
                 <span class="rc-status-icon">
                   {{ reviewClass(q.id) === 'correct' ? '✓' : reviewClass(q.id) === 'wrong' ? '✗' : '–' }}
                 </span>
-                <span class="rc-num">Q{{ questions.indexOf(q) + 1 }}</span>
-                <span class="rc-diff" :class="q.difficulty_level">{{ q.difficulty[selectedLang] }}</span>
+                <span class="rc-num">Q{{ i + 1 }}</span>
+                <span class="rc-diff" :class="q.difficultyLevel">{{ q.difficulty[selectedLang] }}</span>
                 <span class="rc-subject">{{ q.subject[selectedLang] }}</span>
                 <span class="eq-chapter">{{ q.chapter[selectedLang] }}</span>
-                <span class="eq-chapter">{{ q.years?.[0]?.[selectedLang] }}</span>
+                <span class="eq-chapter">{{ q.year[selectedLang] }}</span>
               </div>
             </div>
-            <!-- Stimulus (context passage shown above the question) -->
-            <!--<div v-if="q.stimulus || q.stimulus_image" class="eq-stimulus">
-              <p class="eq-stimulus-label" v-if="q.stimulus">{{ q.stimulus[selectedLang] }}</p>
-              <img v-if="q.stimulus_image" :src="q.stimulus_image" class="eq-img" alt="Stimulus" />
-            </div>-->
-
-            <!-- Question text -->
             <p class="rc-question">{{ q.question[selectedLang] }}</p>
-
-            <!-- Question image -->
-            <img v-if="q.question_image" :src="q.question_image" class="eq-img" alt="Question diagram" />
             <div class="rc-options">
               <div
                 v-for="(opt, oi) in q.options[selectedLang]"
                 :key="oi"
                 class="rc-option"
                 :class="{
-                  'rc-correct': oi === q.correct_index,
-                  'rc-wrong': oi === answers[q.id] && oi !== q.correct_index,
+                  'rc-correct': oi === q.correctIndex,
+                  'rc-wrong': oi === answers[q.id] && oi !== q.correctIndex,
                   'rc-user': oi === answers[q.id],
                 }"
               >
                 <span class="rc-opt-letter">{{ optLetters[oi] }}</span>
                 <span class="rc-opt-text">{{ opt }}</span>
                 <span class="rc-opt-tag">
-                  <template v-if="oi === q.correct_index">✓ Correct</template>
+                  <template v-if="oi === q.correctIndex">✓ Correct</template>
                   <template v-else-if="oi === answers[q.id]">✗ Your answer</template>
                 </span>
               </div>
@@ -600,7 +521,6 @@
               <p class="exp-text">{{ q.explanation[selectedLang] }}</p>
             </div>
           </div>
-          </template>
         </div>
 
         <!-- Right: breakdown sidebar -->
@@ -688,100 +608,25 @@
     </template>
 
   </div>
-
-  <!-- ── Toast ─────────────────────────────────────────────── -->
-  <Teleport to="body">
-    <Transition name="toast-slide">
-      <div class="admin-toast" :class="toast.type" v-if="toast.show">{{ toast.msg }}</div>
-    </Transition>
-  </Teleport>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ middleware: 'auth', layout: 'dashboard' })
-const supabase = useSupabaseClient()
-const session = useSupabaseSession()
 
-// ─── Toast ────────────────────────────────────────────────────
-const toast = reactive({ show: false, msg: '', type: 'success' })
-function showToast(msg, type = 'success') {
-  toast.msg = msg; toast.type = type; toast.show = true
-  setTimeout(() => toast.show = false, 3500)
-}
 
 interface Question {
   id: number
   question: string | { english: string; bangla: string }
-  question_image?: string | null        // ADD
-  stimulus?: { english: string; bangla: string } | null   // ADD
-  stimulus_image?: string | null        // ADD
-  stimulus_hash?: string | null   // ADD — links questions sharing same stimulus
   options: string[] | { english: string[]; bangla: string[] }
-  correct_index: number  // unchanged — index is language-agnostic
+  correctIndex: number  // unchanged — index is language-agnostic
   explanation: string | { english: string; bangla: string }
   subject: string | { english: string; bangla: string }
   chapter: string | { english: string; bangla: string }
   exam: string
   difficulty: string | { english: string; bangla: string }
-  difficulty_level: 'easy' | 'medium' | 'hard'
-  years?: { english: string; bangla: string }[]
+  difficultyLevel: 'easy' | 'medium' | 'hard'
+  year?: string | { english: string; bangla: string }
 }
-
-interface QuestionGroup {
-  stimulus?: { english: string; bangla: string } | null
-  stimulus_image?: string | null
-  questions: Question[]
-}
-
-const questionGroups = computed<QuestionGroup[]>(() => {
-  const groups: QuestionGroup[] = []
-  const stimulusMap = new Map<string, QuestionGroup>()
-
-  for (const q of questions.value) {
-    if (q.stimulus_hash) {
-      if (stimulusMap.has(q.stimulus_hash)) {
-        stimulusMap.get(q.stimulus_hash)!.questions.push(q)
-      } else {
-        const group: QuestionGroup = {
-          stimulus: q.stimulus,
-          stimulus_image: q.stimulus_image,
-          questions: [q],
-        }
-        stimulusMap.set(q.stimulus_hash, group)
-        groups.push(group)
-      }
-    } else {
-      groups.push({ questions: [q] })
-    }
-  }
-
-  return groups
-})
-
-const filteredReviewGroups = computed(() => {
-  const groups: QuestionGroup[] = []
-  const stimulusMap = new Map<string, QuestionGroup>()
-
-  for (const q of filteredReview.value) {
-    if (q.stimulus_hash) {
-      if (stimulusMap.has(q.stimulus_hash)) {
-        stimulusMap.get(q.stimulus_hash)!.questions.push(q)
-      } else {
-        const group: QuestionGroup = {
-          stimulus: q.stimulus,
-          stimulus_image: q.stimulus_image,
-          questions: [q],
-        }
-        stimulusMap.set(q.stimulus_hash, group)
-        groups.push(group)
-      }
-    } else {
-      groups.push({ questions: [q] })
-    }
-  }
-
-  return groups
-})
 
 const { isBn } = useI18n()
 let selectedLang = computed(() => isBn.value ? 'bangla' : 'english')
@@ -790,29 +635,21 @@ let selectedLang = computed(() => isBn.value ? 'bangla' : 'english')
 const optLetters = ['A', 'B', 'C', 'D', 'E']
 
 const examStreams = [
-  { id: 'HSC Science', name: 'HSC Science', desc: 'Higher Secondary Science', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>` },
-  { id: 'HSC Arts', name: 'HSC Arts', desc: 'Higher Secondary Arts', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>` },
-  { id: 'HSC Commerce', name: 'HSC Commerce', desc: 'Higher Secondary Commerce', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>` },
-  { id: 'SSC Science', name: 'SSC Science', desc: 'Secondary Certificate Science', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>` },
-  { id: 'SSC Arts', name: 'SSC Arts', desc: 'Secondary Certificate Arts', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>` },
-  { id: 'SSC Commerce', name: 'SSC Commerce', desc: 'Secondary Certificate Commerce', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>` },
+  { id: 'HSC', name: 'HSC', desc: 'Higher Secondary', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>` },
+  { id: 'SSC', name: 'SSC', desc: 'Secondary Certificate', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>` },
   { id: 'BUET', name: 'BUET', desc: 'Engineering Admission', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>` },
   { id: 'Medical', name: 'Medical', desc: 'MBBS Admission', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>` },
   { id: 'BCS', name: 'BCS', desc: 'Civil Service Exam', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>` },
-  //{ id: 'Bank', name: 'Bank', desc: 'Bank & Govt Jobs', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` },
+  { id: 'Bank', name: 'Bank', desc: 'Bank & Govt Jobs', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` },
 ]
 
 const subjectMap: Record<string, string[]> = {
-  "HSC Science":     ['All', 'Physics', 'Chemistry', 'Math', 'Biology', 'English', 'ICT'],
-  "HSC Arts":     ['All', 'Bangla', 'English', 'History', 'Geography', 'ICT'],
-  "HSC Commerce":     ['All', 'Accounting', 'Finance', 'Business Studies', 'English', 'ICT'],
-  "SSC Science":     ['All', 'Physics', 'Chemistry', 'Math', 'Biology', 'English', 'ICT'],
-  "SSC Arts":     ['All', 'Bangla', 'English', 'History', 'Geography', 'ICT'],
-  "SSC Commerce":     ['All', 'Accounting', 'Finance', 'Business Studies', 'English', 'ICT'],
+  HSC:     ['All', 'Physics', 'Chemistry', 'Math', 'Biology', 'English', 'ICT'],
+  SSC:     ['All', 'Science', 'Math', 'English', 'Bangla'],
   BUET:    ['All', 'Physics', 'Chemistry', 'Higher Math'],
   Medical: ['All', 'Biology', 'Chemistry', 'Physics'],
   BCS:     ['All', 'Bangla', 'English', 'Math', 'Bangladesh Affairs', 'General Knowledge'],
-  //Bank:    ['All', 'English', 'Math', 'General Knowledge'],
+  Bank:    ['All', 'English', 'Math', 'General Knowledge'],
 }
 
 const questionCounts = [10, 20, 30, 50, 100]
@@ -848,64 +685,366 @@ const examRules = [
 ]
 
 // ── Demo data ──────────────────────────────────────────────
-//const pastResults = [
-//  { id: 1, subject: 'Physics · HSC',    score: 88, count: 30, date: '2h ago' },
-//  { id: 2, subject: 'BCS General',      score: 72, count: 50, date: 'Yesterday' },
-//  { id: 3, subject: 'Chemistry · HSC',  score: 65, count: 30, date: '2 days ago' },
-//  { id: 4, subject: 'Math · HSC',       score: 91, count: 20, date: '4 days ago' },
-//]
-//
-//const lastResult = pastResults[0]
+const pastResults = [
+  { id: 1, subject: 'Physics · HSC',    score: 88, count: 30, date: '2h ago' },
+  { id: 2, subject: 'BCS General',      score: 72, count: 50, date: 'Yesterday' },
+  { id: 3, subject: 'Chemistry · HSC',  score: 65, count: 30, date: '2 days ago' },
+  { id: 4, subject: 'Math · HSC',       score: 91, count: 20, date: '4 days ago' },
+]
 
-function timeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  return days === 1 ? 'Yesterday' : `${days} days ago`
-}
+const lastResult = pastResults[0]
 
-// ── Past Results ───────────────────────────────────────────
-const pastResults = ref<any[]>([])
-const lastResult = computed(() => pastResults.value[0] ?? null)
+const questionBank: Question[] = [
+  {
+    id: 1, exam: 'HSC',
+    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' },
+    chapter: { english: 'Optics', bangla: 'আলোকবিজ্ঞান' },
+    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'hard',
+    question: {
+      english: 'A convex lens of focal length 20 cm is placed coaxially with a concave lens of focal length 40 cm. The combination behaves as:',
+      bangla: '২০ সেমি ফোকাস দূরত্বের একটি উত্তল লেন্স ৪০ সেমি ফোকাস দূরত্বের একটি অবতল লেন্সের সাথে সমাক্ষীয়ভাবে স্থাপিত। সমন্বয়টি কাজ করে:'
+    },
+    options: {
+      english: ['Converging lens of f = 40 cm', 'Diverging lens of f = 40 cm', 'Converging lens of f = 20 cm', 'Plane glass'],
+      bangla: ['f = ৪০ সেমি অভিসারী লেন্স', 'f = ৪০ সেমি অপসারী লেন্স', 'f = ২০ সেমি অভিসারী লেন্স', 'সমতল কাচ']
+    },
+    correctIndex: 0,
+    explanation: {
+      english: '1/f = 1/20 + 1/(−40) = 1/40. So f = 40 cm converging.',
+      bangla: '১/f = ১/২০ + ১/(−৪০) = ১/৪০। সুতরাং f = ৪০ সেমি অভিসারী।'
+    }
+  },
 
-async function fetchPastResults() {
-  if (!session.value) return
+  {
+    id: 2, exam: 'HSC',
+    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
+    chapter: { english: 'Electricity', bangla: 'তড়িৎ বিজ্ঞান' },
+    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
+    year: { english: '2022', bangla: '২০২২' },
+    difficultyLevel: 'medium',
+    question: {
+      english: 'Two resistors of 4Ω and 6Ω are connected in parallel. The equivalent resistance is:',
+      bangla: '৪Ω এবং ৬Ω এর দুটি রোধ সমান্তরালে সংযুক্ত। তুল্য রোধ কত?'
+    },
+    options: {
+      english: ['10Ω', '2.4Ω', '5Ω', '1.67Ω'],
+      bangla: ['১০Ω', '২.৪Ω', '৫Ω', '১.৬৭Ω']
+    },
+    correctIndex: 1,
+    explanation: {
+      english: '1/R = 1/4 + 1/6 = 5/12. So R = 2.4Ω.',
+      bangla: '১/R = ১/৪ + ১/৬ = ৫/১২। সুতরাং R = ২.৪Ω।'
+    }
+  },
 
-  const { data } = await supabase
-    .from('exam_results')
-    .select('id, subject, stream, score, questions_count, created_at, exam_type')
-    .eq('user_id', session.value.user.id)
-    .order('created_at', { ascending: false })
-    .limit(5)
+  {
+    id: 3, exam: 'HSC',
+    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
+    chapter: { english: 'Motion', bangla: 'গতিবিদ্যা' },
+    difficulty: { english: 'easy', bangla: 'সহজ' }, 
+    year: { english: '2021', bangla: '২০২১' },
+    difficultyLevel: 'easy',
+    question: {
+      english: "A body remains at rest unless acted on by an external force. This is Newton's:",
+      bangla: 'বাহ্যিক বল প্রযুক্ত না হলে একটি বস্তু স্থিরই থাকে। এটি নিউটনের:'
+    },
+    options: {
+      english: ['Second Law', 'Third Law', 'First Law', 'Law of Gravitation'],
+      bangla: ['দ্বিতীয় সূত্র', 'তৃতীয় সূত্র', 'প্রথম সূত্র', 'মহাকর্ষ সূত্র']
+    },
+    correctIndex: 2,
+    explanation: {
+      english: "Newton's First Law (Inertia) — a body at rest stays at rest unless acted upon by a net external force.",
+      bangla: 'নিউটনের প্রথম সূত্র (জড়তা) — বাহ্যিক বল না লাগলে স্থির বস্তু স্থিরই থাকে।'
+    }
+  },
+  
+  {
+    id: 4, exam: 'HSC', 
+    subject: { english: 'Chemistry', bangla: 'রসায়ন' }, 
+    chapter: { english: 'Electrochemistry', bangla: 'তড়িৎ রসায়ন' },
+    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'hard',
+    question: {
+      english: 'During electrolysis of dilute H₂SO₄, which gas is liberated at the anode?',
+      bangla: 'লঘু H₂SO₄ এর তড়িৎ বিশ্লেষণের সময় অ্যানোডে কোন গ্যাসটি মুক্ত হয়?'
+    },
+    options: {
+      english: ['Hydrogen', 'Oxygen', 'Sulphur dioxide', 'Ozone'],
+      bangla: ['হাইড্রোজেন', 'অক্সিজেন', 'সালফার ডাই অক্সাইড', 'ওজোন']
+    },
+    correctIndex: 1,
+    explanation: {
+      english: 'At the anode (oxidation): 2H₂O → O₂ + 4H⁺ + 4e⁻. Oxygen is liberated.',
+      bangla: 'অ্যানোডে (জারণ): 2H₂O → O₂ + 4H⁺ + 4e⁻। অর্থাৎ অক্সিজেন নির্গত হয়।'
+    }
+  },
 
-  pastResults.value = (data ?? []).map(r => ({
-    id:      r.id,
-    subject: `${r.subject?.english ?? r.subject} · ${r.stream}`,
-    score:   r.score,
-    count:   r.questions_count,
-    date:    timeAgo(r.created_at),
-  }))
-}
+  {
+    id: 5, exam: 'HSC', 
+    subject: { english: 'Chemistry', bangla: 'রসায়ন' }, 
+    chapter: { english: 'Periodic Table', bangla: 'পর্যায় সারণি' },
+    difficulty: { english: 'easy', bangla: 'সহজ' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'easy',
+    question: {
+      english: 'Which element has the highest electronegativity?',
+      bangla: 'কোন মৌলটির তড়িৎ ঋণাত্মকতা সবচেয়ে বেশি?'
+    },
+    options: {
+      english: ['Chlorine', 'Fluorine', 'Oxygen', 'Nitrogen'],
+      bangla: ['ক্লোরিন', 'ফ্লোরিন', 'অক্সিজেন', 'নাইট্রোজেন']
+    },
+    correctIndex: 1,
+    explanation: {
+      english: 'Fluorine (3.98 Pauling scale) has the highest electronegativity of all elements.',
+      bangla: 'ফ্লোরিন (পাউলিং স্কেলে ৩.৯৮) সকল মৌলের মধ্যে সর্বোচ্চ তড়িৎ ঋণাত্মকতা সম্পন্ন।'
+    }
+  },
 
-onMounted(fetchPastResults)
+  {
+    id: 6, exam: 'HSC', 
+    subject: { english: 'Math', bangla: 'গণিত' }, 
+    chapter: { english: 'Integration', bangla: 'যোগজীকরণ' },
+    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
+    year: { english: '2022', bangla: '২০২২' },
+    difficultyLevel: 'hard',
+    question: {
+      english: 'Evaluate ∫(x² + 3x + 2)dx from 0 to 1:',
+      bangla: '∫(x² + 3x + 2)dx এর মান ০ থেকে ১ সীমার মধ্যে নির্ণয় করো:'
+    },
+    options: {
+      english: ['23/6', '11/6', '5/2', '7/3'],
+      bangla: ['২৩/৬', '১১/৬', '৫/২', '৭/৩']
+    },
+    correctIndex: 0,
+    explanation: {
+      english: '[x³/3 + 3x²/2 + 2x] from 0 to 1 = 23/6.',
+      bangla: '[x³/3 + 3x²/2 + 2x] (সীমা ০ থেকে ১) = ২৩/৬।'
+    }
+  },
 
-// ── State ──────────────────────────────────────────────────
-const questionBank = ref<Question[]>([])
-const isLoadingQuestions = ref(false)
-const questionLoadError = ref('')
+  {
+    id: 7, exam: 'HSC', 
+    subject: { english: 'Math', bangla: 'গণিত' }, 
+    chapter: { english: 'Trigonometry', bangla: 'ত্রিকোণমিতি' },
+    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'medium',
+    question: {
+      english: 'If sin θ = 3/5, what is cos θ (first quadrant)?',
+      bangla: 'যদি sin θ = ৩/৫ হয়, তবে cos θ এর মান কত? (প্রথম চতুর্ভাগ)'
+    },
+    options: {
+      english: ['4/5', '3/4', '5/4', '1/2'],
+      bangla: ['৪/৫', '৩/৪', '৫/৪', '১/২']
+    },
+    correctIndex: 0,
+    explanation: {
+      english: 'cos²θ = 1 − 9/25 = 16/25, so cosθ = 4/5.',
+      bangla: 'cos²θ = ১ − ৯/২৫ = ১৬/২৫, সুতরাং cosθ = ৪/৫।'
+    }
+  },
+
+  {
+    id: 8, exam: 'HSC', 
+    subject: { english: 'Biology', bangla: 'জীববিজ্ঞান' }, 
+    chapter: { english: 'Cell Biology', bangla: 'কোষ জীববিজ্ঞান' },
+    difficulty: { english: 'easy', bangla: 'সহজ' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'easy',
+    question: {
+      english: 'The "powerhouse" of the cell that produces ATP is:',
+      bangla: 'কোষের "পাওয়ার হাউস" বা শক্তিঘর কোনটি যা ATP তৈরি করে?'
+    },
+    options: {
+      english: ['Ribosome', 'Mitochondria', 'Chloroplast', 'Golgi apparatus'],
+      bangla: ['রাইবোসোম', 'মাইটোকন্ড্রিয়া', 'ক্লোরোপ্লাস্ট', 'গলজি বডি']
+    },
+    correctIndex: 1,
+    explanation: {
+      english: 'Mitochondria perform aerobic respiration and produce ATP.',
+      bangla: 'মাইটোকন্ড্রিয়া সবাত শ্বসন প্রক্রিয়া সম্পন্ন করে এবং ATP তৈরি করে।'
+    }
+  },
+
+  {
+    id: 9, exam: 'BCS', 
+    subject: { english: 'Bangladesh Affairs', bangla: 'বাংলাদেশ বিষয়াবলী' }, 
+    chapter: { english: 'Liberation War', bangla: 'মুক্তিযুদ্ধ' },
+    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'medium',
+    question: {
+      english: 'Which country first recognized Bangladesh as independent?',
+      bangla: 'কোন দেশ প্রথম বাংলাদেশকে স্বাধীন রাষ্ট্র হিসেবে স্বীকৃতি দেয়?'
+    },
+    options: {
+      english: ['India', 'Soviet Union', 'Bhutan', 'Nepal'],
+      bangla: ['ভারত', 'সোভিয়েত ইউনিয়ন', 'ভুটান', 'নেপাল']
+    },
+    correctIndex: 2,
+    explanation: {
+      english: 'Bhutan recognized Bangladesh on December 6, 1971.',
+      bangla: '৬ ডিসেম্বর, ১৯৭১ সালে ভুটান প্রথম দেশ হিসেবে বাংলাদেশকে স্বীকৃতি দেয়।'
+    }
+  },
+
+  {
+    id: 10, exam: 'BCS', 
+    subject: { english: 'English', bangla: 'ইংরেজি' }, 
+    chapter: { english: 'Grammar', bangla: 'ব্যাকরণ' },
+    difficulty: { english: 'easy', bangla: 'সহজ' }, 
+    year: { english: '2022', bangla: '২০২২' },
+    difficultyLevel: 'easy',
+    question: {
+      english: 'Choose the correct sentence:',
+      bangla: 'সঠিক বাক্যটি নির্বাচন করুন:'
+    },
+    options: {
+      english: [
+        'Neither the students nor the teacher were present.',
+        'Neither the students nor the teacher was present.',
+        'Neither the students nor the teacher are present.',
+        'Neither the students nor the teacher be present.'
+      ],
+      bangla: [
+        'Neither the students nor the teacher were present.',
+        'Neither the students nor the teacher was present.',
+        'Neither the students nor the teacher are present.',
+        'Neither the students nor the teacher be present.'
+      ]
+    },
+    correctIndex: 1,
+    explanation: {
+      english: 'With "neither…nor", the verb agrees with the nearest subject.',
+      bangla: '"Neither…nor" যুক্ত বাক্যে verb নিকটবর্তী subject অনুযায়ী হয়।'
+    }
+  },
+
+  {
+    id: 11, exam: 'HSC', 
+    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
+    chapter: { english: 'Waves', bangla: 'তরঙ্গ' },
+    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'medium',
+    question: {
+      english: 'The speed of sound in air at 0°C is approximately:',
+      bangla: '০°C তাপমাত্রায় বায়ুতে শব্দের বেগ প্রায় কত?'
+    },
+    options: {
+      english: ['300 m/s', '331 m/s', '343 m/s', '360 m/s'],
+      bangla: ['৩০০ m/s', '৩৩১ m/s', '৩৪৩ m/s', '৩৬০ m/s']
+    },
+    correctIndex: 1,
+    explanation: {
+      english: 'Speed of sound in air at 0°C is approximately 331 m/s.',
+      bangla: '০°C তাপমাত্রায় বায়ুতে শব্দের বেগ প্রায় ৩৩১ m/s।'
+    }
+  },
+
+  {
+    id: 12, exam: 'HSC', 
+    subject: { english: 'Chemistry', bangla: 'রসায়ন' }, 
+    chapter: { english: 'Organic Chemistry', bangla: 'জৈব রসায়ন' },
+    difficulty: { english: 'medium', bangla: 'মধ্যম' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'medium',
+    question: {
+      english: 'Which functional group is present in ethanol?',
+      bangla: 'ইথানলে কোন কার্যকরী মূলক উপস্থিত থাকে?'
+    },
+    options: {
+      english: ['Aldehyde –CHO', 'Carboxyl –COOH', 'Hydroxyl –OH', 'Ketone C=O'],
+      bangla: ['অ্যালডিহাইড –CHO', 'কার্বক্সিল –COOH', 'হাইড্রোক্সিল –OH', 'কিটোন C=O']
+    },
+    correctIndex: 2,
+    explanation: {
+      english: 'Ethanol (C₂H₅OH) contains the hydroxyl (–OH) group.',
+      bangla: 'ইথানল (C₂H₅OH) একটি অ্যালকোহল যাতে হাইড্রোক্সিল (–OH) মূলক থাকে।'
+    }
+  },
+
+  {
+    id: 13, exam: 'BCS', 
+    subject: { english: 'Math', bangla: 'গণিত' }, 
+    chapter: { english: 'Percentage', bangla: 'শতকরা' },
+    difficulty: { english: 'easy', bangla: 'সহজ' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'easy',
+    question: {
+      english: 'A product sold at 20% profit. Cost price = Tk. 500. Selling price?',
+      bangla: 'একটি পণ্য ২০% লাভে বিক্রি করা হলো। ক্রয়মূল্য ৫০০ টাকা হলে, বিক্রয়মূল্য কত?'
+    },
+    options: {
+      english: ['Tk. 580', 'Tk. 600', 'Tk. 520', 'Tk. 620'],
+      bangla: ['৫৮০ টাকা', '৬০০ টাকা', '৫২০ টাকা', '৬২০ টাকা']
+    },
+    correctIndex: 1,
+    explanation: {
+      english: 'SP = 500 × 1.20 = 600.',
+      bangla: 'বিক্রয়মূল্য = ৫০০ × ১.২০ = ৬০০ টাকা।'
+    }
+  },
+
+  {
+    id: 14, exam: 'HSC', 
+    subject: { english: 'Physics', bangla: 'পদার্থবিজ্ঞান' }, 
+    chapter: { english: 'Thermodynamics', bangla: 'তাপগতিবিদ্যা' },
+    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'hard',
+    question: {
+      english: 'In an adiabatic process for an ideal gas, which quantity remains constant?',
+      bangla: 'আদর্শ গ্যাসের রুদ্ধতাপীয় প্রক্রিয়ায় কোন রাশিটি স্থির থাকে?'
+    },
+    options: {
+      english: ['Temperature', 'Pressure', 'Volume', 'PVγ'],
+      bangla: ['তাপমাত্রা', 'চাপ', 'আয়তন', 'PVγ']
+    },
+    correctIndex: 3,
+    explanation: {
+      english: 'In an adiabatic process PVγ = constant.',
+      bangla: 'রুদ্ধতাপীয় প্রক্রিয়ায় PVγ = ধ্রুবক থাকে।'
+    }
+  },
+
+  {
+    id: 15, exam: 'HSC', 
+    subject: { english: 'Math', bangla: 'গণিত' }, 
+    chapter: { english: 'Complex Numbers', bangla: 'জটিল সংখ্যা' },
+    difficulty: { english: 'hard', bangla: 'কঠিন' }, 
+    year: { english: '2023', bangla: '২০২৩' },
+    difficultyLevel: 'hard',
+    question: {
+      english: 'The modulus of (1 + i)⁸ is:',
+      bangla: '(1 + i)⁸ এর পরম মান (modulus) কত?'
+    },
+    options: {
+      english: ['4', '8', '16', '32'],
+      bangla: ['৪', '৮', '১৬', '৩২']
+    },
+    correctIndex: 2,
+    explanation: {
+      english: '|1+i| = √2, so |(1+i)⁸| = (√2)⁸ = 16.',
+      bangla: '|1+i| = √২, সুতরাং |(1+i)⁸| = ১৬।'
+    }
+  }
+]
 
 // ── State ──────────────────────────────────────────────────
 const phase = ref<'setup' | 'exam' | 'results'>('setup')
 
 const config = reactive({
-  stream: 'HSC Science',
+  stream: 'HSC',
   subject: 'All',
   chapter: 'All',
   count: 20,
-  duration: 20,
+  duration: 30,
   diffMode: 'balanced',
   shuffle: true,
   showTimer: true,
@@ -926,50 +1065,16 @@ let timerInterval: ReturnType<typeof setInterval> | null = null
 const availableSubjects = computed(() => subjectMap[config.stream] ?? ['All'])
 
 // Chapters only available when a specific subject is selected (not 'All')
-const availableChapters = ref<string[]>([])
-
-//watch([() => config.stream, () => config.subject], async ([stream, subject]) => {
-//  if (!stream) return
-//  availableChapters.value = []
-//
-//  const data = await $fetch<string[]>('/api/chapters', {
-//    query: {
-//      stream,
-//      ...(subject !== 'All' && { subject }),
-//    }
-//  })
-//
-//  availableChapters.value = data.length ? ['All', ...data] : []
-//}, { immediate: false })
-
-watch([() => config.stream, () => config.subject], async ([stream, subject]) => {
-  if (!stream) return
-  availableChapters.value = []
-
-  try {
-    const data = await $fetch<string[]>('/api/chapters', {
-      query: {
-        stream,
-        ...(subject !== 'All' && { subject }),
-      }
-    })
-    availableChapters.value = data.length ? ['All', ...data] : []
-  } catch (e) {
-    console.error('Failed to load chapters:', e)
-    availableChapters.value = []
-  }
-}, { immediate: false })
-
-//const availableChapters = computed(() => {
-//  if (config.subject === 'All') return []
-//  const chapters = new Set<string>()
-//  questionBank.forEach(q => {
-//    if (q.exam === config.stream && getSubjectStr(q) === config.subject) {
-//      chapters.add(getChapterStr(q))
-//    }
-//  })
-//  return ['All', ...Array.from(chapters).sort()]
-//})
+const availableChapters = computed(() => {
+  if (config.subject === 'All') return []
+  const chapters = new Set<string>()
+  questionBank.forEach(q => {
+    if (q.exam === config.stream && getSubjectStr(q) === config.subject) {
+      chapters.add(getChapterStr(q))
+    }
+  })
+  return ['All', ...Array.from(chapters).sort()]
+})
 
 const currentQ = computed(() => questions.value[currentIdx.value])
 
@@ -980,7 +1085,7 @@ const result = computed(() => {
   questions.value.forEach(q => {
     const ans = answers.value[q.id]
     if (ans === undefined) skipped++
-    else if (ans === q.correct_index) correct++
+    else if (ans === q.correctIndex) correct++
     else wrong++
   })
   const total = questions.value.length
@@ -1010,8 +1115,8 @@ const diffBreakdown = computed(() => {
     easy: { correct: 0, total: 0 }, medium: { correct: 0, total: 0 }, hard: { correct: 0, total: 0 },
   }
   questions.value.forEach(q => {
-    diffs[q.difficulty_level].total++
-    if (answers.value[q.id] === q.correct_index) diffs[q.difficulty_level].correct++
+    diffs[q.difficultyLevel].total++
+    if (answers.value[q.id] === q.correctIndex) diffs[q.difficultyLevel].correct++
   })
   return [
     { label: 'Easy',   cls: 'easy',   ...diffs.easy },
@@ -1024,8 +1129,8 @@ const filteredReview = computed(() => {
   if (reviewFilter.value === 'All') return questions.value
   return questions.value.filter(q => {
     const ans = answers.value[q.id]
-    if (reviewFilter.value === 'Correct') return ans === q.correct_index
-    if (reviewFilter.value === 'Wrong')   return ans !== undefined && ans !== q.correct_index
+    if (reviewFilter.value === 'Correct') return ans === q.correctIndex
+    if (reviewFilter.value === 'Wrong')   return ans !== undefined && ans !== q.correctIndex
     if (reviewFilter.value === 'Skipped') return ans === undefined
     return true
   })
@@ -1053,7 +1158,7 @@ function getChapterStr(q: Question): string {
 }
 
 function buildQuestions(): Question[] {
-  let pool = [...questionBank.value]
+  let pool = [...questionBank]
   if (config.stream !== 'All') pool = pool.filter(q => q.exam === config.stream)
   if (config.subject !== 'All') pool = pool.filter(q => getSubjectStr(q) === config.subject)
   if (config.chapter !== 'All') pool = pool.filter(q => getChapterStr(q) === config.chapter)
@@ -1102,39 +1207,9 @@ function buildQuestions(): Question[] {
 
 let observer: IntersectionObserver | null = null
 
-async function startExam() {
-  isLoadingQuestions.value = true
-  questionLoadError.value = ''
-
-  try {
-    const data = await $fetch<Question[]>('/api/questions', {
-      query: {
-        stream: config.stream,
-        subject: config.subject !== 'All' ? config.subject : undefined,
-        chapter: config.chapter !== 'All' ? config.chapter : undefined,
-        difficulty: config.diffMode !== 'mixed' ? config.diffMode : undefined,
-        limit: config.count * 3, // fetch 3× so difficulty bucketing has room
-      }
-    })
-
-    if (!data?.length) {
-      questionLoadError.value = 'No questions found for this selection.'
-      return
-    }
-
-    questionBank.value = data
-    questions.value = buildQuestions()       // same buildQuestions(), no other changes needed
-    if (!questions.value.length) {
-      questionLoadError.value = 'Not enough questions for your filters.'
-      return
-    }
-  } catch (e) {
-    questionLoadError.value = 'Failed to load questions.'
-    return
-  } finally {
-    isLoadingQuestions.value = false
-  }
-
+function startExam() {
+  questions.value = buildQuestions()
+  if (!questions.value.length) return
   answers.value = {}
   flagged.value = new Set()
   currentIdx.value = 0
@@ -1144,19 +1219,6 @@ async function startExam() {
   startTimer()
   nextTick(setupObserver)
 }
-
-//function startExam() {
-//  questions.value = buildQuestions()
-//  if (!questions.value.length) return
-//  answers.value = {}
-//  flagged.value = new Set()
-//  currentIdx.value = 0
-//  timeLeft.value = config.duration * 60
-//  showEndConfirm.value = false
-//  phase.value = 'exam'
-//  startTimer()
-//  nextTick(setupObserver)
-//}
 
 function setupObserver() {
   if (observer) observer.disconnect()
@@ -1219,88 +1281,10 @@ function jumpTo(i: number) { scrollToQuestion(i) }
 
 function confirmEndExam() { showEndConfirm.value = true }
 
-async function saveResult() {
-  if (!session.value) return
-
-  const userId = session.value.user.id
-
-  const timeTakenSecs = config.duration * 60 - timeLeft.value
-
-  // 1. Insert into exam_sessions (full detail)
-  const { data: sessiond, error: sessionError } = await supabase
-    .from('exam_sessions')
-    .insert({
-      user_id:          userId,
-      exam_type:        'mock',
-      stream:           config.stream,
-      subject:          { english: config.subject, bangla: '' },
-      chapter:          { english: config.chapter, bangla: '' },
-      diff_mode:        config.diffMode,
-      questions_count:  questions.value.length,
-      duration_mins:    config.duration,
-      shuffle:          config.shuffle,
-      negative_marking: config.negativeMarking,
-      correct_count:    result.value.correct,
-      wrong_count:      result.value.wrong,
-      skipped_count:    result.value.skipped,
-      score:            result.value.score,
-      marks_earned:     result.value.marksEarned,
-      duration_taken_mins: Math.max(1, Math.round(timeTakenSecs / 60)),
-      question_ids:     questions.value.map(q => q.id),
-      submitted_at:     new Date().toISOString(),
-      completed_at:     new Date().toISOString(),
-    })
-    .select('id')
-    .single()
-
-  if (sessionError) { console.error(sessionError); return }
-
-  // 2. Insert into exam_results (summary for progress.vue + leaderboard)
-  await supabase.from('exam_results').insert({
-    user_id:       userId,
-    session_id:    sessiond.id,
-    title:         `${config.stream} ${config.subject} Mock`,
-    subject:       { english: config.subject, bangla: '' },
-    chapter:       { english: config.chapter, bangla: '' },
-    stream:        config.stream,
-    exam_type:     'mock',
-    score:         result.value.score,
-    marks_earned:  result.value.marksEarned,
-    questions_count: questions.value.length,
-    correct_count: result.value.correct,
-    wrong_count:   result.value.wrong,
-    skipped_count: result.value.skipped,
-    duration_mins: Math.max(1, Math.round(timeTakenSecs / 60)),
-    status:        result.value.score >= 50 ? 'passed' : 'failed',
-    difficulty_breakdown: {
-      easy:   diffBreakdown.value.find(d => d.cls === 'easy'),
-      medium: diffBreakdown.value.find(d => d.cls === 'medium'),
-      hard:   diffBreakdown.value.find(d => d.cls === 'hard'),
-    },
-  })
-
-  // 3. Insert into question_attempts (per-question tracking for question-bank solved badges)
-  const attempts = questions.value.map(q => ({
-    user_id:        userId,
-    question_id:    q.id,
-    selected_index: answers.value[q.id] ?? null,
-    is_correct:     answers.value[q.id] === q.correct_index ? true
-                    : answers.value[q.id] === undefined ? null : false,
-    correct_index:  q.correct_index,
-    source_type:    'mock',
-    source_id:      sessiond.id,
-  }))
-
-  await supabase.from('question_attempts').insert(attempts)
-}
-
-async function submitExam() {
+function submitExam() {
   stopTimer()
   showEndConfirm.value = false
   phase.value = 'results'
-  saveResult()
-  showToast("Result saved successfully ✓")
-  await fetchPastResults()
 }
 
 function formatTime(s: number) {
@@ -1328,30 +1312,13 @@ function reviewClass(id: number) {
   const ans = answers.value[id]
   const q = questions.value.find(x => x.id === id)
   if (!q || ans === undefined) return 'skipped'
-  return ans === q.correct_index ? 'correct' : 'wrong'
+  return ans === q.correctIndex ? 'correct' : 'wrong'
 }
 
 onUnmounted(() => { stopTimer(); observer?.disconnect() })
 </script>
 
 <style scoped>
-/* ═══════════════════════════════════════════════════════════════
-   TOAST
-═══════════════════════════════════════════════════════════════ */
-.admin-toast {
-  position: fixed; bottom: 24px; right: 24px; z-index: 2000;
-  padding: 12px 20px;
-  font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em;
-  background: var(--black); color: var(--white);
-  border: 1px solid var(--border-bright);
-  border-left: 3px solid rgba(120,230,120,0.8);
-  box-shadow: 4px 4px 0 0 rgba(240,240,234,0.06);
-}
-.admin-toast.error { border-left-color: rgba(255,100,100,0.8); }
-.toast-slide-enter-active, .toast-slide-leave-active { transition: all 0.25s ease; }
-.toast-slide-enter-from { transform: translateX(20px); opacity: 0; }
-.toast-slide-leave-to   { transform: translateX(20px); opacity: 0; }
-
 /* ── Page ────────────────────────────────────────────────── */
 .mock-exam { display: flex; flex-direction: column; gap: 1.5rem; }
 
@@ -2065,7 +2032,6 @@ onUnmounted(() => { stopTimer(); observer?.disconnect() })
   border-left: 3px solid transparent;
   padding: 1.2rem 1.4rem;
   display: flex; flex-direction: column; gap: 10px;
-  margin: 10px;
 }
 .review-card:last-child { border-bottom: none; }
 .review-card.correct { border-left-color: rgba(120,230,120,0.5); }
@@ -2195,239 +2161,6 @@ onUnmounted(() => { stopTimer(); observer?.disconnect() })
 .qa-title { font-size: 0.8rem; font-weight: 600; color: var(--white); }
 .qa-sub   { font-size: 0.65rem; color: var(--gray); }
 .qa-arrow { font-family: var(--font-mono); font-size: 0.75rem; color: var(--gray); flex-shrink: 0; }
-
-/* ── Question card (review) ────────────────────────────── */
-/* .rc-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1.2rem 1.4rem;
-  margin-bottom: 1.2rem;
-  box-shadow: 2px 2px 0 0 rgba(240,240,234,0.04);
-}
-
-.rc-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-}
-
-.rc-qnum {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--gray);
-  letter-spacing: 0.05em;
-}
-
-.rc-tags {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.rc-tag {
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  text-transform: uppercase;
-}
-
-.rc-tag.subject {
-  background: rgba(240,240,234,0.08);
-  color: var(--white);
-}
-
-.rc-tag.difficulty {
-  background: rgba(255,100,100,0.1);
-  color: #ff6464;
-}
-
-.rc-question {
-  margin-bottom: 1rem;
-}
-
-.rc-qtext {
-  font-size: 0.95rem;
-  line-height: 1.6;
-  color: var(--white);
-  margin-bottom: 0.8rem;
-}
-
-.rc-qimage {
-  max-width: 100%;
-  height: auto;
-  border-radius: 8px;
-  margin-top: 0.8rem;
-  border: 1px solid var(--border);
-}
-
-.rc-options {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.rc-option {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.6rem 0.8rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: rgba(240,240,234,0.03);
-  transition: all 0.2s ease;
-}
-
-.rc-option:hover {
-  background: rgba(240,240,234,0.06);
-  border-color: var(--accent);
-}
-
-.rc-option.rc-correct {
-  background: rgba(120,230,120,0.1);
-  border-color: #78e678;
-}
-
-.rc-option.rc-wrong {
-  background: rgba(255,100,100,0.1);
-  border-color: #ff6464;
-}
-
-.rc-option.rc-user {
-  background: rgba(255,200,80,0.1);
-  border-color: #ffc850;
-}
-
-.rc-opt-letter {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--gray);
-  min-width: 24px;
-  text-align: center;
-}
-
-.rc-opt-text {
-  flex: 1;
-  font-size: 0.85rem;
-  line-height: 1.5;
-  color: var(--white);
-}
-
-.rc-opt-tag {
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  padding: 0.2rem 0.4rem;
-  border-radius: 4px;
-  text-transform: uppercase;
-}
-
-.rc-option.rc-correct .rc-opt-tag {
-  background: #78e678;
-  color: #000;
-}
-
-.rc-option.rc-wrong .rc-opt-tag {
-  background: #ff6464;
-  color: #fff;
-}
-
-.rc-option.rc-user .rc-opt-tag {
-  background: #ffc850;
-  color: #000;
-}
-
-.rc-skipped-note {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: var(--gray);
-  padding: 0.5rem 0;
-}
-
-.rc-explanation {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
-}
-
-.exp-label {
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.5rem;
-}
-
-.exp-text {
-  font-size: 0.85rem;
-  line-height: 1.6;
-  color: var(--gray);
-} */
-
-.eq-img {
-  max-width: 100%;
-  border-radius: 8px;
-  margin: 10px 0;
-  border: 1px solid var(--border);
-}
-
-.eq-stimulus {
-  background: var(--surface-2, #1a1a1a);
-  border-left: 3px solid var(--accent);
-  border-radius: 6px;
-  padding: 12px 16px;
-  margin-bottom: 14px;
-}
-
-.eq-stimulus-label {
-  display: block;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  margin-bottom: 8px;
-}
-
-.eq-stimulus p {
-  margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.6;
-}
-
-.eq-stimulus-block {
-  background: var(--surface-2, #1a1a1a);
-  border-left: 3px solid var(--accent);
-  border-radius: 8px;
-  padding: 16px 20px;
-  margin-bottom: 0;           /* cards below will connect visually */
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.eq-stimulus-label {
-  display: block;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  margin-bottom: 8px;
-}
-
-.eq-stimulus-block p { margin: 0; line-height: 1.7; }
-
-.eq-img {
-  max-width: 100%;
-  border-radius: 6px;
-  margin: 8px 0;
-}
-
-/* Indent connected questions slightly to show they belong to the stimulus */
-.card-stimulus-child {
-  border-top-left-radius: 0;
-}
 
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 1100px) {

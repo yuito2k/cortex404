@@ -6,7 +6,6 @@ if (profile?.role !== 'admin') navigateTo('/dashboard')
 
 import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { curriculum } from '~/utils/curriculum'
-import { hashText } from '~/utils/hashQuestion'
 
 const supabaseHSC = useSupabaseHSC()
 const supabaseMedical = useSupabaseMedical()
@@ -50,189 +49,12 @@ let explanationBN = ref('')
 
 let statusQuestion = ref('')
 
-// ─── Question image (cropped from sheet) ──────────────────────
-const questionImageUrl      = ref('')   // final public URL after upload
-const questionImagePreview  = ref('')   // local blob URL for preview before upload
-const questionImageUploading = ref(false)
-
-// ─── Manual crop UI ───────────────────────────────────────────
-const cropperOpen        = ref(false)
-const cropperImgFile     = ref(null)   // the source image file for cropping
-const cropperInstance    = ref(null)   // Cropper.js instance
-const cropperForBulkIdx  = ref(null)   // null = single parser, number = bulk row index
-const cropperForStimulus = ref(false)  // true = cropping stimulus, false = cropping question image
-
-const cropperImgSrc = computed(() =>
-  cropperImgFile.value ? URL.createObjectURL(cropperImgFile.value) : ''
-)
-
-function openCropper(imageFile, bulkIdx = null, forStimulus = false) {
-  cropperImgFile.value     = imageFile
-  cropperForBulkIdx.value  = bulkIdx
-  cropperForStimulus.value = forStimulus
-  cropperOpen.value        = true
-  nextTick(() => {
-    const el = document.getElementById('cropper-img')
-    if (!el) return
-    if (cropperInstance.value) cropperInstance.value.destroy()
-    cropperInstance.value = new Cropper(el, {
-      viewMode:      1,
-      dragMode:      'move',
-      autoCropArea:  0.5,
-      movable:       true,
-      zoomable:      true,
-      scalable:      false,
-      responsive:    true,
-      background:    false,
-    })
-  })
-}
-
-function closeCropper() {
-  if (cropperInstance.value) { cropperInstance.value.destroy(); cropperInstance.value = null }
-  cropperOpen.value    = false
-  cropperImgFile.value = null
-}
-
-async function confirmCrop() {
-  if (!cropperInstance.value) return
-  questionImageUploading.value = true
-
-  try {
-    const canvas = cropperInstance.value.getCroppedCanvas({ maxWidth: 1200, imageSmoothingQuality: 'high' })
-
-    const stream  = streamEN.value
-    const subject = (cropperForBulkIdx.value !== null ? bulkResults.value[cropperForBulkIdx.value]?.subjectEN : subjectEN.value) || 'unknown'
-    const chapter = (cropperForBulkIdx.value !== null ? bulkResults.value[cropperForBulkIdx.value]?.chapterEN : chapterEN.value) || 'unknown'
-
-    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.92))
-    const safeSub  = subject.replace(/[^a-zA-Z0-9]/g, '_')
-    const safeCh   = chapter.replace(/[^a-zA-Z0-9]/g, '_')
-    const path     = `${stream}/${safeSub}/${safeCh}/${Date.now()}.jpg`
-    const supabase = stream.startsWith('HSC') ? supabaseHSC : supabaseMedical
-
-    const { error } = await supabase.storage
-      .from('question-images')
-      .upload(path, blob, { contentType: 'image/jpeg', upsert: false })
-
-    if (error) throw new Error(error.message)
-
-    const { data } = supabase.storage.from('question-images').getPublicUrl(path)
-    const url      = data.publicUrl
-    const preview  = canvas.toDataURL('image/jpeg', 0.92)
-
-    //if (cropperForBulkIdx.value !== null) {
-    //  // Bulk — update that specific row
-    //  bulkResults.value[cropperForBulkIdx.value].questionImageUrl     = url
-    //  bulkResults.value[cropperForBulkIdx.value].questionImagePreview = preview
-    //} else {
-    //  // Single parser
-    //  questionImageUrl.value     = url
-    //  questionImagePreview.value = preview
-    //}
-
-    if (cropperForBulkIdx.value !== null) {
-      if (cropperForStimulus.value) {
-        // Get the stimulus text of the cropped row
-        const stimulusText = bulkResults.value[cropperForBulkIdx.value]?.stimulusBN
-      
-        // Auto-fill ALL questions sharing the same stimulus
-        bulkResults.value.forEach(q => {
-          if (q.stimulusBN && q.stimulusBN === stimulusText) {
-            q.stimulusImageUrl     = url
-            q.stimulusImagePreview = preview
-          }
-        })
-      } else {
-        bulkResults.value[cropperForBulkIdx.value].questionImageUrl     = url
-        bulkResults.value[cropperForBulkIdx.value].questionImagePreview = preview
-      }
-    } else {
-      questionImageUrl.value     = url
-      questionImagePreview.value = preview
-    }
-
-    showToast('Image cropped & uploaded ✓')
-    closeCropper()
-  } catch (e) {
-    console.error(e)
-    showToast('Crop upload failed.', 'error')
-  } finally {
-    questionImageUploading.value = false
-  }
-}
-
-async function cropAndUpload(imageFile, crop, stream, subject, chapter) {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = async () => {
-      try {
-        const canvas  = document.createElement('canvas')
-        const padding = 12
-        const x = Math.max(0, crop.xPct * img.naturalWidth  - padding)
-        const y = Math.max(0, crop.yPct * img.naturalHeight - padding)
-        const w = Math.min(img.naturalWidth  - x, crop.wPct * img.naturalWidth  + padding * 2)
-        const h = Math.min(img.naturalHeight - y, crop.hPct * img.naturalHeight + padding * 2)
-        canvas.width  = w
-        canvas.height = h
-        canvas.getContext('2d').drawImage(img, x, y, w, h, 0, 0, w, h)
-
-        // Show local preview immediately
-        questionImagePreview.value = canvas.toDataURL('image/jpeg', 0.92)
-
-        canvas.toBlob(async (blob) => {
-          if (!blob) return reject(new Error('Canvas crop failed'))
-          const supabase  = stream.startsWith('HSC') ? supabaseHSC : supabaseMedical
-          const timestamp = Date.now()
-          const safeSub   = subject.replace(/[^a-zA-Z0-9]/g, '_')
-          const safeCh    = chapter.replace(/[^a-zA-Z0-9]/g, '_')
-          const path      = `${stream}/${safeSub}/${safeCh}/${timestamp}.jpg`
-
-          const { error: upErr } = await supabase.storage
-            .from('question-images')
-            .upload(path, blob, { contentType: 'image/jpeg', upsert: false })
-
-          if (upErr) return reject(new Error(upErr.message))
-
-          const { data } = supabase.storage.from('question-images').getPublicUrl(path)
-          resolve(data.publicUrl)
-        }, 'image/jpeg', 0.92)
-      } catch (e) { reject(e) }
-    }
-    img.onerror = () => reject(new Error('Failed to load image for cropping'))
-    img.src = URL.createObjectURL(imageFile)
-  })
-}
-
-function onQuestionImageReupload(e) {
-  const f = e.target.files?.[0]
-  if (!f) return
-  questionImagePreview.value = URL.createObjectURL(f)
-  // Upload the manually selected file directly (no crop needed)
-  questionImageUploading.value = true
-  const supabase  = streamEN.value.startsWith('HSC') ? supabaseHSC : supabaseMedical
-  const timestamp = Date.now()
-  const safeSub   = subjectEN.value.replace(/[^a-zA-Z0-9]/g, '_')
-  const safeCh    = chapterEN.value.replace(/[^a-zA-Z0-9]/g, '_')
-  const path      = `${streamEN.value}/${safeSub}/${safeCh}/${timestamp}.jpg`
-  supabase.storage.from('question-images').upload(path, f, { contentType: f.type, upsert: false })
-    .then(({ error }) => {
-      if (error) { showToast('Image upload failed.', 'error'); return }
-      const { data } = supabase.storage.from('question-images').getPublicUrl(path)
-      questionImageUrl.value = data.publicUrl
-      showToast('Question image updated ✓')
-    })
-    .finally(() => { questionImageUploading.value = false })
-}
-
 // ─── Image extraction ─────────────────────────────────────────
 const imgFile        = ref(null)
 const imgPreview     = ref('')
 const imgExtracting  = ref(false)
 const imgError       = ref('')
 const imgPanelOpen   = ref(false)
-const singleIsDuplicate   = ref(false)
-const singleLowConfidence = ref(false)
 
 function onImgFileChange(e) {
   const f = e.target.files?.[0]
@@ -282,39 +104,6 @@ async function extractFromImage() {
     chapterBN.value = parsed.chapterBN || ''
 
     imgPanelOpen.value = false
-
-    // Crop question image if Gemini detected one
-    //if (parsed.hasQuestionImage && parsed.questionImageCrop && imgFile.value) {
-    //  questionImageUploading.value = true
-    //  try {
-    //    questionImageUrl.value = await cropAndUpload(
-    //      imgFile.value,
-    //      parsed.questionImageCrop,
-    //      streamEN.value,
-    //      parsed.subjectEN || subjectEN.value,
-    //      parsed.chapterEN || chapterEN.value
-    //    )
-    //  } catch (e) {
-    //    console.error('Crop/upload failed:', e)
-    //    showToast('Image crop failed — you can upload manually.', 'error')
-    //  } finally {
-    //    questionImageUploading.value = false
-    //  }
-    //}
-
-    // Open manual crop UI if Gemini detected an image
-    if (parsed.hasQuestionImage && imgFile.value) {
-      openCropper(imgFile.value, null)
-    }
-
-    // Duplicate + confidence check
-    //const isDup = (await checkDuplicates([parsed])).has(parsed.questionBN)
-    //if (isDup) showToast('⚠ Possible duplicate detected in DB', 'warning')
-    //if (parsed.lowConfidence) showToast('⚠ Low confidence — review fields carefully', 'warning')
-    singleLowConfidence.value = parsed.lowConfidence ?? false
-    singleIsDuplicate.value   = (await checkDuplicates([parsed])).has(parsed.questionBN)
-    if (singleIsDuplicate.value)   showToast('⚠ Possible duplicate detected in DB', 'warning')
-    if (singleLowConfidence.value) showToast('⚠ Low confidence — review fields carefully', 'warning')
     showToast('Fields auto-filled from image ✓')
 
   } catch (err) {
@@ -415,48 +204,14 @@ async function parseBulk() {
 
     bulkRedDotDetected.value = parsed.redDotDetected ?? false
     bulkTotalFound.value     = parsed.totalFound     ?? parsed.questions?.length ?? 0
-
     const questions          = parsed.questions ?? []
     const duplicates         = await checkDuplicates(questions)
     bulkResults.value        = questions.map(q => ({
       ...q,
-      isDuplicate: duplicates.has(q.questionBN),
-      questionImageUrl:     null,
-      questionImagePreview: null,
-      stimulusImageUrl:     null,      // add this
-      stimulusImagePreview: null,      // add this
+      isDuplicate: duplicates.has(q.questionBN)
     }))
-    bulkSelected.value = bulkResults.value.map(q => !q.isDuplicate)
-    bulkExpanded.value = bulkResults.value.map(() => false)
-
-    // Crop question images for any question that has one
-    //const cropsNeeded = bulkResults.value.filter(q => q.hasQuestionImage && q.questionImageCrop)
-    //for (const q of cropsNeeded) {
-    //  try {
-    //    q.questionImageUrl = await cropAndUpload(
-    //      bulkImgFile.value,
-    //      q.questionImageCrop,
-    //      streamEN.value,
-    //      q.subjectEN,
-    //      q.chapterEN
-    //    )
-    //    // local preview
-    //    const img = new Image()
-    //    img.src = URL.createObjectURL(bulkImgFile.value)
-    //    await new Promise(r => { img.onload = r })
-    //    const canvas = document.createElement('canvas')
-    //    const p = 8
-    //    const x = Math.max(0, q.questionImageCrop.xPct * img.naturalWidth  - p)
-    //    const y = Math.max(0, q.questionImageCrop.yPct * img.naturalHeight - p)
-    //    const w = Math.min(img.naturalWidth  - x, q.questionImageCrop.wPct * img.naturalWidth  + p * 2)
-    //    const h = Math.min(img.naturalHeight - y, q.questionImageCrop.hPct * img.naturalHeight + p * 2)
-    //    canvas.width = w; canvas.height = h
-    //    canvas.getContext('2d').drawImage(img, x, y, w, h, 0, 0, w, h)
-    //    q.questionImagePreview = canvas.toDataURL('image/jpeg', 0.92)
-    //  } catch (e) {
-    //    console.error('Bulk crop failed for question:', e)
-    //  }
-    //}
+    bulkSelected.value       = bulkResults.value.map(q => !q.isDuplicate) // uncheck duplicates by default
+    bulkExpanded.value       = bulkResults.value.map(() => false)
 
   } catch (err) {
     console.error(err)
@@ -474,37 +229,26 @@ async function saveBulk() {
   const answerIndexMap    = { A: 0, B: 1, C: 2, D: 3 }
   const difficultyBanglaMap = { Easy: 'সহজ', Medium: 'মাধ্যম', Hard: 'কঠিন' }
 
-  const payloads = await Promise.all(toSave.map(async q => ({
+  const payloads = toSave.map(q => ({
     exam: streamEN.value,
-    question:    { english: q.questionEN || null, bangla: q.questionBN || null },
-    question_hash: await hashText(q.questionBN || null),
-    options:     { english: q.optionsEN || null,  bangla: q.optionsBN  || [] },
+    question:    { english: q.questionEN, bangla: q.questionBN || null },
+    options:     { english: q.optionsEN,  bangla: q.optionsBN  || [] },
     explanation: (q.explanationEN || q.explanationBN)
       ? { english: q.explanationEN || null, bangla: q.explanationBN || null }
       : null,
-    subject:     { english: q.subjectEN || null,   bangla: q.subjectBN   || null },
-    chapter:     { english: q.chapterEN || null,   bangla: q.chapterBN   || null },
-    difficulty:  { english: q.difficulty || null,  bangla: difficultyBanglaMap[q.difficulty] || null },
-    years: q.years?.length
-      ? q.years.map(y => ({ english: y, bangla: toBengaliDigits(y) }))
-      : null,
+    subject:     { english: q.subjectEN,   bangla: q.subjectBN   || null },
+    chapter:     { english: q.chapterEN,   bangla: q.chapterBN   || null },
+    difficulty:  { english: q.difficulty,  bangla: difficultyBanglaMap[q.difficulty] || null },
+    year: q.year ? { english: q.year || null, bangla: toBengaliDigits(q.year) } : null,
     source:      { english: q.sourceEN || null,    bangla: q.sourceBN || null },
     correct_index:    answerIndexMap[q.answerEN] ?? 0,
     is_verified: true,
     difficulty_level: q.difficulty?.toLowerCase() || 'medium',
     status: 'published',
-    question_image: q.questionImageUrl || null,
-    stimulus: (q.stimulusBN || q.stimulusEN)
-      ? { bangla: q.stimulusBN || null, english: q.stimulusEN || null }
-      : null,
-    stimulus_hash: q.stimulusBN
-      ? await hashText(q.stimulusBN)
-      : null,
-    stimulus_image: q.stimulusImageUrl || null,
-  })))
+  }))
 
   try {
-    const supabase = streamEN.value.startsWith('HSC') ? supabaseHSC : supabaseMedical
+    const supabase = streamEN.value === 'HSC' ? supabaseHSC : supabaseMedical
     const { error } = await supabase.from('questions').insert(payloads)
     if (error) throw new Error(error.message)
     showToast(`${payloads.length} question${payloads.length > 1 ? 's' : ''} saved ✓`)
@@ -617,18 +361,18 @@ const userPage   = ref(1)
 const usersPerPage = 10
 
 const users = ref([
-  { id:1,  name:'Tanvir Ahmed',    email:'tanvir@gmail.com',   stream:'HSC Science',     exams:34,  score:82, joined:'2024-11-01', status:'active',     role:'user'  },
+  { id:1,  name:'Tanvir Ahmed',    email:'tanvir@gmail.com',   stream:'HSC',     exams:34,  score:82, joined:'2024-11-01', status:'active',     role:'user'  },
   { id:2,  name:'Farida Khanam',   email:'farida@yahoo.com',   stream:'Medical', exams:61,  score:91, joined:'2024-10-14', status:'active',     role:'user'  },
   { id:3,  name:'Rafiq Islam',     email:'rafiq@gmail.com',    stream:'BUET',    exams:27,  score:74, joined:'2025-01-03', status:'banned',     role:'user'  },
   { id:4,  name:'Maliha Sultana',  email:'maliha@hotmail.com', stream:'BCS',     exams:88,  score:88, joined:'2024-09-22', status:'active',     role:'user'  },
   { id:5,  name:'Jahid Hasan',     email:'jahid@gmail.com',    stream:'SSC',     exams:12,  score:67, joined:'2025-02-11', status:'unverified', role:'user'  },
-  { id:6,  name:'Nusrat Jahan',    email:'nusrat@gmail.com',   stream:'HSC Science',     exams:45,  score:79, joined:'2024-12-05', status:'active',     role:'user'  },
+  { id:6,  name:'Nusrat Jahan',    email:'nusrat@gmail.com',   stream:'HSC',     exams:45,  score:79, joined:'2024-12-05', status:'active',     role:'user'  },
   { id:7,  name:'Sabbir Rahman',   email:'sabbir@gmail.com',   stream:'DU',      exams:19,  score:71, joined:'2025-01-19', status:'active',     role:'user'  },
   { id:8,  name:'Priya Roy',       email:'priya@gmail.com',    stream:'Medical', exams:53,  score:86, joined:'2024-08-30', status:'active',     role:'user'  },
   { id:9,  name:'Kamrul Islam',    email:'kamrul@gmail.com',   stream:'Bank',    exams:31,  score:73, joined:'2025-03-01', status:'active',     role:'user'  },
   { id:10, name:'Sadia Akter',     email:'sadia@gmail.com',    stream:'BCS',     exams:72,  score:84, joined:'2024-11-17', status:'active',     role:'user'  },
   { id:11, name:'Alamin Hossain',  email:'alamin@gmail.com',   stream:'BUET',    exams:9,   score:60, joined:'2025-04-02', status:'unverified', role:'user'  },
-  { id:12, name:'Rima Begum',      email:'rima@gmail.com',     stream:'HSC Science',     exams:40,  score:77, joined:'2024-12-22', status:'active',     role:'user'  },
+  { id:12, name:'Rima Begum',      email:'rima@gmail.com',     stream:'HSC',     exams:40,  score:77, joined:'2024-12-22', status:'active',     role:'user'  },
   { id:13, name:'Nasrin Khatun',   email:'nasrin@gmail.com',   stream:'SSC',     exams:5,   score:55, joined:'2025-04-15', status:'banned',     role:'user'  },
   { id:14, name:'Touhid Bhuiyan',  email:'touhid@gmail.com',   stream:'DU',      exams:66,  score:90, joined:'2024-07-09', status:'active',     role:'user'  },
   { id:15, name:'Admin User',      email:'admin@cortex404.com',stream:'—',       exams:0,   score:0,  joined:'2024-06-01', status:'active',     role:'admin' },
@@ -669,45 +413,18 @@ const queueFilter = ref('all')
 const queueStream = ref('All')
 const queueSearch = ref('')
 
-//const reviewQueue = ref([
-//  { id:101, text:'What is the Krebs cycle?',                    stream:'Medical', subject:'Biology',   diff:'Medium', submittedBy:'Moderator A', status:'pending',  date:'2025-05-09' },
-//  { id:102, text:'Solve for x: 3x² + 5x - 2 = 0',             stream:'BUET',    subject:'Math',      diff:'Hard',   submittedBy:'Moderator B', status:'pending',  date:'2025-05-09' },
-//  { id:103, text:'Who was the first President of Bangladesh?',  stream:'BCS',     subject:'History',   diff:'Easy',   submittedBy:'Moderator A', status:'pending',  date:'2025-05-08' },
-//  { id:104, text:'What does RAM stand for?',                    stream:'SSC',     subject:'ICT',       diff:'Easy',   submittedBy:'Moderator C', status:'approved', date:'2025-05-08' },
-//  { id:105, text:"Define Newton's third law",                   stream:'HSC',     subject:'Physics',   diff:'Medium', submittedBy:'Moderator B', status:'pending',  date:'2025-05-07' },
-//  { id:106, text:'What is the capital of France?',             stream:'BCS',     subject:'GK',        diff:'Easy',   submittedBy:'Moderator A', status:'rejected', date:'2025-05-07', note:'Too generic' },
-//  { id:107, text:'Find derivative of sin²(x)',                 stream:'DU',      subject:'Math',      diff:'Medium', submittedBy:'Moderator C', status:'pending',  date:'2025-05-06' },
-//  { id:108, text:'What is the atomic number of gold?',         stream:'HSC',     subject:'Chemistry', diff:'Easy',   submittedBy:'Moderator A', status:'pending',  date:'2025-05-05' },
-//  { id:109, text:'Binary search time complexity?',             stream:'BUET',    subject:'CS',        diff:'Medium', submittedBy:'Moderator B', status:'approved', date:'2025-05-05' },
-//  { id:110, text:'What is photosynthesis?',                    stream:'SSC',     subject:'Biology',   diff:'Easy',   submittedBy:'Moderator C', status:'pending',  date:'2025-05-04' },
-//])
-
-const reviewQueue    = ref([])
-const queueLoading   = ref(false)
-
-async function loadReviewQueue() {
-  queueLoading.value = true
-  const [hscRes, medRes] = await Promise.all([
-    supabaseHSC.from('question_submissions').select('*').order('created_at', { ascending: false }),
-    supabaseMedical.from('question_submissions').select('*').order('created_at', { ascending: false }),
-  ])
-  const rows = [...(hscRes.data ?? []), ...(medRes.data ?? [])]
-  reviewQueue.value = rows.map(r => ({
-    ...r,
-    id:          r.id,
-    text:        r.question?.english || r.question?.bangla || '',
-    stream:      r.stream,
-    subj:        r.subject?.english  || r.subject?.bangla || '',
-    diff:        r.difficulty?.english || r.difficulty_level || '',
-    submittedBy: r.submitted_by ?? 'unknown',
-    note:        r.admin_note  ?? '',
-    status:      r.status,
-    date:        r.created_at?.slice(0, 10) ?? '',
-  }))
-  queueLoading.value = false
-}
-
-loadReviewQueue()
+const reviewQueue = ref([
+  { id:101, text:'What is the Krebs cycle?',                    stream:'Medical', subject:'Biology',   diff:'Medium', submittedBy:'Moderator A', status:'pending',  date:'2025-05-09' },
+  { id:102, text:'Solve for x: 3x² + 5x - 2 = 0',             stream:'BUET',    subject:'Math',      diff:'Hard',   submittedBy:'Moderator B', status:'pending',  date:'2025-05-09' },
+  { id:103, text:'Who was the first President of Bangladesh?',  stream:'BCS',     subject:'History',   diff:'Easy',   submittedBy:'Moderator A', status:'pending',  date:'2025-05-08' },
+  { id:104, text:'What does RAM stand for?',                    stream:'SSC',     subject:'ICT',       diff:'Easy',   submittedBy:'Moderator C', status:'approved', date:'2025-05-08' },
+  { id:105, text:"Define Newton's third law",                   stream:'HSC',     subject:'Physics',   diff:'Medium', submittedBy:'Moderator B', status:'pending',  date:'2025-05-07' },
+  { id:106, text:'What is the capital of France?',             stream:'BCS',     subject:'GK',        diff:'Easy',   submittedBy:'Moderator A', status:'rejected', date:'2025-05-07', note:'Too generic' },
+  { id:107, text:'Find derivative of sin²(x)',                 stream:'DU',      subject:'Math',      diff:'Medium', submittedBy:'Moderator C', status:'pending',  date:'2025-05-06' },
+  { id:108, text:'What is the atomic number of gold?',         stream:'HSC',     subject:'Chemistry', diff:'Easy',   submittedBy:'Moderator A', status:'pending',  date:'2025-05-05' },
+  { id:109, text:'Binary search time complexity?',             stream:'BUET',    subject:'CS',        diff:'Medium', submittedBy:'Moderator B', status:'approved', date:'2025-05-05' },
+  { id:110, text:'What is photosynthesis?',                    stream:'SSC',     subject:'Biology',   diff:'Easy',   submittedBy:'Moderator C', status:'pending',  date:'2025-05-04' },
+])
 
 const filteredReviewQueue = computed(() => {
   let list = reviewQueue.value
@@ -717,87 +434,21 @@ const filteredReviewQueue = computed(() => {
   return list
 })
 
-async function adminApproveQ(q) {
-  const supabase = q.stream.startsWith('HSC') ? supabaseHSC : supabaseMedical
-
-  // 1. Check for existing question with same hash
-  const { data: existing } = await supabase
-    .from('questions')
-    .select('id')
-    .eq('question_hash', q.question_hash)
-    .maybeSingle()
-
-  if (!existing) {
-    // 2. Insert into questions table only if not duplicate
-    const { error: insertError } = await supabase
-      .from('questions')
-      .insert({
-        exam:             q.stream,
-        question:         q.question,
-        question_hash:    q.question_hash,
-        options:          q.options,
-        explanation:      q.explanation,
-        subject:          q.subject,
-        chapter:          q.chapter,
-        difficulty:       q.difficulty,
-        difficulty_level: q.difficulty_level,
-        years:            q.years,
-        source:           q.source,
-        stimulus:         q.stimulus,
-        stimulus_hash:    q.stimulus_hash,
-        correct_index:    q.correct_index,
-        question_image:   q.question_image  ?? null,
-        stimulus_image:   q.stimulus_image  ?? null,
-        is_verified:      true,
-        status:           'published',
-      })
-
-    if (insertError) { showToast(insertError.message, 'error'); return }
-  } else {
-    showToast('Already exists in questions table — marking approved only.', 'warning')
-  }
-
-  // 3. Mark submission as approved regardless
-  const { error: updateError } = await supabase
-    .from('question_submissions')
-    .update({ status: 'approved' })
-    .eq('id', q.id)
-
-  if (updateError) { showToast(updateError.message, 'error'); return }
-
+function adminApproveQ(q) {
   q.status = 'approved'
-  showToast('Question approved and published ✓')
+  showToast('Question approved and published.')
 }
-
-const rejectNote = ref('')
-
-async function adminRejectQ(q) {
-  const supabase = q.stream.startsWith('HSC') ? supabaseHSC : supabaseMedical
-  const { error } = await supabase
-    .from('question_submissions')
-    .update({ status: 'rejected', admin_note: rejectNote.value || null })
-    .eq('id', q.id)
-  if (error) { showToast(error.message, 'error'); return }
+function adminRejectQ(q) {
   q.status = 'rejected'
-  q.admin_note = rejectNote.value || null
   showToast('Question rejected.', 'error')
 }
-
-//function adminApproveQ(q) {
-//  q.status = 'approved'
-//  showToast('Question approved and published.')
-//}
-//function adminRejectQ(q) {
-//  q.status = 'rejected'
-//  showToast('Question rejected.', 'error')
-//}
 
 // ─── Questions tab ────────────────────────────────────────────
 const qSearch = ref('')
 const qStream = ref('All')
 const qDiff   = ref('All')
 const qStatus = ref('All')
-const streams     = ['All','SSC','HSC Science','HSC Arts','HSC Commerce','BUET','Medical','DU','BCS','Bank']
+const streams     = ['All','SSC','HSC','BUET','Medical','DU','BCS','Bank']
 const difficulties = ['All','Easy','Medium','Hard']
 const qStatuses   = ['All','Published','Draft','Flagged']
 
@@ -818,10 +469,6 @@ function resetQuestionForm() {
   imgFile.value = null;     imgPreview.value = ''
   imgError.value = '';      imgPanelOpen.value = false
   sourceEN.value = '';      sourceBN.value = ''
-  questionImageUrl.value     = ''
-  questionImagePreview.value = ''
-  singleIsDuplicate.value   = false
-  singleLowConfidence.value = false
 }
 
 async function saveQuestion() {
@@ -842,8 +489,6 @@ async function saveQuestion() {
       english: questionEN.value,
       bangla: questionBN.value || null,
     },
-
-    question_hash: await hashText(questionBN.value),
 
     options: {
       english: optionsEN.value,        // already an array ["A text","B text","C text","D text"]
@@ -874,21 +519,20 @@ async function saveQuestion() {
       bangla: sourceBN.value || null,
     },
 
-    years: yearEN.value
-      ? [{ english: yearEN.value, bangla: toBengaliDigits(yearEN.value) }]
-      : null, // TODO: seems a little wrong here (maybe)
+    year: yearEN.value
+      ? { english: yearEN.value || null, bangla: toBengaliDigits(yearEN.value) }
+      : null,
 
     is_verified: true,
 
     correct_index: correctIndex,
     difficulty_level: difficultyEN.value?.toLowerCase() || 'medium',  // scalar col too
     status: statusQuestion.value?.toLowerCase() || 'published',
-    question_image: questionImageUrl.value || null,
   }
 
   // Edit vs Add
   if (modal.type === 'editQuestion' && modal.data?.id) {
-    const supabase = streamEN.value.startsWith('HSC') ? supabaseHSC : supabaseMedical
+    const supabase = streamEN.value === 'HSC' ? supabaseHSC : supabaseMedical
 
     const { error } = await supabase
       .from('questions')
@@ -903,7 +547,7 @@ async function saveQuestion() {
     showToast('Question updated.')
 
   } else {
-    const supabase = streamEN.value.startsWith('HSC') ? supabaseHSC : supabaseMedical
+    const supabase = streamEN.value === 'HSC' ? supabaseHSC : supabaseMedical
 
     const { error } = await supabase
       .from('questions')
@@ -919,14 +563,14 @@ async function saveQuestion() {
 }
 
 const questions = ref([
-  { id:1,  text:'What is the SI unit of electric charge?',           stream:'HSC Science',    subject:'Physics',  diff:'Easy',   status:'Published', reports:0 },
+  { id:1,  text:'What is the SI unit of electric charge?',           stream:'HSC',    subject:'Physics',  diff:'Easy',   status:'Published', reports:0 },
   { id:2,  text:'Solve: lim(x→0) sin(x)/x',                        stream:'BUET',   subject:'Math',     diff:'Medium', status:'Published', reports:1 },
   { id:3,  text:'Which organelle is called the powerhouse of the cell?', stream:'Medical',subject:'Biology',diff:'Easy',status:'Published', reports:0 },
   { id:4,  text:'The Treaty of Westphalia was signed in which year?',stream:'BCS',    subject:'History',  diff:'Medium', status:'Draft',     reports:0 },
   { id:5,  text:'What is the valency of carbon?',                   stream:'SSC',    subject:'Chemistry',diff:'Easy',   status:'Published', reports:0 },
   { id:6,  text:'Binary representation of decimal 255 is?',         stream:'BUET',   subject:'CS',       diff:'Easy',   status:'Published', reports:0 },
   { id:7,  text:'Who wrote "Amar Sonar Bangla"?',                   stream:'BCS',    subject:'Bangla',   diff:'Easy',   status:'Flagged',   reports:3 },
-  { id:8,  text:"What is Avogadro's number?",                       stream:'HSC Science',    subject:'Chemistry',diff:'Medium', status:'Published', reports:0 },
+  { id:8,  text:"What is Avogadro's number?",                       stream:'HSC',    subject:'Chemistry',diff:'Medium', status:'Published', reports:0 },
   { id:9,  text:'Find the derivative of e^(2x)',                    stream:'DU',     subject:'Math',     diff:'Medium', status:'Published', reports:0 },
   { id:10, text:'Bangladesh gained independence in which year?',    stream:'SSC',    subject:'History',  diff:'Easy',   status:'Published', reports:0 },
 ])
@@ -954,11 +598,11 @@ function toggleQStatus(q) {
 // ─── Exam Results tab ─────────────────────────────────────────
 const examFilter = ref('all')
 const examResults = ref([
-  { id:1,  user:'Tanvir Ahmed',   stream:'HSC Science',    subject:'Physics', score:88, qs:30, date:'2025-05-07', status:'passed'  },
+  { id:1,  user:'Tanvir Ahmed',   stream:'HSC',    subject:'Physics', score:88, qs:30, date:'2025-05-07', status:'passed'  },
   { id:2,  user:'Farida Khanam', stream:'Medical',subject:'Biology', score:94, qs:50, date:'2025-05-07', status:'passed'  },
   { id:3,  user:'Maliha Sultana',stream:'BCS',    subject:'General', score:62, qs:50, date:'2025-05-06', status:'passed'  },
   { id:4,  user:'Jahid Hasan',   stream:'SSC',    subject:'Math',    score:44, qs:20, date:'2025-05-06', status:'failed'  },
-  { id:5,  user:'Nusrat Jahan',  stream:'HSC Science',    subject:'Bangla',  score:77, qs:30, date:'2025-05-05', status:'passed'  },
+  { id:5,  user:'Nusrat Jahan',  stream:'HSC',    subject:'Bangla',  score:77, qs:30, date:'2025-05-05', status:'passed'  },
   { id:6,  user:'Sabbir Rahman', stream:'DU',     subject:'English', score:55, qs:20, date:'2025-05-05', status:'passed'  },
   { id:7,  user:'Priya Roy',     stream:'Medical',subject:'Chem',    score:91, qs:50, date:'2025-05-04', status:'passed'  },
   { id:8,  user:'Kamrul Islam',  stream:'Bank',   subject:'Math',    score:38, qs:50, date:'2025-05-04', status:'failed'  },
@@ -1379,18 +1023,12 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
           <div class="fb-meta">{{ filteredReviewQueue.length }} questions</div>
         </div>
 
-        <div v-if="queueLoading" class="empty-panel">Loading submissions…</div>
-        <!--<div v-else-if="filteredReviewQueue.length === 0" class="empty-panel">
-          <span class="empty-icon">✓</span>
-          <h3>No pending questions</h3>
-          <p>Everything is clean. Take a break.</p>
-        </div>-->
         <div class="queue-cards">
           <div class="queue-card" v-for="q in filteredReviewQueue" :key="q.id" :class="'qcard-'+q.status">
             <div class="qcard-top">
               <div class="qcard-meta">
                 <span class="stream-tag">{{ q.stream }}</span>
-                <span class="mono dim">{{ q.subj }}</span>
+                <span class="mono dim">{{ q.subject }}</span>
                 <span class="diff-badge" :class="diffClass(q.diff)">{{ q.diff }}</span>
                 <span v-if="q.status==='fixed'" class="fixed-tag">✎ Mod-Fixed</span>
               </div>
@@ -1684,52 +1322,17 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
               <!-- ── / Image Extractor ──────────────────────── -->
 
               <div class="mf-group">
-                <div class="single-flags" v-if="singleIsDuplicate || singleLowConfidence">
-                  <span v-if="singleLowConfidence" class="flag-badge flag-warn">⚠ Low Confidence — review carefully</span>
-                  <span v-if="singleIsDuplicate"   class="flag-badge flag-dup">DUP — possible duplicate in database</span>
-                </div>
                 <label class="mf-label">QUESTION TEXT (English)</label>
                 <textarea v-model="questionEN" class="mf-input mf-textarea" placeholder="Enter question…" rows="3"></textarea>
                 <label class="mf-label">QUESTION TEXT (Bengali)</label>
                 <textarea v-model="questionBN" class="mf-input mf-textarea" placeholder="Enter question…" rows="3"></textarea>
               </div>
               <br>
-              <!-- ── Question Image field ──────────────────── -->
-              <div class="mf-group">
-                <label class="mf-label">QUESTION IMAGE <span style="opacity:0.5;font-size:0.6rem">(auto-filled if detected · optional)</span></label>
-                <div class="qimg-field" style="background-color: #1A1A1A;">
-                  <div v-if="questionImageUploading" class="qimg-uploading">
-                    <span class="img-spinner">◌</span> Cropping &amp; uploading…
-                  </div>
-                  <div v-else-if="questionImagePreview || questionImageUrl" class="qimg-preview-wrap">
-                    <img :src="questionImagePreview || questionImageUrl" class="qimg-preview" />
-                    <div class="qimg-actions">
-                      <span class="qimg-status">{{ questionImageUrl ? '✓ Uploaded' : '⏳ Preview only' }}</span>
-                      <button class="iso-btn iso-btn--ghost qimg-reupload-btn" @click="openCropper(imgFile, null)">
-                        Re-crop
-                      </button>
-                      <label class="iso-btn iso-btn--ghost qimg-reupload-btn">
-                        Re-upload
-                        <input type="file" accept="image/*" style="display:none" @change="onQuestionImageReupload" />
-                      </label>
-                      <button class="iso-btn iso-btn--ghost" style="font-size:0.65rem" @click="questionImageUrl = ''; questionImagePreview = ''">Remove</button>
-                    </div>
-                  </div>
-                  <div v-else class="qimg-empty">
-                    <label class="qimg-upload-label">
-                      <span>📎 Upload question image manually</span>
-                      <input type="file" accept="image/*" style="display:none" @change="onQuestionImageReupload" />
-                    </label>
-                  </div>
-                </div>
-              </div>
-              <!-- ── / Question Image field ────────────────── -->
-              <br>
               <div class="mf-row">
                 <div class="mf-group">
                   <label class="mf-label">STREAM</label>
                   <select v-model="streamEN" class="mf-input mf-select">
-                    <option v-for="s in ['SSC Science','SSC Arts','SSC Commerce','HSC Science','HSC Arts','HSC Commerce','BUET','Medical','DU','BCS']" :key="s">{{ s }}</option>
+                    <option v-for="s in ['SSC','HSC','BUET','Medical','DU','BCS','Bank']" :key="s">{{ s }}</option>
                   </select>
                 </div>
                 <div class="mf-group">
@@ -1843,7 +1446,7 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                   <label class="mf-label">STREAM (required)</label>
                   <select v-model="streamEN" class="mf-input mf-select">
                     <option value="" disabled>Select stream…</option>
-                    <option v-for="s in ['SSC Science','SSC Arts','SSC Commerce','HSC Science','HSC Arts','HSC Commerce','BUET','Medical','DU','BCS']" :key="s">{{ s }}</option>
+                    <option v-for="s in ['SSC','HSC','BUET','Medical','DU','BCS','Bank']" :key="s">{{ s }}</option>
                   </select>
                 </div>
                 <div class="mf-group" style="justify-content:flex-end; padding-top:18px;">
@@ -1951,49 +1554,9 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
 
                     <!-- Expanded detail -->
                     <div v-if="bulkExpanded[i]" class="bulk-row-detail">
-                      <div v-if="q.stimulusBN || q.stimulusEN" class="brd-section brd-stimulus">
-                        <span class="brd-label">
-                          STIMULUS
-                          <span class="stimulus-link-badge">🔗 linked</span>
-                        </span>
-                      
-                        <!-- Stimulus image — above text -->
-                        <div v-if="q.hasStimulusImage" class="stimulus-img-wrap">
-                          <img
-                            v-if="q.stimulusImagePreview || q.stimulusImageUrl"
-                            :src="q.stimulusImagePreview || q.stimulusImageUrl"
-                            class="brd-qimg"
-                          />
-                          <button
-                            class="iso-btn iso-btn--ghost"
-                            style="font-size:0.68rem; margin-top:6px; width:fit-content"
-                            @click="openCropper(bulkImgFile, i, true)"
-                          >
-                            {{ q.stimulusImageUrl ? '✎ Re-crop stimulus' : '✂ Crop stimulus image' }}
-                          </button>
-                          <span v-if="q.stimulusImageUrl" class="stimulus-auto-filled">
-                            ✓ auto-filled on linked questions
-                          </span>
-                        </div>
-                      
-                        <span v-if="q.stimulusEN" class="brd-text bn-text">{{ q.stimulusEN }}</span>
-                        <span v-if="q.stimulusBN" class="brd-text" style="opacity:0.7; font-size:0.72rem">({{ q.stimulusBN }})</span>
-                      </div>
                       <div class="brd-section">
                         <span class="brd-label">English Question</span>
                         <span class="brd-text">{{ q.questionEN || '—' }} <span class="brd-text" style="font-size:0.7rem; opacity:0.7">({{ q.questionBN || '—' }})</span></span>
-                      </div>
-                      <div class="brd-section">
-                        <span v-if="q.hasQuestionImage" class="brd-label">QUESTION IMAGE</span>
-                        <img v-if="q.questionImagePreview || q.questionImageUrl" :src="q.questionImagePreview || q.questionImageUrl" class="brd-qimg" />
-                        <button
-                          v-if="q.hasQuestionImage"
-                          class="iso-btn iso-btn--ghost"
-                          style="font-size:0.68rem; margin-top:6px; width:fit-content"
-                          @click="openCropper(bulkImgFile, i)"
-                        >
-                          {{ q.questionImageUrl ? '✎ Re-crop' : '✂ Crop image' }}
-                        </button>
                       </div>
                       <div class="brd-section">
                         <span class="brd-label">Options</span>
@@ -2009,7 +1572,7 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                         <span v-if="q.explanationEN" class="brd-text">{{ q.explanationEN }} <span v-if="q.explanationBN" class="brd-text" style="font-size:0.7rem; opacity:0.7">({{ q.explanationBN }})</span></span>
                       </div>
                       <div class="brd-section brd-meta-row">
-                        <span v-if="q.years?.length"><b>Year:</b> {{ q.years.join(' · ') }}</span>
+                        <span v-if="q.year"><b>Year:</b> {{ q.year }}</span>
                         <span v-if="q.sourceEN?.length">
                           <b>Source: </b>
                           <span v-for="(s, si) in q.sourceEN" :key="si" class="bn-text">{{ s }}{{ si < q.sourceEN.length - 1 ? ' · ' : '' }}</span>
@@ -2087,7 +1650,7 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
             </div>
             <div class="mf-group">
               <label class="mf-label">REJECTION REASON (sent to moderator)</label>
-              <textarea v-model="rejectNote" class="mf-input mf-textarea" rows="3" placeholder="E.g. Answer key is incorrect, duplicate, out of scope…"></textarea>
+              <textarea class="mf-input mf-textarea" rows="3" placeholder="E.g. Answer key is incorrect, duplicate, out of scope…"></textarea>
             </div>
           </div>
           <div class="modal-actions">
@@ -2105,34 +1668,6 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
       </Transition>
     </Teleport>
 
-  </div>
-
-  <!-- ── Cropper modal ─────────────────────────────────────── -->
-  <div v-if="cropperOpen" class="cropper-overlay">
-    <div class="cropper-modal">
-      <div class="cropper-head">
-        <span class="panel-title">{{ cropperForStimulus ? 'CROP STIMULUS IMAGE' : 'CROP QUESTION IMAGE' }}</span>
-        <button class="modal-close" @click="closeCropper">×</button>
-      </div>
-      <div class="cropper-body">
-        <img
-          id="cropper-img"
-          :src="cropperImgSrc"
-          style="max-width:100%; display:block"
-        />
-      </div>
-      <div class="modal-actions">
-        <button class="iso-btn iso-btn--ghost" @click="closeCropper">Cancel</button>
-        <button
-          class="iso-btn iso-btn--fill"
-          :disabled="questionImageUploading"
-          @click="confirmCrop"
-        >
-          <span v-if="questionImageUploading" class="img-spinner">◌</span>
-          {{ questionImageUploading ? 'Uploading…' : 'Confirm Crop' }}
-        </button>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -2377,8 +1912,6 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
   font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.08em;
   color: var(--gray); border: 1px solid var(--border); padding: 2px 6px;
   text-transform: uppercase; white-space: nowrap;
-  overflow: hidden;        /* 2. Hides the overflowing text */
-  text-overflow: ellipsis;
 }
 .score-val { font-family: var(--font-mono); font-size: 0.76rem; white-space: nowrap; }
 .score-val.high { color: rgba(120,230,120,0.9); }
@@ -2866,88 +2399,8 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
 }
 .flag-warn { border-color: rgba(255,200,80,0.4);  color: rgba(255,200,80,0.9);  }
 .flag-dup  { border-color: rgba(255,100,100,0.4); color: rgba(255,100,100,0.9); }
-/* ═══════════════════════════════════════════════════════════════
-   QUESTION IMAGE FIELD
-═══════════════════════════════════════════════════════════════ */
-.qimg-field {
-  border: 1px solid var(--border); min-height: 60px;
-  display: flex; align-items: center;
-}
-.qimg-uploading {
-  padding: 14px 16px; font-family: var(--font-mono); font-size: 0.68rem;
-  color: var(--gray); display: flex; align-items: center; gap: 8px;
-}
-.qimg-preview-wrap {
-  display: flex; flex-direction: column; gap: 8px; padding: 10px; width: 100%;
-}
-.qimg-preview {
-  max-width: 100%; max-height: 200px; object-fit: contain; display: block;
-}
-.qimg-actions {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-}
-.qimg-status {
-  font-family: var(--font-mono); font-size: 0.62rem; color: var(--gray);
-  margin-right: auto;
-}
-.qimg-reupload-btn { font-size: 0.68rem !important; cursor: pointer; }
-.qimg-empty {
-  padding: 14px 16px; width: 100%;
-}
-.qimg-upload-label {
-  font-family: var(--font-mono); font-size: 0.68rem; color: var(--gray);
-  cursor: pointer; display: flex; align-items: center; gap: 6px;
-  transition: color 0.15s;
-}
-.qimg-upload-label:hover { color: var(--white); }
 
-/* Bulk review image thumbnail */
-.brd-qimg {
-  max-width: 100%; max-height: 160px; object-fit: contain;
-  border: 1px solid var(--border);
-}
-
-/* ── Cropper modal ──────────────────────────────────────────── */
-.cropper-overlay {
-  position: fixed; inset: 0; z-index: 9999;
-  background: rgba(0,0,0,0.85);
-  display: flex; align-items: center; justify-content: center;
-  padding: 20px;
-}
-.cropper-modal {
-  background: var(--bg-panel); border: 1px solid var(--border);
-  width: 100%; max-width: 780px;
-  display: flex; flex-direction: column; max-height: 90vh;
-}
-.cropper-head {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 16px; border-bottom: 1px solid var(--border);
-}
-.cropper-body {
-  flex: 1; overflow: hidden; padding: 12px;
-  background: #111;
-}
-.cropper-body img { max-height: 60vh; }
-
-/* Stimulus badge */
-.brd-stimulus {
-  border-left: 2px solid rgba(120,180,255,0.4);
-  padding-left: 10px;
-  background: rgba(120,180,255,0.04);
-  padding: 8px 10px;
-}
-.stimulus-link-badge {
-  font-size: 0.58rem; opacity: 0.6;
-  margin-left: 6px; letter-spacing: 0.05em;
-}
-.stimulus-img-wrap {
-  display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px;
-}
-.stimulus-auto-filled {
-  font-family: var(--font-mono); font-size: 0.58rem;
-  color: rgba(120, 230, 120, 0.8); letter-spacing: 0.05em;
-}
-
+/* ── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 600px) {
   .bulk-table-head,
   .bulk-row-main {

@@ -2,21 +2,7 @@
 definePageMeta({ middleware: 'auth', layout: 'admin' })
 // Guard: profile.role must be 'moderator' or 'admin'
 
-const supabase = useSupabaseClient()
-const { data: { user } } = await supabase.auth.getUser()
-
-import { ref, reactive, computed, watch, nextTick } from 'vue'
-import { curriculum } from '~/utils/curriculum'
-import { hashText } from '~/utils/hashQuestion'
-
-const supabaseHSC     = useSupabaseHSC()
-const supabaseMedical = useSupabaseMedical()
-
-// ─── Bengali digit helper ─────────────────────────────────────
-function toBengaliDigits(str) {
-  const map = { '0':'০','1':'১','2':'২','3':'৩','4':'৪','5':'৫','6':'৬','7':'৭','8':'৮','9':'৯' }
-  return String(str).replace(/[0-9]/g, d => map[d] ?? d)
-}
+import { ref, reactive, computed } from 'vue'
 
 // ─── Sidebar & layout ─────────────────────────────────────────
 const sidebarCollapsed = ref(
@@ -135,65 +121,27 @@ function escalateReport(r) {
 const myQueueFilter = ref('all')  // all | pending | approved | rejected
 const myQueueSearch = ref('')
 
-//const myQueue = ref([
-//  { id:101, text:'What is the Krebs cycle?',                    stream:'Medical', subject:'Biology',   diff:'Medium', date:'2025-05-09', status:'pending',  adminNote:'' },
-//  { id:102, text:'Solve for x: 3x² + 5x - 2 = 0',             stream:'BUET',    subject:'Math',      diff:'Hard',   date:'2025-05-09', status:'pending',  adminNote:'' },
-//  { id:103, text:'Who was the first President of Bangladesh?',  stream:'BCS',     subject:'History',   diff:'Easy',   date:'2025-05-08', status:'approved', adminNote:'' },
-//  { id:104, text:'What does RAM stand for?',                    stream:'SSC',     subject:'ICT',       diff:'Easy',   date:'2025-05-07', status:'rejected', adminNote:'Too basic — already covered in Q#44' },
-//  { id:105, text:"Define Newton's third law of motion",         stream:'HSC',     subject:'Physics',   diff:'Medium', date:'2025-05-07', status:'pending',  adminNote:'' },
-//  { id:106, text:'Find derivative of sin²(x)',                  stream:'DU',      subject:'Math',      diff:'Medium', date:'2025-05-06', status:'pending',  adminNote:'' },
-//  { id:107, text:'What is the atomic number of gold?',          stream:'HSC',     subject:'Chemistry', diff:'Easy',   date:'2025-05-06', status:'approved', adminNote:'' },
-//  { id:108, text:'Binary search time complexity?',              stream:'BUET',    subject:'CS',        diff:'Medium', date:'2025-05-05', status:'approved', adminNote:'' },
-//  { id:109, text:'What is photosynthesis?',                     stream:'SSC',     subject:'Biology',   diff:'Easy',   date:'2025-05-04', status:'pending',  adminNote:'' },
-//  { id:110, text:'Who wrote "Gitanjali"?',                      stream:'BCS',     subject:'Bangla',    diff:'Easy',   date:'2025-05-03', status:'rejected', adminNote:'Duplicate of Q#12 — already in bank' },
-//])
-
-const myQueue      = ref([])
-const myQueueLoading = ref(false)
-
-async function loadMyQueue() {
-  myQueueLoading.value = true
-  const supabase = useSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) { myQueueLoading.value = false; return }
-
-  const [hscRes, medRes] = await Promise.all([
-    supabaseHSC.from('question_submissions')
-      .select('*')
-      .eq('submitted_by', user.id)
-      .order('created_at', { ascending: false }),
-    supabaseMedical.from('question_submissions')
-      .select('*')
-      .eq('submitted_by', user.id)
-      .order('created_at', { ascending: false }),
-  ])
-
-  const rows = [...(hscRes.data ?? []), ...(medRes.data ?? [])]
-  myQueue.value = rows.map(r => ({
-    ...r,
-    id:        r.id,
-    stream:    r.stream,
-    text:      r.question?.english || r.question?.bangla || '',
-    subj:      r.subject?.english  || '',
-    diff:      r.difficulty?.english || r.difficulty_level || '',
-    adminNote: r.admin_note ?? '',
-    status:    r.status,
-    date:      r.created_at?.slice(0, 10) ?? '',
-  }))
-  myQueueLoading.value = false
-}
-
-loadMyQueue()
+const myQueue = ref([
+  { id:101, text:'What is the Krebs cycle?',                    stream:'Medical', subject:'Biology',   diff:'Medium', date:'2025-05-09', status:'pending',  adminNote:'' },
+  { id:102, text:'Solve for x: 3x² + 5x - 2 = 0',             stream:'BUET',    subject:'Math',      diff:'Hard',   date:'2025-05-09', status:'pending',  adminNote:'' },
+  { id:103, text:'Who was the first President of Bangladesh?',  stream:'BCS',     subject:'History',   diff:'Easy',   date:'2025-05-08', status:'approved', adminNote:'' },
+  { id:104, text:'What does RAM stand for?',                    stream:'SSC',     subject:'ICT',       diff:'Easy',   date:'2025-05-07', status:'rejected', adminNote:'Too basic — already covered in Q#44' },
+  { id:105, text:"Define Newton's third law of motion",         stream:'HSC',     subject:'Physics',   diff:'Medium', date:'2025-05-07', status:'pending',  adminNote:'' },
+  { id:106, text:'Find derivative of sin²(x)',                  stream:'DU',      subject:'Math',      diff:'Medium', date:'2025-05-06', status:'pending',  adminNote:'' },
+  { id:107, text:'What is the atomic number of gold?',          stream:'HSC',     subject:'Chemistry', diff:'Easy',   date:'2025-05-06', status:'approved', adminNote:'' },
+  { id:108, text:'Binary search time complexity?',              stream:'BUET',    subject:'CS',        diff:'Medium', date:'2025-05-05', status:'approved', adminNote:'' },
+  { id:109, text:'What is photosynthesis?',                     stream:'SSC',     subject:'Biology',   diff:'Easy',   date:'2025-05-04', status:'pending',  adminNote:'' },
+  { id:110, text:'Who wrote "Gitanjali"?',                      stream:'BCS',     subject:'Bangla',    diff:'Easy',   date:'2025-05-03', status:'rejected', adminNote:'Duplicate of Q#12 — already in bank' },
+])
 
 const filteredMyQueue = computed(() => {
   let list = myQueue.value
   if (myQueueFilter.value !== 'all') list = list.filter(q => q.status === myQueueFilter.value)
   if (myQueueSearch.value) {
     const s = myQueueSearch.value.toLowerCase()
-    list = list.filter(q => q.text.toLowerCase().includes(s) || q.subj.toLowerCase().includes(s))
+    list = list.filter(q => q.text.toLowerCase().includes(s) || q.subject.toLowerCase().includes(s))
   }
-  //return list
-  return list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  return list
 })
 
 const myQueueStats = computed(() => ({
@@ -226,434 +174,30 @@ function fixAndPublish() {
 }
 
 // ─── Submit new question to queue ─────────────────────────────
-// Bilingual question form fields
-let questionEN   = ref('')
-let questionBN   = ref('')
-let subjectEN    = ref('')
-let subjectBN    = ref('')
-let chapterEN    = ref('')
-let chapterBN    = ref('')
-let streamEN     = ref('HSC Science')
-let sourceEN     = ref('')
-let sourceBN     = ref('')
-let yearEN       = ref('')
-let difficultyEN = ref('Medium')
-let optionsEN    = ref(['', '', '', ''])
-let optionsBN    = ref(['', '', '', ''])
-let answerEN     = ref('A')
-let explanationEN = ref('')
-let explanationBN = ref('')
-let stimulusBN   = ref('')
-let stimulusEN   = ref('')
-
-// ─── Question image (cropped from sheet) ──────────────────────
-const questionImageUrl       = ref('')
-const questionImagePreview   = ref('')
-const questionImageUploading = ref(false)
-
-// ─── Cropper state ────────────────────────────────────────────
-const cropperOpen        = ref(false)
-const cropperImgFile     = ref(null)
-const cropperInstance    = ref(null)
-const cropperForBulkIdx  = ref(null)   // null = single, number = bulk row index
-const cropperForStimulus = ref(false)  // true = cropping stimulus image
-
-const cropperImgSrc = computed(() =>
-  cropperImgFile.value ? URL.createObjectURL(cropperImgFile.value) : ''
-)
-
-// Curriculum-driven subject / chapter selects
-const availableSubjects = computed(() =>
-  streamEN.value ? (curriculum[streamEN.value] ?? []) : []
-)
-const availableChapters = computed(() =>
-  availableSubjects.value.find(s => s.en === subjectEN.value)?.chapters ?? []
-)
-watch(subjectEN, () => { chapterEN.value = ''; chapterBN.value = '' })
-watch(streamEN,  () => { subjectEN.value = ''; subjectBN.value = ''; chapterEN.value = ''; chapterBN.value = '' })
-
-function openCropper(imageFile, bulkIdx = null, forStimulus = false) {
-  cropperImgFile.value     = imageFile
-  cropperForBulkIdx.value  = bulkIdx
-  cropperForStimulus.value = forStimulus
-  cropperOpen.value        = true
-  nextTick(() => {
-    const el = document.getElementById('cropper-img')
-    if (!el) return
-    if (cropperInstance.value) cropperInstance.value.destroy()
-    cropperInstance.value = new Cropper(el, {
-      viewMode:     1,
-      dragMode:     'move',
-      autoCropArea: 0.5,
-      movable:      true,
-      zoomable:     true,
-      scalable:     false,
-      responsive:   true,
-      background:   false,
-    })
+const newQ = reactive({
+  text: '', optA: '', optB: '', optC: '', optD: '',
+  answer: 'A', stream: 'HSC', subject: '', diff: 'Medium', explanation: ''
+})
+function submitNewQuestion() {
+  if (!newQ.text.trim() || !newQ.optA.trim() || !newQ.optB.trim() || !newQ.subject.trim()) {
+    showToast('Fill in question, options A & B, and subject.', 'error')
+    return
+  }
+  // Push to my queue so it shows in the Review Queue tab
+  myQueue.value.unshift({
+    id: Date.now(),
+    text: newQ.text,
+    stream: newQ.stream,
+    subject: newQ.subject,
+    diff: newQ.diff,
+    date: new Date().toISOString().slice(0, 10),
+    status: 'pending',
+    adminNote: ''
   })
-}
-
-function closeCropper() {
-  if (cropperInstance.value) { cropperInstance.value.destroy(); cropperInstance.value = null }
-  cropperOpen.value    = false
-  cropperImgFile.value = null
-}
-
-async function confirmCrop() {
-  if (!cropperInstance.value) return
-  questionImageUploading.value = true
-  try {
-    const canvas  = cropperInstance.value.getCroppedCanvas({ maxWidth: 1200, imageSmoothingQuality: 'high' })
-    const subject = (cropperForBulkIdx.value !== null ? bulkResults.value[cropperForBulkIdx.value]?.subjectEN : subjectEN.value) || 'unknown'
-    const chapter = (cropperForBulkIdx.value !== null ? bulkResults.value[cropperForBulkIdx.value]?.chapterEN : chapterEN.value) || 'unknown'
-    const blob    = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.92))
-    const path    = `${streamEN.value}/${subject.replace(/[^a-zA-Z0-9]/g,'_')}/${chapter.replace(/[^a-zA-Z0-9]/g,'_')}/${Date.now()}.jpg`
-    const supabase = streamEN.value.startsWith('HSC') ? supabaseHSC : supabaseMedical
-
-    const { error } = await supabase.storage.from('question-images').upload(path, blob, { contentType: 'image/jpeg', upsert: false })
-    if (error) throw new Error(error.message)
-
-    const { data }  = supabase.storage.from('question-images').getPublicUrl(path)
-    const url       = data.publicUrl
-    const preview   = canvas.toDataURL('image/jpeg', 0.92)
-
-    if (cropperForBulkIdx.value !== null) {
-      if (cropperForStimulus.value) {
-        // Auto-fill ALL questions sharing the same stimulus
-        const stimulusText = bulkResults.value[cropperForBulkIdx.value]?.stimulusBN
-        bulkResults.value.forEach(q => {
-          if (q.stimulusBN && q.stimulusBN === stimulusText) {
-            q.stimulusImageUrl     = url
-            q.stimulusImagePreview = preview
-          }
-        })
-      } else {
-        bulkResults.value[cropperForBulkIdx.value].questionImageUrl     = url
-        bulkResults.value[cropperForBulkIdx.value].questionImagePreview = preview
-      }
-    } else {
-      questionImageUrl.value     = url
-      questionImagePreview.value = preview
-    }
-    showToast('Image cropped & uploaded ✓')
-    closeCropper()
-  } catch (e) {
-    console.error(e)
-    showToast('Crop upload failed.', 'error')
-  } finally {
-    questionImageUploading.value = false
-  }
-}
-
-function resetQuestionForm() {
-  questionEN.value = ''; questionBN.value = ''
-  subjectEN.value  = ''; subjectBN.value  = ''
-  chapterEN.value  = ''; chapterBN.value  = ''
-  streamEN.value   = 'HSC Science'
-  sourceEN.value   = ''; sourceBN.value   = ''
-  yearEN.value     = ''
-  difficultyEN.value = 'Medium'
-  optionsEN.value  = ['', '', '', '']
-  optionsBN.value  = ['', '', '', '']
-  answerEN.value   = 'A'
-  explanationEN.value = ''; explanationBN.value = ''
-  stimulusBN.value = ''; stimulusEN.value = ''
-  singleIsDuplicate.value = false; singleLowConfidence.value = false
-  imgFile.value = null; imgPreview.value = ''; imgError.value = ''
-  imgPanelOpen.value = false
-  questionImageUrl.value     = ''
-  questionImagePreview.value = ''
-  resetBulk()
-}
-
-// ─── Duplicate check ─────────────────────────────────────────
-async function checkDuplicates(questions) {
-  try {
-    const raw = await $fetch('/api/check-duplicates', {
-      method: 'POST',
-      body: { questions, stream: streamEN.value }
-    })
-    return new Set((raw.results ?? []).filter(r => r.isDuplicate).map(r => r.questionBN))
-  } catch { return new Set() }
-}
-
-// ─── Single image extraction ─────────────────────────────────
-const imgFile         = ref(null)
-const imgPreview      = ref('')
-const imgExtracting   = ref(false)
-const imgError        = ref('')
-const imgPanelOpen    = ref(false)
-const singleIsDuplicate   = ref(false)
-const singleLowConfidence = ref(false)
-
-// Sub-tab inside the submitQuestion modal
-const submitQuestionTab = ref('single') // 'single' | 'bulk'
-
-function onImgFileChange(e) {
-  const f = e.target.files?.[0]
-  if (!f) return
-  imgFile.value = f
-  imgPreview.value = URL.createObjectURL(f)
-  imgError.value = ''
-}
-
-async function extractFromImage() {
-  if (!imgFile.value || !streamEN.value) return
-  imgExtracting.value = true
-  imgError.value = ''
-  try {
-    const formData = new FormData()
-    formData.append('image', imgFile.value)
-    formData.append('stream', streamEN.value)
-    const raw    = await $fetch('/api/analyze-question', { method: 'POST', body: formData })
-    const parsed = JSON.parse(raw.result)
-
-    questionBN.value    = parsed.questionBN    || ''
-    questionEN.value    = parsed.questionEN    || ''
-    optionsBN.value     = parsed.optionsBN     || ['', '', '', '']
-    optionsEN.value     = parsed.optionsEN     || ['', '', '', '']
-    answerEN.value      = parsed.answerEN      || 'A'
-    explanationBN.value = parsed.explanationBN || ''
-    explanationEN.value = parsed.explanationEN || ''
-    yearEN.value        = parsed.year          || ''
-    difficultyEN.value  = parsed.difficulty    || 'Medium'
-    if (parsed.sourceEN) sourceEN.value = parsed.sourceEN
-    if (parsed.sourceBN) sourceBN.value = parsed.sourceBN
-    subjectEN.value = parsed.subjectEN || ''
-    subjectBN.value = parsed.subjectBN || ''
-    await nextTick()
-    chapterEN.value = parsed.chapterEN || ''
-    chapterBN.value = parsed.chapterBN || ''
-    imgPanelOpen.value = false
-
-    if (parsed.hasQuestionImage && imgFile.value) {
-      openCropper(imgFile.value, null)
-    }
-
-    singleLowConfidence.value = parsed.lowConfidence ?? false
-    singleIsDuplicate.value   = (await checkDuplicates([parsed])).has(parsed.questionBN)
-    if (singleIsDuplicate.value)   showToast('⚠ Possible duplicate detected', 'warning')
-    if (singleLowConfidence.value) showToast('⚠ Low confidence — review carefully', 'warning')
-    showToast('Fields auto-filled from image ✓')
-  } catch (err) {
-    console.error(err)
-    imgError.value = err.message || 'Extraction failed.'
-  } finally {
-    imgExtracting.value = false
-  }
-}
-
-// ─── Bulk extraction ─────────────────────────────────────────
-const bulkImgFile        = ref(null)
-const bulkImgPreview     = ref('')
-const bulkParsing        = ref(false)
-const bulkError          = ref('')
-const bulkResults        = ref([])
-const bulkSelected       = ref([])
-const bulkExpanded       = ref([])
-const bulkRedDotDetected = ref(false)
-const bulkTotalFound     = ref(0)
-const bulkSaving         = ref(false)
-
-function onBulkFileChange(e) {
-  const f = e.target.files?.[0]
-  if (!f) return
-  bulkImgFile.value    = f
-  bulkImgPreview.value = URL.createObjectURL(f)
-  bulkError.value      = ''
-  bulkResults.value    = []
-  bulkSelected.value   = []
-  bulkExpanded.value   = []
-}
-
-function resetBulk() {
-  bulkImgFile.value        = null
-  bulkImgPreview.value     = ''
-  bulkError.value          = ''
-  bulkResults.value        = []
-  bulkSelected.value       = []
-  bulkExpanded.value       = []
-  bulkRedDotDetected.value = false
-  bulkTotalFound.value     = 0
-}
-
-const bulkSelectedCount = computed(() => bulkSelected.value.filter(Boolean).length)
-function toggleBulkAll(val) { bulkSelected.value = bulkSelected.value.map(() => val) }
-
-async function parseBulk() {
-  if (!bulkImgFile.value || !streamEN.value) return
-  bulkParsing.value = true
-  bulkError.value   = ''
-  bulkResults.value = []
-  try {
-    const formData = new FormData()
-    formData.append('image', bulkImgFile.value)
-    formData.append('stream', streamEN.value)
-    const raw    = await $fetch('/api/analyze-question-bulk', { method: 'POST', body: formData })
-    const parsed = JSON.parse(raw.result)
-
-    bulkRedDotDetected.value = parsed.redDotDetected ?? false
-    bulkTotalFound.value     = parsed.totalFound     ?? parsed.questions?.length ?? 0
-
-    const questions  = parsed.questions ?? []
-    const duplicates = await checkDuplicates(questions)
-    bulkResults.value = questions.map(q => ({
-      ...q,
-      isDuplicate:          duplicates.has(q.questionBN),
-      questionImageUrl:     null,
-      questionImagePreview: null,
-      stimulusImageUrl:     null,
-      stimulusImagePreview: null,
-    }))
-    bulkSelected.value  = bulkResults.value.map(q => !q.isDuplicate)
-    bulkExpanded.value  = bulkResults.value.map(() => false)
-  } catch (err) {
-    console.error(err)
-    bulkError.value = err.message || 'Bulk parse failed.'
-  } finally {
-    bulkParsing.value = false
-  }
-}
-
-// ─── Submit single question to question_submissions ───────────
-async function submitNewQuestion() {
-  if (!questionBN.value.trim() && !questionEN.value.trim()) {
-    showToast('Question text is required.', 'error')
-    return
-  }
-  if (!subjectEN.value || !streamEN.value) {
-    showToast('Stream and subject are required.', 'error')
-    return
-  }
-
-  const answerIndexMap      = { A: 0, B: 1, C: 2, D: 3 }
-  const difficultyBanglaMap = { Easy: 'সহজ', Medium: 'মাধ্যম', Hard: 'কঠিন' }
-
-  const payload = {
-    stream:          streamEN.value,
-    question:        { english: questionEN.value || null, bangla: questionBN.value || null },
-    question_hash:   questionBN.value ? await hashText(questionBN.value) : null,
-    question_image:  questionImageUrl.value || null,
-    options:         { english: optionsEN.value, bangla: optionsBN.value },
-    explanation:     (explanationEN.value || explanationBN.value)
-                       ? { english: explanationEN.value || null, bangla: explanationBN.value || null }
-                       : null,
-    subject:         { english: subjectEN.value || null,   bangla: subjectBN.value   || null },
-    chapter:         { english: chapterEN.value || null,   bangla: chapterBN.value   || null },
-    difficulty:      { english: difficultyEN.value || null, bangla: difficultyBanglaMap[difficultyEN.value] || null },
-    difficulty_level: (difficultyEN.value || 'medium').toLowerCase(),
-    // year:            yearEN.value
-    //                    ? { english: yearEN.value, bangla: toBengaliDigits(yearEN.value) }
-    //                    : null,
-    years: yearEN.value
-      ? [{ english: yearEN.value, bangla: toBengaliDigits(yearEN.value) }]
-      : null, // TODO: seems a little wrong here (maybe)
-    source:          (sourceEN.value || sourceBN.value)
-                       ? { english: sourceEN.value || null, bangla: sourceBN.value || null }
-                       : null,
-    stimulus:        (stimulusBN.value || stimulusEN.value)
-                       ? { bangla: stimulusBN.value || null, english: stimulusEN.value || null }
-                       : null,
-    stimulus_hash:   stimulusBN.value ? await hashText(stimulusBN.value) : null,
-    //stimulus_image:  stimulusImageUrl.value || null,
-    correct_index:   answerIndexMap[answerEN.value] ?? 0,
-    status:          'pending',
-    submitted_by:    user?.id ?? null,
-  }
-
-  try {
-    const supabase = streamEN.value.startsWith('HSC') ? supabaseHSC : supabaseMedical
-    const { error } = await supabase.from('question_submissions').insert(payload)
-    if (error) throw new Error(error.message)
-
-    myQueue.value.unshift({
-      id: Date.now(),
-      text: questionEN.value || questionBN.value,
-      stream: streamEN.value,
-      subject: subjectEN.value,
-      diff: difficultyEN.value,
-      date: new Date().toISOString().slice(0, 10),
-      status: 'pending',
-      adminNote: ''
-    })
-    logMod('approve', `Submitted question for review: "${(questionEN.value || questionBN.value).slice(0, 40)}…"`)
-    showToast('Question submitted for admin review ✓')
-    resetQuestionForm()
-    closeModal()
-  } catch (err) {
-    console.error(err)
-    showToast(err.message || 'Submission failed.', 'error')
-  }
-}
-
-// ─── Bulk submit to question_submissions ─────────────────────
-async function submitBulk() {
-  const toSave = bulkResults.value.filter((_, i) => bulkSelected.value[i])
-  if (!toSave.length) return
-  bulkSaving.value = true
-
-  const answerIndexMap      = { A: 0, B: 1, C: 2, D: 3 }
-  const difficultyBanglaMap = { Easy: 'সহজ', Medium: 'মাধ্যম', Hard: 'কঠিন' }
-
-  const payloads = await Promise.all(toSave.map(async q => ({
-    stream:          streamEN.value,
-    question:        { english: q.questionEN || null, bangla: q.questionBN || null },
-    question_hash:   q.questionBN ? await hashText(q.questionBN) : null,
-    question_image:  q.questionImageUrl  || null,
-    stimulus_image:  q.stimulusImageUrl  || null,
-    options:         { english: q.optionsEN || [],    bangla: q.optionsBN  || [] },
-    explanation:     (q.explanationEN || q.explanationBN)
-                       ? { english: q.explanationEN || null, bangla: q.explanationBN || null }
-                       : null,
-    subject:         { english: q.subjectEN || null,  bangla: q.subjectBN  || null },
-    chapter:         { english: q.chapterEN || null,  bangla: q.chapterBN  || null },
-    difficulty:      { english: q.difficulty || null, bangla: difficultyBanglaMap[q.difficulty] || null },
-    difficulty_level: (q.difficulty || 'medium').toLowerCase(),
-    // year:            q.years?.length
-    //                    ? { english: q.years[0], bangla: toBengaliDigits(q.years[0]) }
-    //                    : null,
-    years: q.years?.length
-                      ? q.years.map(y => ({ english: y, bangla: toBengaliDigits(y) }))
-                      : null,
-    source:          (q.sourceEN?.length || q.sourceBN?.length)
-                       ? { english: q.sourceEN || null, bangla: q.sourceBN || null }
-                       : null,
-    stimulus:        (q.stimulusBN || q.stimulusEN)
-                       ? { bangla: q.stimulusBN || null, english: q.stimulusEN || null }
-                       : null,
-    stimulus_hash:   q.stimulusBN ? await hashText(q.stimulusBN) : null,
-    correct_index:   answerIndexMap[q.answerEN] ?? 0,
-    status:          'pending',
-    submitted_by:    user?.id ?? null,
-  })))
-
-  try {
-    const supabase = streamEN.value.startsWith('HSC') ? supabaseHSC : supabaseMedical
-    const { error } = await supabase.from('question_submissions').insert(payloads)
-    if (error) throw new Error(error.message)
-    payloads.forEach((p, i) => {
-      myQueue.value.unshift({
-        id: Date.now() + i,
-        text: toSave[i].questionEN || toSave[i].questionBN || '',
-        stream: streamEN.value,
-        subject: toSave[i].subjectEN || '',
-        diff: toSave[i].difficulty || 'Medium',
-        date: new Date().toISOString().slice(0, 10),
-        status: 'pending',
-        adminNote: ''
-      })
-    })
-    logMod('approve', `Bulk submitted ${payloads.length} question(s) for admin review`)
-    showToast(`${payloads.length} question${payloads.length > 1 ? 's' : ''} submitted ✓`)
-    resetQuestionForm()
-    closeModal()
-  } catch (err) {
-    console.error(err)
-    bulkError.value = err.message || 'Bulk submit failed.'
-  } finally {
-    bulkSaving.value = false
-  }
+  logMod('approve', `Submitted new question for admin review: "${newQ.text.slice(0,40)}…"`)
+  showToast('Question submitted for admin review.')
+  Object.assign(newQ, { text:'', optA:'', optB:'', optC:'', optD:'', answer:'A', stream:'HSC', subject:'', diff:'Medium', explanation:'' })
+  closeModal()
 }
 
 // ─── USER WARNINGS tab ────────────────────────────────────────
@@ -667,7 +211,7 @@ const warnedUsers = ref([
   { id:7,  name:'Sabbir Rahman',   email:'sabbir@gmail.com',   stream:'DU',   warnings:1, lastWarn:'2025-04-20', status:'warned',  reason:'Spam in comments' },
   { id:2,  name:'Farida Khanam',   email:'farida@yahoo.com',   stream:'Medical',warnings:0,lastWarn:'—',         status:'watched', reason:'Multiple flagged questions' },
   { id:9,  name:'Kamrul Islam',    email:'kamrul@gmail.com',   stream:'Bank', warnings:0, lastWarn:'—',          status:'clear',   reason:'—' },
-  { id:6,  name:'Nusrat Jahan',    email:'nusrat@gmail.com',   stream:'HSC Science',  warnings:0, lastWarn:'—',          status:'clear',   reason:'—' },
+  { id:6,  name:'Nusrat Jahan',    email:'nusrat@gmail.com',   stream:'HSC',  warnings:0, lastWarn:'—',          status:'clear',   reason:'—' },
 ])
 
 const filteredWarned = computed(() => {
@@ -699,7 +243,7 @@ function watchUser(u) {
 // ─── DISCUSSIONS tab ──────────────────────────────────────────
 const discFilter = ref('all')  // all | flagged | locked | open
 const discussions = ref([
-  { id:1,  title:'HSC Physics MCQ Tips',          stream:'HSC Science',    replies:34, flags:0, status:'open',    lastActive:'2m ago'  },
+  { id:1,  title:'HSC Physics MCQ Tips',          stream:'HSC',    replies:34, flags:0, status:'open',    lastActive:'2m ago'  },
   { id:2,  title:'BUET 2024 Math Doubt Thread',   stream:'BUET',   replies:89, flags:3, status:'flagged', lastActive:'15m ago' },
   { id:3,  title:'BCS General Discussion',        stream:'BCS',    replies:12, flags:0, status:'open',    lastActive:'1h ago'  },
   { id:4,  title:'SSC Board Question Sharing',    stream:'SSC',    replies:201,flags:7, status:'locked',  lastActive:'3h ago'  },
@@ -969,7 +513,6 @@ function logColor(type) {
         </div>
 
         <!-- Question cards -->
-        <div v-if="myQueueLoading" class="empty-panel">Loading your submissions…</div>
         <div class="my-queue-list">
           <div
             class="mq-card"
@@ -980,7 +523,7 @@ function logColor(type) {
             <div class="mq-top">
               <div class="mq-meta">
                 <span class="stream-tag">{{ q.stream }}</span>
-                <span class="mono dim">{{ q.subj }}</span>
+                <span class="mono dim">{{ q.subject }}</span>
                 <span class="diff-badge" :class="diffClass(q.diff)">{{ q.diff }}</span>
               </div>
               <div class="mq-status-group">
@@ -1382,441 +925,83 @@ function logColor(type) {
               <span class="panel-title">SUBMIT QUESTION FOR REVIEW</span>
               <button class="modal-close" @click="closeModal()">×</button>
             </div>
-
-            <!-- Tab switcher -->
-            <div class="add-q-tabs">
-              <button
-                class="add-q-tab" :class="{ 'add-q-tab--active': submitQuestionTab === 'single' }"
-                @click="submitQuestionTab = 'single'"
-              >Single Question</button>
-              <button
-                class="add-q-tab" :class="{ 'add-q-tab--active': submitQuestionTab === 'bulk' }"
-                @click="submitQuestionTab = 'bulk'"
-              >Bulk Import</button>
-            </div>
-
-            <!-- ══════════════════ SINGLE TAB ══════════════════ -->
-            <div v-if="submitQuestionTab === 'single'" class="modal-form">
-
-              <!-- Image Extractor panel -->
-              <div class="img-extract-panel">
-                <button
-                  class="img-extract-toggle"
-                  :class="{ 'img-extract-toggle--open': imgPanelOpen }"
-                  @click="imgPanelOpen = !imgPanelOpen"
-                >
-                  <span>⚡ AI Extract from Image</span>
-                  <span class="img-extract-arrow">{{ imgPanelOpen ? '▲' : '▼' }}</span>
-                </button>
-
-                <div v-if="imgPanelOpen" class="img-extract-body">
-                  <div
-                    class="img-drop-zone"
-                    :class="{ 'has-file': imgPreview }"
-                    @click="$refs.imgInput.click()"
-                    @dragover.prevent
-                    @drop.prevent="e => { imgFile = e.dataTransfer.files[0]; imgPreview = URL.createObjectURL(imgFile); imgError = '' }"
-                  >
-                    <img v-if="imgPreview" :src="imgPreview" class="img-preview" />
-                    <div v-else class="img-drop-hint">
-                      <span class="img-drop-icon">🖼</span>
-                      <span>Click or drag &amp; drop a question image</span>
-                      <span class="mono dim" style="font-size:0.62rem">PNG, JPG, WEBP supported</span>
-                    </div>
-                    <input ref="imgInput" type="file" accept="image/*" style="display:none" @change="onImgFileChange" />
-                  </div>
-                  <div v-if="imgError" class="img-error">⚠ {{ imgError }}</div>
-                  <div class="img-extract-actions">
-                    <button
-                      class="iso-btn iso-btn--fill img-extract-btn"
-                      :disabled="!imgFile || imgExtracting || !streamEN"
-                      @click="extractFromImage"
-                    >
-                      <span v-if="imgExtracting" class="img-spinner">◌</span>
-                      {{ imgExtracting ? 'Extracting & Translating…' : !streamEN ? 'Select a stream first' : '⚡ Extract & Auto-fill Fields' }}
-                    </button>
-                    <button v-if="imgFile" class="iso-btn iso-btn--ghost" @click="imgFile = null; imgPreview = ''; imgError = ''" style="font-size:0.72rem">Clear</button>
-                  </div>
-                </div>
-              </div>
-
+            <div class="modal-body">
               <div class="mf-group">
-                <div class="single-flags" v-if="singleIsDuplicate || singleLowConfidence">
-                  <span v-if="singleLowConfidence" class="flag-badge flag-warn">⚠ Low Confidence — review carefully</span>
-                  <span v-if="singleIsDuplicate"   class="flag-badge flag-dup">DUP — possible duplicate in database</span>
-                </div>
                 <label class="mf-label">QUESTION TEXT (English)</label>
-                <textarea class="mf-input mf-textarea" v-model="questionEN" rows="3" placeholder="Write the full question…" />
+                <textarea class="mf-input mf-textarea" v-model="newQ.text" rows="3" placeholder="Write the full question…" />
                 <label class="mf-label">QUESTION TEXT (Bengali)</label>
-                <textarea class="mf-input mf-textarea" v-model="questionBN" rows="3" placeholder="প্রশ্ন লিখুন…" />
+                <textarea class="mf-input mf-textarea" v-model="newQ.text" rows="3" placeholder="Write the full question…" />
               </div>
               <br>
-
-              <!-- Stimulus -->
-              <div class="mf-group">
-                <label class="mf-label">STIMULUS / উদ্দীপক (English) <span style="opacity:0.5;font-size:0.6rem">optional</span></label>
-                <textarea class="mf-input mf-textarea" v-model="stimulusEN" rows="2" placeholder="Shared passage if any…" />
-                <label class="mf-label">STIMULUS / উদ্দীপক (Bengali)</label>
-                <textarea class="mf-input mf-textarea" v-model="stimulusBN" rows="2" placeholder="উদ্দীপক থাকলে লিখুন…" />
-              </div>
-              <br>
-
-              <!-- ── Question Image ──────────────────────────────── -->
-              <div class="mf-group">
-                <label class="mf-label">QUESTION IMAGE <span style="opacity:0.5;font-size:0.6rem">(auto-cropped if detected · optional)</span></label>
-                <div class="qimg-field">
-                  <div v-if="questionImageUploading" class="qimg-uploading">
-                    <span class="img-spinner">◌</span> Cropping &amp; uploading…
-                  </div>
-                  <div v-else-if="questionImagePreview || questionImageUrl" class="qimg-preview-wrap">
-                    <img :src="questionImagePreview || questionImageUrl" class="qimg-preview" />
-                    <div class="qimg-actions">
-                      <span class="qimg-status">{{ questionImageUrl ? '✓ Uploaded' : '⏳ Preview only' }}</span>
-                      <button class="iso-btn iso-btn--ghost qimg-reupload-btn" @click="openCropper(imgFile, null)">Re-crop</button>
-                      <button class="iso-btn iso-btn--ghost" style="font-size:0.65rem" @click="questionImageUrl = ''; questionImagePreview = ''">Remove</button>
-                    </div>
-                  </div>
-                  <div v-else class="qimg-empty">
-                    <span class="dim" style="font-size:0.7rem">No image — will be auto-cropped after extraction if detected</span>
-                  </div>
-                </div>
-              </div>
-
               <div class="mf-row">
                 <div class="mf-group">
                   <label class="mf-label">STREAM</label>
-                  <select class="mf-input mf-select" style="background: lightblack;" v-model="streamEN">
-                    <option v-for="s in ['SSC Science','SSC Arts','SSC Commerce','HSC Science','HSC Arts','HSC Commerce','BUET','Medical','DU','BCS']" :key="s">{{ s }}</option>
+                  <select class="mf-input mf-select" v-model="newQ.stream">
+                    <option v-for="s in ['SSC','HSC','BUET','Medical','DU','BCS','Bank']" :key="s">{{ s }}</option>
+                  </select>
+                  <label class="mf-label">YEAR</label>
+                  <input class="mf-input" v-model="newQ.year" placeholder="e.g. 2023" />
+                  <br>
+                </div>
+                <br>
+                <div class="mf-group">
+                  <label class="mf-label">SUBJECT (English)</label>
+                  <input class="mf-input" v-model="newQ.subject" placeholder="e.g. Physics, Math…" />
+                  <label class="mf-label">SUBJECT (Bengali)</label>
+                  <input class="mf-input" v-model="newQ.subject" placeholder="e.g. Physics, Math…" />
+                </div>
+                <br>
+                <div class="mf-group">
+                  <label class="mf-label">CHAPTER (English)</label>
+                  <input class="mf-input" v-model="newQ.subject" placeholder="e.g. Physics, Math…" />
+                  <label class="mf-label">CHAPTER (Bengali)</label>
+                  <input class="mf-input" v-model="newQ.subject" placeholder="e.g. Physics, Math…" />
+                </div>
+              </div>
+              <br>
+              <div class="mf-group">
+                <label class="mf-label">OPTIONS (English)</label>
+                <input class="mf-input"    v-model="newQ.optA" placeholder="Option A" />
+                <input class="mf-input mt4" v-model="newQ.optB" placeholder="Option B" />
+                <input class="mf-input mt4" v-model="newQ.optC" placeholder="Option C" />
+                <input class="mf-input mt4" v-model="newQ.optD" placeholder="Option D" />
+                <br>
+                <label class="mf-label">OPTIONS (Bengali)</label>
+                <input class="mf-input"    v-model="newQ.optA" placeholder="Option A" />
+                <input class="mf-input mt4" v-model="newQ.optB" placeholder="Option B" />
+                <input class="mf-input mt4" v-model="newQ.optC" placeholder="Option C" />
+                <input class="mf-input mt4" v-model="newQ.optD" placeholder="Option D" />
+              </div>
+              <br>
+              <div class="mf-row">
+                <div class="mf-group">
+                  <label class="mf-label">CORRECT ANSWER </label>
+                  <select class="mf-input mf-select" v-model="newQ.answer">
+                    <option>A</option><option>B</option><option>C</option><option>D</option>
                   </select>
                 </div>
                 <div class="mf-group">
                   <label class="mf-label">DIFFICULTY</label>
-                  <select class="mf-input mf-select" v-model="difficultyEN">
+                  <select class="mf-input mf-select" v-model="newQ.diff">
                     <option>Easy</option><option>Medium</option><option>Hard</option>
-                  </select>
-                </div>
-              </div>
-              <div class="mf-group">
-                <label class="mf-label">YEAR</label>
-                <input class="mf-input" v-model="yearEN" placeholder="e.g. 2023" />
-              </div>
-              <div class="mf-group">
-                <label class="mf-label">SOURCE (English)</label>
-                <input class="mf-input" v-model="sourceEN" placeholder="e.g. Dhaka Board" />
-              </div>
-              <div class="mf-group">
-                <label class="mf-label">SOURCE (Bengali)</label>
-                <input class="mf-input" v-model="sourceBN" placeholder="যেমন: ঢাকা বোর্ড" />
-              </div>
-
-              <div class="mf-row">
-                <div class="mf-group">
-                  <label class="mf-label">SUBJECT (English)</label>
-                  <select
-                    v-model="subjectEN" class="mf-input mf-select"
-                    :disabled="!availableSubjects.length"
-                    @change="() => { const m = availableSubjects.find(x => x.en === subjectEN); subjectBN = m?.bn ?? '' }"
-                  >
-                    <option value="" disabled>{{ streamEN ? 'Select subject…' : 'Select stream first' }}</option>
-                    <option v-for="s in availableSubjects" :key="s.en" :value="s.en">{{ s.en }}</option>
-                  </select>
-                </div>
-                <div class="mf-group">
-                  <label class="mf-label">SUBJECT (Bengali)</label>
-                  <select
-                    v-model="subjectBN" class="mf-input mf-select"
-                    :disabled="!availableSubjects.length"
-                    @change="() => { const m = availableSubjects.find(x => x.bn === subjectBN); subjectEN = m?.en ?? '' }"
-                  >
-                    <option value="" disabled>{{ streamEN ? 'বিষয় বেছে নিন…' : 'স্ট্রিম বেছে নিন' }}</option>
-                    <option v-for="s in availableSubjects" :key="s.bn" :value="s.bn">{{ s.bn }}</option>
-                  </select>
-                </div>
-              </div>
-              <div class="mf-row">
-                <div class="mf-group">
-                  <label class="mf-label">CHAPTER (English)</label>
-                  <select
-                    v-model="chapterEN" class="mf-input mf-select"
-                    :disabled="!availableChapters.length"
-                    @change="() => { const m = availableChapters.find(c => c.en === chapterEN); chapterBN = m?.bn ?? '' }"
-                  >
-                    <option value="" disabled>{{ subjectEN ? 'Select chapter…' : 'Select subject first' }}</option>
-                    <option v-for="c in availableChapters" :key="c.en" :value="c.en">{{ c.en }}</option>
-                  </select>
-                </div>
-                <div class="mf-group">
-                  <label class="mf-label">CHAPTER (Bengali)</label>
-                  <select
-                    v-model="chapterBN" class="mf-input mf-select"
-                    :disabled="!availableChapters.length"
-                    @change="() => { const m = availableChapters.find(c => c.bn === chapterBN); chapterEN = m?.en ?? '' }"
-                  >
-                    <option value="" disabled>{{ subjectEN ? 'অধ্যায় বেছে নিন…' : 'বিষয় বেছে নিন' }}</option>
-                    <option v-for="c in availableChapters" :key="c.bn" :value="c.bn">{{ c.bn }}</option>
-                  </select>
-                </div>
-              </div>
-              <br>
-
-              <div class="mf-group">
-                <label class="mf-label">OPTIONS (A / B / C / D)</label>
-                <input v-model="optionsEN[0]" class="mf-input"    placeholder="Option A (English)" /><input v-model="optionsBN[0]" class="mf-input"    placeholder="বিকল্প A (Bengali)" /><br>
-                <input v-model="optionsEN[1]" class="mf-input mt4" placeholder="Option B (English)" /><input v-model="optionsBN[1]" class="mf-input mt4" placeholder="বিকল্প B (Bengali)" /><br>
-                <input v-model="optionsEN[2]" class="mf-input mt4" placeholder="Option C (English)" /><input v-model="optionsBN[2]" class="mf-input mt4" placeholder="বিকল্প C (Bengali)" /><br>
-                <input v-model="optionsEN[3]" class="mf-input mt4" placeholder="Option D (English)" /><input v-model="optionsBN[3]" class="mf-input mt4" placeholder="বিকল্প D (Bengali)" /><br>
-              </div>
-
-              <div class="mf-row">
-                <div class="mf-group">
-                  <label class="mf-label">CORRECT ANSWER</label>
-                  <select class="mf-input mf-select" v-model="answerEN">
-                    <option>A</option><option>B</option><option>C</option><option>D</option>
                   </select>
                 </div>
               </div>
               <br>
               <div class="mf-group">
                 <label class="mf-label">EXPLANATION (optional) (English)</label>
-                <textarea class="mf-input mf-textarea" v-model="explanationEN" rows="2" placeholder="Explain why the answer is correct…" />
+                <textarea class="mf-input mf-textarea" v-model="newQ.explanation" rows="2" placeholder="Explain why the answer is correct…" />
                 <label class="mf-label">EXPLANATION (optional) (Bengali)</label>
-                <textarea class="mf-input mf-textarea" v-model="explanationBN" rows="2" placeholder="উত্তর কেন সঠিক তা ব্যাখ্যা করুন…" />
+                <textarea class="mf-input mf-textarea" v-model="newQ.explanation" rows="2" placeholder="Explain why the answer is correct…" />
               </div>
-
               <div class="submit-note">
                 <span class="submit-note-icon">⚑</span>
                 This question will be submitted as <strong>pending</strong> and requires admin approval before going live.
               </div>
             </div>
-            <div v-if="submitQuestionTab === 'single'" class="modal-actions">
+            <div class="modal-actions">
               <button class="iso-btn iso-btn--ghost" @click="closeModal()">Cancel</button>
               <button class="iso-btn iso-btn--fill"  @click="submitNewQuestion()">Submit for Review</button>
-            </div>
-
-            <!-- ══════════════════ BULK TAB ══════════════════ -->
-            <div v-if="submitQuestionTab === 'bulk'" class="modal-form bulk-form">
-
-              <div class="mf-row">
-                <div class="mf-group">
-                  <label class="mf-label">STREAM (required)</label>
-                  <select v-model="streamEN" class="mf-input mf-select">
-                    <option value="" disabled>Select stream…</option>
-                    <option v-for="s in ['SSC Science','SSC Arts','SSC Commerce','HSC Science','HSC Arts','HSC Commerce','BUET','Medical','DU','BCS']" :key="s">{{ s }}</option>
-                  </select>
-                </div>
-                <div class="mf-group" style="justify-content:flex-end; padding-top:18px;">
-                  <span v-if="bulkRedDotDetected" class="bulk-mode-badge red-dot-badge">🔴 Red-dot mode</span>
-                  <span v-else-if="bulkResults.length" class="bulk-mode-badge">All questions mode</span>
-                </div>
-              </div>
-
-              <div
-                class="img-drop-zone bulk-drop-zone"
-                :class="{ 'has-file': bulkImgPreview }"
-                @click="$refs.bulkImgInput.click()"
-                @dragover.prevent
-                @drop.prevent="e => { const f = e.dataTransfer.files[0]; if(f){ bulkImgFile = f; bulkImgPreview = URL.createObjectURL(f); bulkError = ''; bulkResults = [] } }"
-              >
-                <img v-if="bulkImgPreview" :src="bulkImgPreview" class="img-preview bulk-img-preview" />
-                <div v-else class="img-drop-hint">
-                  <span class="img-drop-icon">📄</span>
-                  <span>Click or drag &amp; drop a question sheet image</span>
-                  <span class="mono dim" style="font-size:0.62rem">Up to 30 questions parsed · Red dots respected</span>
-                </div>
-                <input ref="bulkImgInput" type="file" accept="image/*" style="display:none" @change="onBulkFileChange" />
-              </div>
-
-              <div v-if="bulkError" class="img-error">⚠ {{ bulkError }}</div>
-
-              <div class="img-extract-actions">
-                <button
-                  class="iso-btn iso-btn--fill img-extract-btn"
-                  :disabled="!bulkImgFile || bulkParsing || !streamEN"
-                  @click="parseBulk"
-                >
-                  <span v-if="bulkParsing" class="img-spinner">◌</span>
-                  {{ bulkParsing ? 'Analyzing image…' : !streamEN ? 'Select a stream first' : '⚡ Parse Questions' }}
-                </button>
-                <button v-if="bulkImgFile" class="iso-btn iso-btn--ghost" @click="resetBulk" style="font-size:0.72rem">Clear</button>
-              </div>
-
-              <div v-if="bulkResults.length" class="bulk-review">
-                <div class="bulk-review-header">
-                  <span class="bulk-review-title">
-                    REVIEW — {{ bulkResults.length }} QUESTION{{ bulkResults.length > 1 ? 'S' : '' }} FOUND
-                    <span v-if="bulkRedDotDetected" style="color:rgba(255,100,100,0.8)"> · 🔴 Red-dot filtered</span>
-                  </span>
-                  <div class="bulk-review-controls">
-                    <button class="iso-btn iso-btn--ghost" style="font-size:0.65rem; padding:4px 10px" @click="toggleBulkAll(true)">Select All</button>
-                    <button class="iso-btn iso-btn--ghost" style="font-size:0.65rem; padding:4px 10px" @click="toggleBulkAll(false)">Deselect All</button>
-                  </div>
-                </div>
-
-                <div class="bulk-table">
-                  <div class="bulk-table-head">
-                    <span class="btc-check"></span>
-                    <span class="btc-num">#</span>
-                    <span class="btc-flags"></span>
-                    <span class="btc-q">Question (English)</span>
-                    <span class="btc-meta">Subject / Chapter</span>
-                    <span class="btc-ans">Ans</span>
-                    <span class="btc-diff">Diff</span>
-                    <span class="btc-expand"></span>
-                  </div>
-
-                  <div
-                    v-for="(q, i) in bulkResults"
-                    :key="i"
-                    class="bulk-row"
-                    :class="{ 'bulk-row--unchecked': !bulkSelected[i], 'bulk-row--expanded': bulkExpanded[i] }"
-                  >
-                    <div class="bulk-row-main">
-                      <span class="btc-check">
-                        <input type="checkbox" v-model="bulkSelected[i]" class="bulk-checkbox" />
-                      </span>
-                      <span class="btc-num">
-                        {{ i + 1 }}
-                        <span v-if="q.redDot" class="reddot-badge" title="Red dot marked">🔴</span>
-                      </span>
-                      <span class="btc-flags">
-                        <span v-if="q.lowConfidence" class="flag-badge flag-warn" title="Low confidence — review carefully">⚠</span>
-                        <span v-if="q.isDuplicate"   class="flag-badge flag-dup"  title="Already exists in database">DUP</span>
-                      </span>
-                      <span class="btc-q bulk-q-text">{{ q.questionEN }}</span>
-                      <span class="btc-meta bulk-meta-text">
-                        <span class="bulk-subject">{{ q.subjectEN || '—' }}</span>
-                        <span class="bulk-chapter">{{ q.chapterEN || '—' }}</span>
-                      </span>
-                      <span class="btc-ans">
-                        <span class="bulk-answer-badge">{{ q.answerEN }}</span>
-                      </span>
-                      <span class="btc-diff">
-                        <span class="bulk-diff-badge" :class="'diff-' + (q.difficulty || 'medium').toLowerCase()">{{ q.difficulty }}</span>
-                      </span>
-                      <span class="btc-expand">
-                        <button class="bulk-expand-btn" @click="bulkExpanded[i] = !bulkExpanded[i]">
-                          {{ bulkExpanded[i] ? '▲' : '▼' }}
-                        </button>
-                      </span>
-                    </div>
-
-                    <!-- Expanded detail -->
-                    <div v-if="bulkExpanded[i]" class="bulk-row-detail">
-                      <!-- <div class="brd-section">
-                        <span class="brd-label">BN Question</span>
-                        <span class="brd-text">{{ q.questionBN }}</span>
-                      </div>
-                      <div v-if="q.stimulusBN || q.stimulusEN" class="brd-section">
-                        <span class="brd-label">Stimulus</span>
-                        <span class="brd-text">{{ q.stimulusBN || q.stimulusEN }}</span>
-                      </div> -->
-                      <!-- Stimulus with crop button -->
-                      <!-- <div v-if="q.stimulusBN || q.stimulusEN" class="brd-section">
-                        <span class="brd-label">STIMULUS</span>
-                        <div v-if="q.hasStimulusImage" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px">
-                          <img v-if="q.stimulusImagePreview || q.stimulusImageUrl"
-                               :src="q.stimulusImagePreview || q.stimulusImageUrl" class="brd-qimg" />
-                          <button class="iso-btn iso-btn--ghost" style="font-size:0.68rem;width:fit-content"
-                                  @click="openCropper(bulkImgFile, i, true)">
-                            {{ q.stimulusImageUrl ? '✎ Re-crop stimulus' : '✂ Crop stimulus image' }}
-                          </button>
-                          <span v-if="q.stimulusImageUrl" style="font-size:0.6rem;color:rgba(120,200,120,0.8)">✓ auto-filled on linked questions</span>
-                        </div>
-                        <span class="brd-text">{{ q.stimulusEN || q.stimulusBN }}</span>
-                      </div> -->
-
-                      <!-- Question image with crop button -->
-                      <!--      ///////////////      -->
-                      <div v-if="q.stimulusBN || q.stimulusEN" class="brd-section brd-stimulus">
-                        <span class="brd-label">
-                          STIMULUS
-                          <span class="stimulus-link-badge">🔗 linked</span>
-                        </span>
-                      
-                        <!-- Stimulus image — above text -->
-                        <div v-if="q.hasStimulusImage" class="stimulus-img-wrap">
-                          <img
-                            v-if="q.stimulusImagePreview || q.stimulusImageUrl"
-                            :src="q.stimulusImagePreview || q.stimulusImageUrl"
-                            class="brd-qimg"
-                          />
-                          <button
-                            class="iso-btn iso-btn--ghost"
-                            style="font-size:0.68rem; margin-top:6px; width:fit-content"
-                            @click="openCropper(bulkImgFile, i, true)"
-                          >
-                            {{ q.stimulusImageUrl ? '✎ Re-crop stimulus' : '✂ Crop stimulus image' }}
-                          </button>
-                          <span v-if="q.stimulusImageUrl" class="stimulus-auto-filled">
-                            ✓ auto-filled on linked questions
-                          </span>
-                        </div>
-                      
-                        <span v-if="q.stimulusEN" class="brd-text bn-text">{{ q.stimulusEN }}</span>
-                        <span v-if="q.stimulusBN" class="brd-text" style="opacity:0.7; font-size:0.72rem">({{ q.stimulusBN }})</span>
-                      </div>
-                      <div class="brd-section">
-                        <span class="brd-label">English Question</span>
-                        <span class="brd-text">{{ q.questionEN || '—' }} <span class="brd-text" style="font-size:0.7rem; opacity:0.7">({{ q.questionBN || '—' }})</span></span>
-                      </div>
-                      <div class="brd-section">
-                        <span v-if="q.hasQuestionImage" class="brd-label">QUESTION IMAGE</span>
-                        <img v-if="q.questionImagePreview || q.questionImageUrl" :src="q.questionImagePreview || q.questionImageUrl" class="brd-qimg" />
-                        <button
-                          v-if="q.hasQuestionImage"
-                          class="iso-btn iso-btn--ghost"
-                          style="font-size:0.68rem; margin-top:6px; width:fit-content"
-                          @click="openCropper(bulkImgFile, i)"
-                        >
-                          {{ q.questionImageUrl ? '✎ Re-crop' : '✂ Crop image' }}
-                        </button>
-                      </div>
-                      <div class="brd-section">
-                        <span class="brd-label">Options</span>
-                        <div class="brd-options">
-                          <span v-for="(opt, oi) in ['A','B','C','D']" :key="oi" class="brd-option" :class="{ 'brd-option--correct': q.answerEN === opt }">
-                            <b>{{ opt }}.</b> {{ q.optionsEN[oi] || '—' }}
-                            <span v-if="q.optionsBN[oi]" class="brd-option-bn bn-text"> / {{ q.optionsBN[oi] }}</span>
-                          </span>
-                        </div>
-                      </div>
-                      <div v-if="q.explanationEN || q.explanationBN" class="brd-section">
-                        <span class="brd-label">Explanation</span>
-                        <span v-if="q.explanationEN" class="brd-text">{{ q.explanationEN }} <span v-if="q.explanationBN" class="brd-text" style="font-size:0.7rem; opacity:0.7">({{ q.explanationBN }})</span></span>
-                      </div>
-                      <div class="brd-section brd-meta-row">
-                        <span v-if="q.years?.length"><span class="brd-label">Year:</span> <span class="brd-text" style="font-size:0.65rem; opacity:0.5">{{ q.years.join(' · ') }}</span></span>
-                        <span v-if="q.sourceEN?.length">
-                          <span class="brd-label">Source: </span>
-                          <span v-for="(s, si) in q.sourceEN" :key="si" class="brd-text bn-text" style="font-size:0.65rem; opacity:0.4">{{ s }}{{ si < q.sourceEN.length - 1 ? ' · ' : '' }}</span>
-                        </span>
-                        <span v-if="q.sourceBN?.length" style="font-size:0.65rem; opacity:0.7">
-                          ({{ q.sourceBN.join(' · ') }})
-                        </span>
-                        <span v-if="q.subjectEN" class="bn-text"><span class="brd-label">Subject:</span> {{ q.subjectEN }} <span v-if="q.subjectBN" style="font-size:0.65rem; opacity:0.7">({{ q.subjectBN }})</span></span>
-                        <span v-if="q.chapterEN" class="bn-text"><span class="brd-label">Chapter:</span> {{ q.chapterEN }} <span v-if="q.chapterBN" style="font-size:0.65rem; opacity:0.7">({{ q.chapterBN }})</span></span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="submit-note" style="margin-top:12px">
-                  <span class="submit-note-icon">⚑</span>
-                  {{ bulkSelectedCount }} question{{ bulkSelectedCount !== 1 ? 's' : '' }} selected — all will be submitted as <strong>pending</strong> for admin approval.
-                </div>
-              </div>
-            </div>
-
-            <div v-if="submitQuestionTab === 'bulk' && bulkResults.length" class="modal-actions">
-              <button class="iso-btn iso-btn--ghost" @click="closeModal()">Cancel</button>
-              <button
-                class="iso-btn iso-btn--fill"
-                :disabled="!bulkSelectedCount || bulkSaving"
-                @click="submitBulk"
-              >
-                <span v-if="bulkSaving" class="img-spinner">◌</span>
-                {{ bulkSaving ? 'Submitting…' : `Submit ${bulkSelectedCount} Question${bulkSelectedCount !== 1 ? 's' : ''} for Review` }}
-              </button>
             </div>
           </template>
 
@@ -1833,26 +1018,6 @@ function logColor(type) {
       </Transition>
     </Teleport>
 
-  </div>
-
-  <!-- ── Cropper modal ─────────────────────────────────────── -->
-  <div v-if="cropperOpen" class="cropper-overlay">
-    <div class="cropper-modal">
-      <div class="cropper-head">
-        <span class="panel-title">{{ cropperForStimulus ? 'CROP STIMULUS IMAGE' : 'CROP QUESTION IMAGE' }}</span>
-        <button class="modal-close" @click="closeCropper">×</button>
-      </div>
-      <div class="cropper-body">
-        <img id="cropper-img" :src="cropperImgSrc" style="max-width:100%;display:block" />
-      </div>
-      <div class="modal-actions">
-        <button class="iso-btn iso-btn--ghost" @click="closeCropper">Cancel</button>
-        <button class="iso-btn iso-btn--fill" :disabled="questionImageUploading" @click="confirmCrop">
-          <span v-if="questionImageUploading" class="img-spinner">◌</span>
-          {{ questionImageUploading ? 'Uploading…' : 'Confirm Crop' }}
-        </button>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -2233,8 +1398,7 @@ function logColor(type) {
 .mf-group { display: flex; flex-direction: column; gap: 5px; }
 .mf-input {
   width: 100%; box-sizing: border-box;
-  /*background: rgba(240,240,234,0.03); border: 1px solid var(--border);*/
-  background: #191818; border: 1px solid var(--border);
+  background: rgba(240,240,234,0.03); border: 1px solid var(--border);
   color: var(--white); font-family: var(--font-sans); font-size: 0.8rem;
   padding: 8px 12px; outline: none; transition: border-color 0.15s;
 }
@@ -2403,164 +1567,4 @@ function logColor(type) {
   .qsr-val        { font-size: 1.3rem; }
   .mq-card        { padding: 12px; }
 }
-/* ═══════════════════════════════════════════════════════════════
-   SUBMIT QUESTION MODAL — TABS & EXTRACTOR
-═══════════════════════════════════════════════════════════════ */
-.add-q-tabs {
-  display: flex; border-bottom: 1px solid var(--border);
-}
-.add-q-tab {
-  flex: 1; padding: 10px 0;
-  background: none; border: none; border-bottom: 2px solid transparent;
-  color: var(--gray); font-family: var(--font-mono); font-size: 0.68rem;
-  letter-spacing: 0.1em; cursor: pointer; transition: all 0.15s;
-  margin-bottom: -1px;
-}
-.add-q-tab:hover { color: var(--white); }
-.add-q-tab--active { color: var(--white); border-bottom-color: var(--white); }
-
-/* Modal form layout (used by submitQuestion) */
-.modal-form { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; max-height: 70vh; }
-.mf-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.mt4 { margin-top: 4px !important; }
-
-/* Image Extractor */
-.img-extract-panel { border: 1px solid var(--border); background: rgba(240,240,234,0.02); }
-.img-extract-toggle {
-  width: 100%; display: flex; align-items: center; gap: 8px;
-  padding: 10px 14px; background: none; border: none; cursor: pointer;
-  color: var(--white); font-family: var(--font-mono); font-size: 0.7rem;
-  letter-spacing: 0.1em; text-align: left; transition: background 0.15s;
-}
-.img-extract-toggle:hover { background: rgba(240,240,234,0.04); }
-.img-extract-arrow { margin-left: auto; font-size: 0.55rem; color: var(--gray); }
-.img-extract-body { padding: 12px 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
-
-.img-drop-zone {
-  border: 1px dashed var(--border-bright); cursor: pointer;
-  min-height: 110px; display: flex; align-items: center; justify-content: center;
-  transition: border-color 0.15s; overflow: hidden; position: relative;
-}
-.img-drop-zone:hover { border-color: rgba(240,240,234,0.5); }
-.img-drop-zone.has-file { min-height: unset; }
-.img-drop-hint { display: flex; flex-direction: column; align-items: center; gap: 5px; color: var(--gray); font-family: var(--font-sans); font-size: 0.74rem; padding: 18px; }
-.img-drop-icon { font-size: 1.6rem; }
-.img-preview   { max-width: 100%; max-height: 220px; display: block; object-fit: contain; }
-
-.img-error { font-family: var(--font-mono); font-size: 0.66rem; color: rgba(255,100,100,0.85); border: 1px solid rgba(255,100,100,0.25); padding: 6px 10px; }
-.img-extract-actions { display: flex; gap: 8px; align-items: center; }
-.img-extract-btn     { font-size: 0.72rem !important; padding: 8px 16px !important; }
-.img-spinner { display: inline-block; animation: spin 0.9s linear infinite; margin-right: 4px; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* Single form flags */
-.single-flags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
-.flag-badge   { font-family: var(--font-mono); font-size: 0.55rem; padding: 1px 5px; border: 1px solid; line-height: 1.4; white-space: nowrap; }
-.flag-warn    { border-color: rgba(255,200,80,0.4);  color: rgba(255,200,80,0.9);  }
-.flag-dup     { border-color: rgba(255,100,100,0.4); color: rgba(255,100,100,0.9); }
-
-/* ── Bulk import ─────────────────────────────────────────── */
-.bulk-form { gap: 14px; }
-.bulk-drop-zone   { min-height: 130px; }
-.bulk-img-preview { max-height: 160px; }
-
-.bulk-mode-badge { font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.08em; padding: 3px 9px; border: 1px solid var(--border-bright); color: var(--gray); align-self: center; }
-.red-dot-badge { border-color: rgba(255,100,100,0.4); color: rgba(255,140,140,0.9); }
-
-.bulk-review { display: flex; flex-direction: column; gap: 0; margin-top: 4px; }
-.bulk-review-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; margin-bottom: 4px; gap: 8px; flex-wrap: wrap; }
-.bulk-review-title  { font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.12em; color: var(--gray); }
-.bulk-review-controls { display: flex; gap: 6px; }
-
-.bulk-table { border: 1px solid var(--border); }
-.bulk-table-head {
-  display: grid;
-  grid-template-columns: 28px 36px 40px 1fr 160px 36px 60px 28px;
-  gap: 0; padding: 6px 10px;
-  background: rgba(240,240,234,0.04); border-bottom: 1px solid var(--border);
-  font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.1em; color: var(--gray); align-items: center;
-}
-.bulk-row { border-bottom: 1px solid var(--border); transition: background 0.1s; }
-.bulk-row:last-child { border-bottom: none; }
-.bulk-row:hover { background: rgba(240,240,234,0.02); }
-.bulk-row--unchecked { opacity: 0.4; }
-.bulk-row-main { display: grid; grid-template-columns: 28px 36px 40px 1fr 160px 36px 60px 28px; gap: 0; padding: 8px 10px; align-items: center; }
-
-/* Expanded detail */
-.bulk-row-detail {
-  padding: 10px 12px 14px 74px;
-  border-top: 1px solid var(--border);
-  background: rgba(240,240,234,0.02);
-  display: flex; flex-direction: column; gap: 10px;
-}
-.brd-section { display: flex; flex-direction: column; gap: 4px; }
-.brd-label {
-  font-family: var(--font-mono); font-size: 0.56rem;
-  letter-spacing: 0.12em; color: var(--gray);
-}
-.brd-text {
-  font-family: var(--font-sans); font-size: 0.78rem;
-  color: var(--white); line-height: 1.4;
-}
-.brd-options { display: flex; flex-direction: column; gap: 4px; }
-.brd-option {
-  font-family: var(--font-sans); font-size: 0.74rem;
-  color: var(--gray); line-height: 1.3;
-}
-.brd-option--correct { color: rgba(120,230,120,0.9); }
-.brd-option-bn { opacity: 0.7; }
-.brd-meta-row {
-  flex-direction: row; flex-wrap: wrap; gap: 12px;
-  font-family: var(--font-sans); font-size: 0.7rem; color: var(--gray);
-}
-.bn-text { font-family: 'Noto Sans Bengali', sans-serif; }
-
-.btc-check { display: flex; align-items: center; }
-.btc-flags { display: flex; align-items: center; gap: 3px; }
-.bulk-checkbox { accent-color: var(--white); cursor: pointer; width: 13px; height: 13px; }
-.btc-num { font-family: var(--font-mono); font-size: 0.65rem; color: var(--gray); display: flex; align-items: center; gap: 3px; }
-.reddot-badge { font-size: 0.55rem; }
-.bulk-q-text { font-family: var(--font-sans); font-size: 0.76rem; color: var(--white); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.bulk-meta-text { display: flex; flex-direction: column; gap: 2px; padding: 0 6px; }
-.bulk-subject { font-family: var(--font-mono); font-size: 0.6rem; color: var(--white); letter-spacing: 0.05em; }
-.bulk-chapter { font-family: var(--font-sans); font-size: 0.62rem; color: var(--gray); line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-.btc-ans { display: flex; align-items: center; justify-content: center; }
-.bulk-answer-badge { font-family: var(--font-mono); font-size: 0.68rem; font-weight: 600; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-bright); color: var(--white); }
-.btc-diff { display: flex; align-items: center; }
-.bulk-diff-badge { font-family: var(--font-mono); font-size: 0.58rem; padding: 2px 7px; border: 1px solid var(--border); }
-.bulk-diff-badge.diff-easy   { border-color: rgba(120,230,120,0.3); color: rgba(120,230,120,0.8); }
-.bulk-diff-badge.diff-medium { border-color: rgba(255,200,80,0.3);  color: rgba(255,200,80,0.8);  }
-.bulk-diff-badge.diff-hard   { border-color: rgba(255,100,100,0.3); color: rgba(255,100,100,0.8); }
-.btc-expand { display: flex; align-items: center; justify-content: center; }
-.bulk-expand-btn { background: none; border: none; color: var(--gray); cursor: pointer; font-size: 0.6rem; padding: 2px 4px; transition: color 0.15s; }
-.bulk-expand-btn:hover { color: var(--white); }
-
-/* ── Question image field ─────────────────────────────────── */
-.qimg-field { border: 1px solid var(--border); padding: 10px 12px; min-height: 52px; }
-.qimg-uploading { font-family: var(--font-mono); font-size: 0.68rem; color: var(--gray); display: flex; align-items: center; gap: 6px; }
-.qimg-preview-wrap { display: flex; flex-direction: column; gap: 8px; }
-.qimg-preview { max-width: 100%; max-height: 160px; object-fit: contain; border: 1px solid var(--border); }
-.qimg-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.qimg-status { font-family: var(--font-mono); font-size: 0.62rem; color: var(--gray); }
-.qimg-reupload-btn { font-size: 0.65rem !important; padding: 4px 10px !important; }
-.qimg-empty { font-family: var(--font-sans); font-size: 0.72rem; color: var(--gray); }
-.brd-qimg { max-width: 100%; max-height: 160px; object-fit: contain; border: 1px solid var(--border); }
-
-/* ── Cropper modal ────────────────────────────────────────── */
-.cropper-overlay {
-  position: fixed; inset: 0; z-index: 9999;
-  background: rgba(0,0,0,0.85);
-  display: flex; align-items: center; justify-content: center; padding: 20px;
-}
-.cropper-modal {
-  background: var(--bg-panel); border: 1px solid var(--border);
-  width: 100%; max-width: 780px;
-  display: flex; flex-direction: column; max-height: 90vh;
-}
-.cropper-head {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 16px; border-bottom: 1px solid var(--border);
-}
-.cropper-body { flex: 1; overflow: hidden; padding: 12px; background: #111; }
-.cropper-body img { max-height: 60vh; }
 </style>
