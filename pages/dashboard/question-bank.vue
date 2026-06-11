@@ -455,6 +455,7 @@ const session = useSupabaseSession()
 
 const config = useRuntimeConfig()
 
+const { data: profile } = await supabase.from('profiles').select('primary_stream').single()
 const bookmarkedQuestions = ref<{ id: number; question: any }[]>([])
 
 //async function fetchBookmarks() {
@@ -528,7 +529,22 @@ let selectedLang = computed(() => isBn.value ? 'bangla' : 'english')
 // ── Constants ──────────────────────────────────────────────
 const optLetters = ['A', 'B', 'C', 'D', 'E']
 
-const examStreams = ['All', 'HSC Science', 'HSC Arts', 'HSC Commerce', 'SSC', 'BUET', 'Medical', 'DU', 'BCS', 'Bank']
+//const examStreams = ['All', 'HSC Science', 'HSC Arts', 'HSC Commerce', 'SSC', 'BUET', 'Medical', 'DU', 'BCS', 'Bank']
+let stream_sets = []
+
+if (profile?.primary_stream.startsWith('HSC')) {
+  stream_sets = ['HSC Science', 'HSC Arts', 'HSC Commerce', 'BUET', 'Medical', 'DU']
+} else if (profile?.primary_stream.startsWith('SSC')) {
+  stream_sets = ['SSC Science', 'SSC Arts', 'SSC Commerce']
+} else if (profile?.primary_stream.startsWith('Admission')) {
+  stream_sets = ['BUET', 'Medical', 'DU']
+} else if (profile?.primary_stream == 'Jobs') {
+  stream_sets = ['BCS', 'Bank']
+} else {
+  stream_sets = ['HSC Science', 'HSC Arts', 'HSC Commerce', 'SSC Science', 'SSC Arts', 'SSC Commerce', 'BUET', 'Medical', 'DU', 'BCS', 'Bank']
+}
+
+const examStreams = stream_sets
 
 const subjectMap = computed<Record<string, string[]>>(
   () => tm('qBank.subjectMap') as Record<string, string[]>
@@ -556,9 +572,23 @@ const bankStats = [
 ]
 
 // ── State ──────────────────────────────────────────────────
+let streamConfig = ''
+
+if (profile?.primary_stream.startsWith('HSC')) {
+  streamConfig = 'HSC Science'
+} else if (profile?.primary_stream.startsWith('SSC')) {
+  streamConfig = 'SSC Science'
+} else if (profile?.primary_stream.startsWith('Admission')) {
+  streamConfig = 'BUET'
+} else if (profile?.primary_stream == 'Jobs') {
+  streamConfig = 'BCS'
+} else {
+  streamConfig = 'HSC Science'
+}
+
 const loading = ref(true)
 const searchQuery = ref('')
-const selectedExam = ref('HSC Science')
+const selectedExam = ref(streamConfig)
 const selectedSubject = ref('All')
 const selectedDiff = ref('all')
 const selectedChapter = ref('')

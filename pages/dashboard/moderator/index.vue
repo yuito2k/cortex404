@@ -2,7 +2,12 @@
 definePageMeta({ middleware: 'auth', layout: 'admin' })
 // Guard: profile.role must be 'moderator' or 'admin'
 const { data: profile } = await useSupabaseClient().from('profiles').select('role').single()
-if (profile?.role !== 'admin' || profile?.role !== 'moderator') navigateTo('/dashboard')
+if (profile?.role === 'admin' || profile?.role === 'moderator') { 
+  let x = true
+}
+else { 
+  navigateTo('/dashboard') 
+}
 
 const supabase = useSupabaseClient()
 const { data: { user } } = await supabase.auth.getUser()

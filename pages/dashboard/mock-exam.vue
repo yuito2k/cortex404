@@ -86,7 +86,7 @@
                 class="filter-pill"
                 :class="{ active: config.chapter === ch }"
                 @click="config.chapter = ch"
-              >{{ ch }}</button>
+              ><span v-if="ch.name">{{ ch.name }}</span><span v-else>{{ ch }}</span></button>
             </div>
           </div>
 
@@ -702,6 +702,8 @@ definePageMeta({ middleware: 'auth', layout: 'dashboard' })
 const supabase = useSupabaseClient()
 const session = useSupabaseSession()
 
+const { data: profile } = await supabase.from('profiles').select('primary_stream').single()
+
 // ─── Toast ────────────────────────────────────────────────────
 const toast = reactive({ show: false, msg: '', type: 'success' })
 function showToast(msg, type = 'success') {
@@ -788,19 +790,81 @@ let selectedLang = computed(() => isBn.value ? 'bangla' : 'english')
 
 // ── Constants ──────────────────────────────────────────────
 const optLetters = ['A', 'B', 'C', 'D', 'E']
+let examStreams = []
 
-const examStreams = [
-  { id: 'HSC Science', name: 'HSC Science', desc: 'Higher Secondary Science', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>` },
-  { id: 'HSC Arts', name: 'HSC Arts', desc: 'Higher Secondary Arts', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>` },
-  { id: 'HSC Commerce', name: 'HSC Commerce', desc: 'Higher Secondary Commerce', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>` },
-  { id: 'SSC Science', name: 'SSC Science', desc: 'Secondary Certificate Science', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>` },
-  { id: 'SSC Arts', name: 'SSC Arts', desc: 'Secondary Certificate Arts', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>` },
-  { id: 'SSC Commerce', name: 'SSC Commerce', desc: 'Secondary Certificate Commerce', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>` },
-  { id: 'BUET', name: 'BUET', desc: 'Engineering Admission', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>` },
-  { id: 'Medical', name: 'Medical', desc: 'MBBS Admission', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>` },
-  { id: 'BCS', name: 'BCS', desc: 'Civil Service Exam', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>` },
-  //{ id: 'Bank', name: 'Bank', desc: 'Bank & Govt Jobs', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` },
+if (profile?.primary_stream.startsWith('HSC')) {
+  examStreams = [
+    { id: 'HSC Science', name: 'HSC Science', desc: 'Higher Secondary Science', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><circle cx="12" cy="12" r="3"/><path d="M12 2v3"/><path d="M12 19v3"/><path d="M2 12h3"/><path d="M19 12h3"/><path d="M5.6 5.6l2.1 2.1"/><path d="M16.3 16.3l2.1 2.1"/><path d="M5.6 18.4l2.1-2.1"/><path d="M16.3 7.7l2.1-2.1"/></svg>` },
+    { id: 'HSC Arts', name: 'HSC Arts', desc: 'Higher Secondary Arts', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><circle cx="12" cy="12" r="9"/><path d="M12 3c-2 4-2 14 0 18"/><path d="M3 12c4-2 14-2 18 0"/><path d="M5 6.5c3 1 11 1 14 0"/><path d="M5 17.5c3-1 11-1 14 0"/></svg>` },
+    { id: 'HSC Commerce', name: 'HSC Commerce', desc: 'Higher Secondary Commerce', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 8h2v5H7z"/><path d="M11 6h2v7h-2z"/><path d="M15 10h2v3h-2z"/></svg>` },
+    { id: 'BUET', name: 'BUET', desc: 'Engineering Admission', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>` },
+    { id: 'Medical', name: 'Medical', desc: 'MBBS Admission', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>` },
+    { id: 'DU', name: 'DU', desc: 'DU Admission', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-4a3 3 0 0 1 6 0v4"/><rect x="9" y="9" width="2" height="2"/><rect x="13" y="9" width="2" height="2"/></svg>` },
+  ]
+} else if (profile?.primary_stream.startsWith('SSC')) {
+  examStreams = [
+    { id: 'SSC Science', name: 'SSC Science', desc: 'Secondary Certificate Science', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M9 3h6"/><path d="M10 3v6l-5 9a1 1 0 0 0 .9 1.5h12.2a1 1 0 0 0 .9-1.5L14 9V3"/><path d="M8.5 16h7"/></svg>` },
+    { id: 'SSC Arts', name: 'SSC Arts', desc: 'Secondary Certificate Arts', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><circle cx="12" cy="12" r="9"/><path d="M12 3c-2 4-2 14 0 18"/><path d="M3 12c4-2 14-2 18 0"/><path d="M5 6.5c3 1 11 1 14 0"/><path d="M5 17.5c3-1 11-1 14 0"/></svg>` },
+    { id: 'SSC Commerce', name: 'SSC Commerce', desc: 'Secondary Certificate Commerce', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 8h2v5H7z"/><path d="M11 6h2v7h-2z"/><path d="M15 10h2v3h-2z"/></svg>` },
+  ]
+} else if (profile?.primary_stream.startsWith('Admission')) {
+  examStreams = [
+    { id: 'BUET', name: 'BUET', desc: 'Engineering Admission', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>` },
+    { id: 'Medical', name: 'Medical', desc: 'MBBS Admission', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>` },
+    { id: 'DU', name: 'DU', desc: 'DU Admission', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-4a3 3 0 0 1 6 0v4"/><rect x="9" y="9" width="2" height="2"/><rect x="13" y="9" width="2" height="2"/></svg>` },
+  ]
+} else if (profile?.primary_stream === 'Jobs') {
+  examStreams = [
+    { id: 'BCS', name: 'BCS', desc: 'Civil Service Exam', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>` },
+    { id: 'Bank', name: 'Bank', desc: 'Bank & Govt Jobs', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` },
+    { id: 'NTRCA', name: 'NTRCA', desc: 'Teacher Registration', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="2" y="3" width="20" height="14" rx="1"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 7h10"/><path d="M7 11h6"/></svg>` },
+    { id: 'PSC', name: 'PSC', desc: 'Primary School Recruitment', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M12 3L2 9l10 6 10-6-10-6z"/><path d="M2 9v6"/><path d="M22 9v6"/><path d="M6 11.5v5l6 3 6-3v-5"/></svg>` },
+    { id: 'POLICE', name: 'Police', desc: 'Police Recruitment', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M12 2l2 4h5l-4 3 1.5 5L12 11l-4.5 3L9 9 5 6h5z"/><path d="M12 11v9"/><path d="M9 17h6"/></svg>` },
+    { id: 'ARMY', name: 'Army/Defence', desc: 'Defence Recruitment', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M12 2l3 6h6l-5 4 2 6-6-4-6 4 2-6-5-4h6z"/></svg>` },
+    { id: 'NAVY', name: 'Navy', desc: 'Navy Recruitment', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M3 17l9-14 9 14"/><path d="M3 17c0 0 4 2 9 2s9-2 9-2"/><path d="M12 3v14"/><path d="M7 10h10"/></svg>` },
+    { id: 'AIRFORCE', name: 'Air Force', desc: 'Air Force Recruitment', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M2 12c0 0 4-7 10-7s10 7 10 7"/><path d="M5 12l-3 4h6l4-4"/><path d="M19 12l3 4h-6l-4-4"/><circle cx="12" cy="12" r="2"/></svg>` },
+    { id: 'FIRE', name: 'Fire Service', desc: 'Fire Service & Civil Defence', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M12 2c0 4-4 5-4 9a4 4 0 0 0 8 0c0-4-4-5-4-9z"/><path d="M12 12c0 2-2 2.5-2 4.5a2 2 0 0 0 4 0c0-2-2-2.5-2-4.5z"/></svg>` },
+    { id: 'CUSTOMS', name: 'Customs/Tax', desc: 'Customs & Tax Cadre', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M7 15h2"/><path d="M11 15h6"/></svg>` },
+    { id: 'RAILWAY', name: 'Railway', desc: 'Railway Job', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="6" y="2" width="12" height="17" rx="2"/><path d="M6 8h12"/><path d="M6 13h12"/><circle cx="9" cy="17" r="1"/><circle cx="15" cy="17" r="1"/><path d="M4 21l2-2"/><path d="M20 21l-2-2"/></svg>` },
+    { id: 'TELETALK', name: 'Govt Job', desc: 'General Govt Recruitment', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h10"/><rect x="2" y="3" width="20" height="18" rx="2"/></svg>` },
+  ]
+} else {
+  examStreams = [
+    { id: 'HSC Science', name: 'HSC Science', desc: 'Higher Secondary Science', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><circle cx="12" cy="12" r="3"/><path d="M12 2v3"/><path d="M12 19v3"/><path d="M2 12h3"/><path d="M19 12h3"/><path d="M5.6 5.6l2.1 2.1"/><path d="M16.3 16.3l2.1 2.1"/><path d="M5.6 18.4l2.1-2.1"/><path d="M16.3 7.7l2.1-2.1"/></svg>` },
+    { id: 'HSC Arts', name: 'HSC Arts', desc: 'Higher Secondary Arts', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><circle cx="12" cy="12" r="9"/><path d="M12 3c-2 4-2 14 0 18"/><path d="M3 12c4-2 14-2 18 0"/><path d="M5 6.5c3 1 11 1 14 0"/><path d="M5 17.5c3-1 11-1 14 0"/></svg>` },
+    { id: 'HSC Commerce', name: 'HSC Commerce', desc: 'Higher Secondary Commerce', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 8h2v5H7z"/><path d="M11 6h2v7h-2z"/><path d="M15 10h2v3h-2z"/></svg>` },
+    { id: 'SSC Science', name: 'SSC Science', desc: 'Secondary Certificate Science', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M9 3h6"/><path d="M10 3v6l-5 9a1 1 0 0 0 .9 1.5h12.2a1 1 0 0 0 .9-1.5L14 9V3"/><path d="M8.5 16h7"/></svg>` },
+    { id: 'SSC Arts', name: 'SSC Arts', desc: 'Secondary Certificate Arts', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><circle cx="12" cy="12" r="9"/><path d="M12 3c-2 4-2 14 0 18"/><path d="M3 12c4-2 14-2 18 0"/><path d="M5 6.5c3 1 11 1 14 0"/><path d="M5 17.5c3-1 11-1 14 0"/></svg>` },
+    { id: 'SSC Commerce', name: 'SSC Commerce', desc: 'Secondary Certificate Commerce', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 8h2v5H7z"/><path d="M11 6h2v7h-2z"/><path d="M15 10h2v3h-2z"/></svg>` },
+    { id: 'BUET', name: 'BUET', desc: 'Engineering Admission', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>` },
+    { id: 'Medical', name: 'Medical', desc: 'MBBS Admission', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>` },
+    { id: 'DU', name: 'DU', desc: 'DU Admission', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-4a3 3 0 0 1 6 0v4"/><rect x="9" y="9" width="2" height="2"/><rect x="13" y="9" width="2" height="2"/></svg>` },
+    { id: 'BCS', name: 'BCS', desc: 'Civil Service Exam', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>` },
+    { id: 'Bank', name: 'Bank', desc: 'Bank & Govt Jobs', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` },
+    { id: 'NTRCA', name: 'NTRCA', desc: 'Teacher Registration', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="2" y="3" width="20" height="14" rx="1"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 7h10"/><path d="M7 11h6"/></svg>` },
+    { id: 'PSC', name: 'PSC', desc: 'Primary School Recruitment', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M12 3L2 9l10 6 10-6-10-6z"/><path d="M2 9v6"/><path d="M22 9v6"/><path d="M6 11.5v5l6 3 6-3v-5"/></svg>` },
+    { id: 'POLICE', name: 'Police', desc: 'Police Recruitment', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M12 2l2 4h5l-4 3 1.5 5L12 11l-4.5 3L9 9 5 6h5z"/><path d="M12 11v9"/><path d="M9 17h6"/></svg>` },
+    { id: 'ARMY', name: 'Army/Defence', desc: 'Defence Recruitment', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M12 2l3 6h6l-5 4 2 6-6-4-6 4 2-6-5-4h6z"/></svg>` },
+    { id: 'NAVY', name: 'Navy', desc: 'Navy Recruitment', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M3 17l9-14 9 14"/><path d="M3 17c0 0 4 2 9 2s9-2 9-2"/><path d="M12 3v14"/><path d="M7 10h10"/></svg>` },
+    { id: 'AIRFORCE', name: 'Air Force', desc: 'Air Force Recruitment', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M2 12c0 0 4-7 10-7s10 7 10 7"/><path d="M5 12l-3 4h6l4-4"/><path d="M19 12l3 4h-6l-4-4"/><circle cx="12" cy="12" r="2"/></svg>` },
+    { id: 'FIRE', name: 'Fire Service', desc: 'Fire Service & Civil Defence', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M12 2c0 4-4 5-4 9a4 4 0 0 0 8 0c0-4-4-5-4-9z"/><path d="M12 12c0 2-2 2.5-2 4.5a2 2 0 0 0 4 0c0-2-2-2.5-2-4.5z"/></svg>` },
+    { id: 'CUSTOMS', name: 'Customs/Tax', desc: 'Customs & Tax Cadre', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M7 15h2"/><path d="M11 15h6"/></svg>` },
+    { id: 'RAILWAY', name: 'Railway', desc: 'Railway Job', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="6" y="2" width="12" height="17" rx="2"/><path d="M6 8h12"/><path d="M6 13h12"/><circle cx="9" cy="17" r="1"/><circle cx="15" cy="17" r="1"/><path d="M4 21l2-2"/><path d="M20 21l-2-2"/></svg>` },
+    { id: 'TELETALK', name: 'Govt Job', desc: 'General Govt Recruitment', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h10"/><rect x="2" y="3" width="20" height="18" rx="2"/></svg>` },
 ]
+}
+//const examStreams = [
+//  { id: 'HSC Science', name: 'HSC Science', desc: 'Higher Secondary Science', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>` },
+//  { id: 'HSC Arts', name: 'HSC Arts', desc: 'Higher Secondary Arts', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>` },
+//  { id: 'HSC Commerce', name: 'HSC Commerce', desc: 'Higher Secondary Commerce', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>` },
+//  { id: 'SSC Science', name: 'SSC Science', desc: 'Secondary Certificate Science', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>` },
+//  { id: 'SSC Arts', name: 'SSC Arts', desc: 'Secondary Certificate Arts', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>` },
+//  { id: 'SSC Commerce', name: 'SSC Commerce', desc: 'Secondary Certificate Commerce', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>` },
+//  { id: 'BUET', name: 'BUET', desc: 'Engineering Admission', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>` },
+//  { id: 'Medical', name: 'Medical', desc: 'MBBS Admission', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>` },
+//  { id: 'BCS', name: 'BCS', desc: 'Civil Service Exam', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>` },
+//  //{ id: 'Bank', name: 'Bank', desc: 'Bank & Govt Jobs', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` },
+//]
 
 const subjectMap: Record<string, string[]> = {
   "HSC Science":     ['All', 'Physics', 'Chemistry', 'Math', 'Biology', 'English', 'ICT'],
@@ -900,8 +964,22 @@ const questionLoadError = ref('')
 // ── State ──────────────────────────────────────────────────
 const phase = ref<'setup' | 'exam' | 'results'>('setup')
 
+let streamConfig = ''
+
+if (profile?.primary_stream.startsWith('HSC')) {
+  streamConfig = 'HSC Science'
+} else if (profile?.primary_stream.startsWith('SSC')) {
+  streamConfig = 'SSC Science'
+} else if (profile?.primary_stream.startsWith('Admission')) {
+  streamConfig = 'BUET'
+} else if (profile?.primary_stream === 'Jobs') {
+  streamConfig = 'BCS'
+} else {
+  streamConfig = 'HSC Science'
+}
+
 const config = reactive({
-  stream: 'HSC Science',
+  stream: streamConfig,
   subject: 'All',
   chapter: 'All',
   count: 20,
@@ -1684,6 +1762,12 @@ onUnmounted(() => { stopTimer(); observer?.disconnect() })
 .result-score.high { color: rgba(120,230,120,0.9); }
 .result-score.mid  { color: rgba(255,200,80,0.9); }
 .result-score.low  { color: rgba(255,100,100,0.8); }
+
+.result-empty {
+  padding: 0.7rem 1.2rem;
+  font-size: 0.7rem;
+  color: var(--gray);
+}
 
 .rules-list { display: flex; flex-direction: column; }
 .rule-row {

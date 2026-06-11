@@ -247,7 +247,7 @@ const levels = [
   { value: 'HSC',        label: 'HSC' },
   { value: 'University', label: 'University Admission' },
   { value: 'BCS',        label: 'BCS' },
-  { value: 'Bank',       label: 'Bank / Govt Job' },
+  { value: 'Jobs',       label: 'Bank / Govt Job' },
   { value: 'Other',      label: 'Other' },
 ]
 

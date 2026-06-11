@@ -27,7 +27,7 @@ create table if not exists public.profiles (
 
   -- Admin panel fields (index.vue Users tab)
   role             text not null default 'user'     check (role   in ('user','moderator','admin')),
-  status           text not null default 'unverified'   check (status in ('active','banned','unverified')),
+  status           text not null default 'unverified'   check (status in ('verified','banned','unverified')),
 
   -- Academic context (settings.vue profile tab)
   primary_stream   text default 'HSC Science',            -- HSC | SSC | BUET | Medical | BCS | Bank
