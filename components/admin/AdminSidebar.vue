@@ -49,6 +49,13 @@
       </NuxtLink>
     </nav>
 
+    <div class="sidebar-lang">
+        <span class="user-name">
+          {{ isBn ? 'ভাষা' : 'LANG' }}
+        </span>
+        <LangToggle />
+    </div>
+
     <!-- User -->
     <div class="sidebar-user">
       <div class="user-avatar">{{ userInitials }}</div>
@@ -67,6 +74,8 @@
 <script setup lang="ts">
 defineProps<{ collapsed: boolean; activeTab: string; mobileOpen?: boolean }>()
 defineEmits(['toggle', 'tab'])
+
+const { isBn } = useI18n()
 
 const { user, signOut } = useAuth()
 const userName = computed(() => user.value?.user_metadata?.full_name ?? 'Admin')
@@ -267,5 +276,14 @@ const navItems = [
   .admin-sidebar.mobile-open .user-info     { display: flex !important; }
   .admin-sidebar.mobile-open .signout-btn   { display: flex !important; }
   .collapse-btn { display: none; }
+}
+
+.sidebar-lang {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-left: 20px;
+  margin-right: 20px;
+  margin-bottom: 10px;
 }
 </style>

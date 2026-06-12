@@ -13,12 +13,12 @@
         </p>
       </div>
       <div class="welcome-right">
-        <a href="/dashboard/mock-exam" class="iso-btn iso-btn--fill">
+        <NuxtLink to="/dashboard/mock-exam" class="iso-btn iso-btn--fill">
           Start Today's Exam →
-        </a>
-        <a href="/dashboard/question-bank" class="iso-btn iso-btn--ghost">
+        </NuxtLink>
+        <NuxtLink to="/dashboard/question-bank" class="iso-btn iso-btn--ghost">
           Browse Questions
-        </a>
+        </NuxtLink>
       </div>
     </div>
 
