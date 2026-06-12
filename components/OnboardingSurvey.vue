@@ -373,7 +373,7 @@ function validateStep(step: number): boolean {
   if (step === 1) {
     if (!form.level) { errors.level = 'Please select your level.'; return false }
     if (showStreamPicker.value && !form.stream) { errors.stream = 'Please select your stream.'; return false }
-    if (admission_category.value && !form.admission_cat) { errors.admission_cat = 'Please select your admission category.'; return false }
+    if (showAdmissionCategory.value && !form.admission_cat) { errors.admission_cat = 'Please select your admission category.'; return false }
   }
   if (step === 2) {
     if (!form.district) { errors.district = 'Please select or type your district.'; return false }
@@ -456,7 +456,7 @@ async function submitSurvey() {
         //full_name:    form.fullName.trim(),
         //display_name: form.displayName.trim(),
         //bio:          form.bio,
-        stream:       finalStream,
+        stream:       primaryStream,
         institution:  form.institution.trim() || null,
         district:     form.district,
         heard_from:   heardFromFinal,

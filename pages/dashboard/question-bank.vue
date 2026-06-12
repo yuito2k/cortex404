@@ -533,7 +533,7 @@ const optLetters = ['A', 'B', 'C', 'D', 'E']
 let stream_sets = []
 
 if (profile?.primary_stream.startsWith('HSC')) {
-  stream_sets = ['HSC Science', 'HSC Arts', 'HSC Commerce', 'BUET', 'Medical', 'DU']
+  stream_sets = ['HSC Science', 'HSC Arts', 'HSC Commerce']
 } else if (profile?.primary_stream.startsWith('SSC')) {
   stream_sets = ['SSC Science', 'SSC Arts', 'SSC Commerce']
 } else if (profile?.primary_stream.startsWith('Engineering')) {
