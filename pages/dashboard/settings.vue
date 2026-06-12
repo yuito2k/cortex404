@@ -145,6 +145,23 @@
               </div>
             </div>
 
+            <!-- Heard From -->
+            <!--<div class="form-group">
+              <label class="form-label">Heard From</label>
+              <div class="select-wrap">
+                <select v-model="profile.heard_from" class="form-input form-select">
+                  <option value="">Select heard from</option>
+                  <option v-for="h in heardFrom" :key="h" :value="h">{{ h }}</option>
+                </select>
+                <span class="select-arrow">▾</span>
+              </div>
+            </div>-->
+
+            <div class="form-group">
+              <label class="form-label">Heard From <span class="optional">(optional)</span></label>
+              <input v-model="profile.heard_from" class="form-input" placeholder="Type here" />
+            </div>
+
             <div class="form-actions">
               <button
                 class="iso-btn iso-btn--fill"
@@ -634,6 +651,11 @@ const supabase = useSupabaseClient()
 // ── User info ──────────────────────────────────────────────
 const userEmail = computed(() => user.value?.email ?? '')
 const userName  = computed(() => user.value?.user_metadata?.full_name ?? '')
+const stream = computed(() => user.value?.user_metadata?.stream ?? '')
+const bio = computed(() => user.value?.user_metadata?.bio ?? '')
+const institution = computed(() => user.value?.user_metadata?.institution ?? '')
+const district = computed(() => user.value?.user_metadata?.district ?? '')
+const heard_from = computed(() =>user.value?.user_metadata?.heard_from ?? '')
 const userInitials = computed(() =>
   userName.value.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'ME'
 )
@@ -655,13 +677,17 @@ const tabs = [
 const profile = reactive({
   fullName:    userName.value,
   displayName: userName.value.split(' ')[0] ?? '',
-  bio:         '',
-  stream:      'HSC',
-  institution: '',
-  district:    '',
+  bio:         bio.value,
+  stream:      stream.value,
+  institution: institution.value,
+  district:    district.value,
+  heard_from:  heard_from.value,
 })
 
-const examStreams = ['HSC', 'SSC', 'BUET', 'Medical', 'DU', 'BCS', 'Bank']
+const heardFrom = [
+  'Facebook', 'Friend / Family', 'Google Search', 'YouTube', 'Teacher', 'X / Twitter',
+]
+const examStreams = ['HSC Science', 'HSC Arts', 'HSC Commerce', 'SSC Science', 'SSC Arts', 'SSC Commerce', 'Admission Science', 'Admission Arts', 'Admission Commerce', 'Jobs', 'Others']
 
 const districts = [
   'Dhaka','Chittagong','Rajshahi','Khulna','Barisal','Sylhet','Rangpur','Mymensingh',
@@ -732,7 +758,7 @@ const inAppNotifs = [
 
 // ── Exam prefs state ───────────────────────────────────────
 const examPrefs = reactive<Record<string, any>>({
-  stream:        'HSC',
+  stream:        'HSC Science',
   questionCount: 30,
   duration:      30,
   difficulty:    'Balanced',
@@ -808,6 +834,7 @@ async function saveProfile() {
         stream:       profile.stream,
         institution:  profile.institution,
         district:     profile.district,
+        heard_from:   profile.heard_from,
       }
     })
     if (error) throw error
