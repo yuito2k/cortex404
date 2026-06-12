@@ -159,7 +159,7 @@
 
             <div class="form-group">
               <label class="form-label">Heard From <span class="optional">(optional)</span></label>
-              <input v-model="profile.heard_from" class="form-input" placeholder="Type here" />
+              <input disabled v-model="profile.heard_from" class="form-input" placeholder="Type here" />
             </div>
 
             <div class="form-actions">

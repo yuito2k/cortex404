@@ -536,8 +536,12 @@ if (profile?.primary_stream.startsWith('HSC')) {
   stream_sets = ['HSC Science', 'HSC Arts', 'HSC Commerce', 'BUET', 'Medical', 'DU']
 } else if (profile?.primary_stream.startsWith('SSC')) {
   stream_sets = ['SSC Science', 'SSC Arts', 'SSC Commerce']
-} else if (profile?.primary_stream.startsWith('Admission')) {
-  stream_sets = ['BUET', 'Medical', 'DU']
+} else if (profile?.primary_stream.startsWith('Engineering')) {
+  stream_sets = ['BUET', 'KUET', 'RUET', 'CUET']
+} else if (profile?.primary_stream.startsWith('Varsity')) {
+  stream_sets = ['DU', 'Jnu', 'Ru', 'Cu', 'JU', 'KU']
+} else if (profile?.primary_stream.startsWith('Medical')) {
+  stream_sets = ['Medical', 'Dental', 'AFMC']
 } else if (profile?.primary_stream == 'Jobs') {
   stream_sets = ['BCS', 'Bank']
 } else {
@@ -578,8 +582,12 @@ if (profile?.primary_stream.startsWith('HSC')) {
   streamConfig = 'HSC Science'
 } else if (profile?.primary_stream.startsWith('SSC')) {
   streamConfig = 'SSC Science'
-} else if (profile?.primary_stream.startsWith('Admission')) {
+} else if (profile?.primary_stream.startsWith('Engineering')) {
   streamConfig = 'BUET'
+} else if (profile?.primary_stream.startsWith('Varsity')) {
+  streamConfig = 'DU'
+} else if (profile?.primary_stream.startsWith('Medical')) {
+  streamConfig = 'Medical'
 } else if (profile?.primary_stream == 'Jobs') {
   streamConfig = 'BCS'
 } else {

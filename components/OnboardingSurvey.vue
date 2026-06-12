@@ -51,6 +51,21 @@
               </div>
 
               <!-- Stream (only show if relevant) -->
+              <div class="field-group" v-if="showAdmissionCategory">
+                <label class="field-label">YOUR ADMISSION CATEGORY</label>
+                <div class="pill-row">
+                  <button
+                    v-for="ac in admission_categories"
+                    :key="ac.value"
+                    class="survey-pill"
+                    :class="{ selected: form.admission_cat === ac.value }"
+                    @click="form.admission_cat = ac.value"
+                  >{{ ac.label }}</button>
+                </div>
+                <span v-if="errors.admission_cat" class="field-error">{{ errors.admission_cat }}</span>
+              </div>
+
+              <!-- Stream (only show if relevant) -->
               <div class="field-group" v-if="showStreamPicker">
                 <label class="field-label">YOUR STREAM</label>
                 <div class="pill-row">
@@ -208,6 +223,8 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+
 const supabase = useSupabaseClient()
 const user = useSupabaseUser()
 
@@ -235,6 +252,7 @@ const errors = reactive<Record<string, string>>({})
 const form = reactive({
   level: '',        // SSC | HSC | University | BCS | Bank | Other
   stream: '',       // Science | Arts | Commerce | General
+  admission_cat: '',// Engineering | Medical | Varsity | Other
   district: '',
   institution: '',
   heardFrom: '',
@@ -257,10 +275,34 @@ const streams = [
   { value: 'Commerce',  label: 'Commerce' },
 ]
 
+const admission_categories = [
+  { value: 'Engineering', label: 'Engineering Admission' },
+  { value: 'Medical', label: 'Medical Admission' },
+  { value: 'Varsity', label: 'Varsity Admission' },
+]
+
+//const admission_categories = [
+//  { value: 'Engineering', label: 'Engineering (BUET/CUET…)' },
+//  { value: 'Medical',     label: 'Medical (MBBS/BDS)' },
+//  { value: 'Varsity',     label: 'General University (DU/RU…)' },
+//]
+
+const showAdmissionCategory = computed(() => form.level === 'University')
+
 // Only show stream picker for levels where it's relevant
 const showStreamPicker = computed(() =>
-  ['SSC', 'HSC', 'University'].includes(form.level)
+  ['SSC', 'HSC'].includes(form.level) ||
+  (form.level === 'University' && form.admission_cat === 'Varsity')
 )
+
+watch(() => form.level, () => {
+  form.admission_cat = ''
+  form.stream = ''
+})
+
+watch(() => form.admission_cat, () => {
+  form.stream = ''
+})
 
 const heardFromOptions = [
   { value: 'facebook',  label: 'Facebook',      icon: '📘' },
@@ -331,6 +373,7 @@ function validateStep(step: number): boolean {
   if (step === 1) {
     if (!form.level) { errors.level = 'Please select your level.'; return false }
     if (showStreamPicker.value && !form.stream) { errors.stream = 'Please select your stream.'; return false }
+    if (admission_category.value && !form.admission_cat) { errors.admission_cat = 'Please select your admission category.'; return false }
   }
   if (step === 2) {
     if (!form.district) { errors.district = 'Please select or type your district.'; return false }
@@ -364,16 +407,34 @@ async function submitSurvey() {
     : form.heardFrom
 
   // Map level → primary_stream (existing column)
-  const primaryStream = form.level === 'University'
-    ? (form.stream === 'Science' || form.stream === 'Arts' || form.stream === 'Commerce' ? 'Admission' : form.level)
-    : form.level
+  //const primaryStream = form.level === 'University'
+  //  ? (form.stream === 'Science' || form.stream === 'Arts' || form.stream === 'Commerce' ? 'Admission' : form.level)
+  //  : form.level
 
-  const finalStream = form.stream ? primaryStream + ' ' + form.stream : primaryStream
+  //const finalStream = form.stream ? primaryStream + ' ' + form.stream : primaryStream
+
+  let primaryStream = form.level
+
+  if (form.level === 'University') {
+    if (form.admission_cat === 'Engineering') {
+      primaryStream = 'Engineering Admission'
+    } else if (form.admission_cat === 'Medical') {
+      primaryStream = 'Medical Admission'
+    } else if (form.admission_cat === 'Varsity') {
+      primaryStream = form.stream
+        ? `Varsity ${form.stream} Admission`
+        : 'Varsity Admission'
+    }
+  } else if (form.level === 'HSC' || form.level === 'SSC') {
+    primaryStream = form.stream
+      ? `${form.level} ${form.stream}`   // e.g. "HSC Science", "SSC Commerce"
+      : form.level
+  }
 
   const { error } = await supabase
     .from('profiles')
     .update({
-      primary_stream:       finalStream,
+      primary_stream:       primaryStream,
       institution:          form.institution.trim() || null,
       district:             form.district,
       onboarding_completed: true,
@@ -390,6 +451,18 @@ async function submitSurvey() {
     //  p_stream: primaryStream,
     //}).then(() => {}).catch(() => {})
     // ^ best-effort — don't block close if this fails
+    const { error } = await supabase.auth.updateUser({
+      data: {
+        //full_name:    form.fullName.trim(),
+        //display_name: form.displayName.trim(),
+        //bio:          form.bio,
+        stream:       finalStream,
+        institution:  form.institution.trim() || null,
+        district:     form.district,
+        heard_from:   heardFromFinal,
+      }
+    })
+    if (error) throw error
 
     visible.value = false
   } else {
