@@ -669,6 +669,8 @@ const queueFilter = ref('all')
 const queueStream = ref('All')
 const queueSearch = ref('')
 
+function toggleQueueExpand(q) { q.expanded = !q.expanded }
+
 //const reviewQueue = ref([
 //  { id:101, text:'What is the Krebs cycle?',                    stream:'Medical', subject:'Biology',   diff:'Medium', submittedBy:'Moderator A', status:'pending',  date:'2025-05-09' },
 //  { id:102, text:'Solve for x: 3x² + 5x - 2 = 0',             stream:'BUET',    subject:'Math',      diff:'Hard',   submittedBy:'Moderator B', status:'pending',  date:'2025-05-09' },
@@ -692,17 +694,33 @@ async function loadReviewQueue() {
     supabaseMedical.from('question_submissions').select('*').order('created_at', { ascending: false }),
   ])
   const rows = [...(hscRes.data ?? []), ...(medRes.data ?? [])]
+
+  // Collect unique submitter UUIDs and fetch their profiles in one query
+  const submitterIds = [...new Set(rows.map(r => r.submitted_by).filter(Boolean))]
+  let profileMap = {}
+  if (submitterIds.length) {
+    // profiles lives in one DB (use either client — it's a shared auth table)
+    const { data: profiles } = await useSupabaseClient()
+      .from('profiles')
+      .select('user_id, full_name, avatar_url')
+      .in('user_id', submitterIds)
+    ;(profiles ?? []).forEach(p => { profileMap[p.user_id] = p })
+  }
+
   reviewQueue.value = rows.map(r => ({
     ...r,
     id:          r.id,
-    text:        r.question?.english || r.question?.bangla || '',
+    text:        r.question?.english || '',
+    text_bn:     r.question?.bangla || '',
     stream:      r.stream,
     subj:        r.subject?.english  || r.subject?.bangla || '',
     diff:        r.difficulty?.english || r.difficulty_level || '',
-    submittedBy: r.submitted_by ?? 'unknown',
+    submittedBy: profileMap[r.submitted_by]?.full_name  ?? r.submitted_by ?? 'Unknown',
+    submitterAvatar:   profileMap[r.submitted_by]?.avatar_url ?? null,
     note:        r.admin_note  ?? '',
     status:      r.status,
     date:        r.created_at?.slice(0, 10) ?? '',
+    expanded:    false,   // for the expand feature below
   }))
   queueLoading.value = false
 }
@@ -1385,7 +1403,8 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
           <h3>No pending questions</h3>
           <p>Everything is clean. Take a break.</p>
         </div>-->
-        <div class="queue-cards">
+
+        <!-- <div class="queue-cards">
           <div class="queue-card" v-for="q in filteredReviewQueue" :key="q.id" :class="'qcard-'+q.status">
             <div class="qcard-top">
               <div class="qcard-meta">
@@ -1410,6 +1429,126 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                 <span class="status-badge" :class="q.status">{{ q.status }}</span>
               </div>
             </div>
+          </div>
+          <div v-if="!filteredReviewQueue.length" class="empty-panel">No questions match this filter.</div>
+        </div> -->
+
+        <div class="queue-cards">
+          <div class="queue-card" v-for="q in filteredReviewQueue" :key="q.id" :class="'qcard-'+q.status">
+          
+            <!-- TOP ROW: tags + status badge -->
+            <div class="qcard-top">
+              <div class="qcard-meta">
+                <span class="stream-tag">{{ q.stream }}</span>
+                <span class="mono dim">{{ q.subj }}</span>
+                <span class="diff-badge" :class="diffClass(q.diff)">{{ q.diff }}</span>
+                <span v-if="q.status==='fixed'" class="fixed-tag">✎ Mod-Fixed</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <!-- <span class="status-badge" :class="q.status==='fixed'?'pending':q.status">
+                  {{ q.status === 'fixed' ? 'pending (fixed)' : q.status }}
+                </span>  -->
+                <span class="iso-btn iso-btn--ghost" style="font-size:0.65rem;padding:3px 8px" >
+                  {{ q.status === 'fixed' ? 'pending (fixed)' : q.status }}
+                </span>
+                <!-- Expand toggle -->
+                <button class="iso-btn iso-btn--ghost" style="font-size:0.65rem;padding:3px 8px" @click="toggleQueueExpand(q)">
+                  {{ q.expanded ? '▲ Collapse' : '▼ Details' }}
+                </button>
+              </div>
+            </div>
+          
+            <!-- QUESTION TEXT -->
+            <p class="qcard-text"><span v-if="q.expanded">EN:</span> {{ q.text }}</p>
+            <p v-if="q.expanded" class="qcard-text">BN: {{ q.text_bn }}</p>
+          
+            <!-- EXPANDED DETAILS -->
+            <div v-if="q.expanded" class="qcard-details">
+              <!-- Stimulus -->
+              <div v-if="q.stimulus?.bangla || q.stimulus?.english" class="qd-section">
+                <span class="qd-label">STIMULUS</span>
+                <p class="qd-text">EN: {{ q.stimulus?.english }}</p>
+                <p class="qd-text">BN: {{ q.stimulus?.bangla }}</p>
+                <img v-if="q.stimulus_image" :src="q.stimulus_image" class="qd-img" />
+              </div>
+            
+              <!-- Options -->
+              <div class="qd-section">
+                <span class="qd-label">OPTIONS</span>
+                <div class="qd-options">
+                  <div
+                    v-for="(opt, i) in (q.options?.english || q.options?.bangla || [])"
+                    :key="i"
+                    class="qd-option"
+                    :class="{ 'qd-option--correct': i === q.correct_index }"
+                  >
+                    <span class="qd-opt-letter">{{ ['A','B','C','D'][i] }}.</span>
+                    {{ opt }} / {{ q.options?.bangla[i] }}
+                    <span v-if="i === q.correct_index" style="margin-left:6px;color:rgba(120,230,120,0.9)">✓</span>
+                  </div>
+                </div>
+              </div>
+            
+              <!-- Explanation -->
+              <div v-if="q.explanation?.bangla || q.explanation?.english" class="qd-section">
+                <span class="qd-label">EXPLANATION</span>
+                <p class="qd-text">EN: {{ q.explanation?.english }}</p>
+                <p class="qd-text">BN: {{ q.explanation?.bangla }}</p>
+              </div>
+            
+              <!-- Question image -->
+              <div v-if="q.question_image" class="qd-section">
+                <span class="qd-label">QUESTION IMAGE</span>
+                <img :src="q.question_image" class="qd-img" />
+              </div>
+            
+              <!-- Metadata row -->
+              <div class="qd-meta-row">
+                <span v-if="q.chapter?.english">
+                  Chapter: {{ q.chapter?.english }}
+                </span>
+                <span v-if="q.years">Year: {{ Array.isArray(q.years) ? q.years.map(y=>y.english||y).join(', ') : q.years }}</span>
+                <span v-if="q.source?.english">Source: {{ q.source.english.join(', ') }}</span>
+                <!-- <span>Correct index: {{ q.correct_index }}</span> -->
+              </div>
+              <div class="qd-meta-row">
+                <span v-if="q.chapter?.bangla">
+                  Chapter: {{ q.chapter?.bangla }}
+                </span>
+                <span v-if="q.years">Year: {{ Array.isArray(q.years) ? q.years.map(y=>y.bangla||y).join(', ') : q.years }}</span>
+                <span v-if="q.source?.bangla">Source: {{ q.source.bangla.join(', ') }}</span>
+                <!-- <span>Correct index: {{ q.correct_index }}</span> -->
+              </div>
+              <br>
+            </div>
+          
+            <!-- FOOTER: submitter + actions -->
+            <div class="qcard-footer">
+              <!-- ↓ CHANGED: avatar + full name instead of bare UUID -->
+              <div class="qcard-submitter">
+                <span class="qcard-by mono dim">Submitted by:</span>
+                <img
+                  v-if="q.submitterAvatar"
+                  :src="q.submitterAvatar"
+                  class="qcard-avatar"
+                  :alt="q.submittedBy"
+                />
+                <span v-else class="qcard-avatar qcard-avatar--fallback">
+                  {{ q.submittedBy?.charAt(0)?.toUpperCase() ?? '?' }}
+                </span>
+                <span class="qcard-by mono dim">{{ q.submittedBy }} · {{ q.date }}</span>
+              </div>
+            
+              <span v-if="q.note" class="qcard-note">Note: {{ q.note }}</span>
+              <div class="qcard-actions" v-if="q.status==='pending'||q.status==='fixed'">
+                <button class="iso-btn iso-btn--ghost qact-btn approve-btn" @click="adminApproveQ(q)">✓ Approve & Publish</button>
+                <button class="iso-btn iso-btn--ghost qact-btn reject-btn"  @click="openModal('adminRejectQ', q)">✕ Reject</button>
+              </div>
+              <div v-else class="qcard-done">
+                <span class="status-badge" :class="q.status">{{ q.status }}</span>
+              </div>
+            </div>
+          
           </div>
           <div v-if="!filteredReviewQueue.length" class="empty-panel">No questions match this filter.</div>
         </div>
@@ -2946,6 +3085,55 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
 .stimulus-auto-filled {
   font-family: var(--font-mono); font-size: 0.58rem;
   color: rgba(120, 230, 120, 0.8); letter-spacing: 0.05em;
+}
+
+/* Submitter row */
+.qcard-submitter {
+  display: flex; align-items: center; gap: 8px; flex: 1;
+}
+.qcard-avatar {
+  width: 24px; height: 24px; border-radius: 50%;
+  object-fit: cover; border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.qcard-avatar--fallback {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(240,240,234,0.08);
+  font-family: var(--font-mono); font-size: 0.65rem; color: var(--white);
+}
+
+/* Expanded detail panel */
+.qcard-details {
+  border-top: 1px solid var(--border);
+  margin-top: 10px; padding-top: 12px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.qd-section { display: flex; flex-direction: column; gap: 4px; }
+.qd-label {
+  font-family: var(--font-mono); font-size: 0.56rem;
+  letter-spacing: 0.12em; color: var(--gray);
+}
+.qd-text {
+  font-family: var(--font-sans); font-size: 0.8rem;
+  color: var(--white); line-height: 1.5;
+}
+.qd-options { display: flex; flex-direction: column; gap: 4px; }
+.qd-option {
+  font-family: var(--font-sans); font-size: 0.76rem;
+  color: var(--gray); display: flex; align-items: center; gap: 6px;
+}
+.qd-option--correct { color: rgba(120,230,120,0.9); }
+.qd-opt-letter {
+  font-family: var(--font-mono); font-size: 0.65rem;
+  width: 16px; flex-shrink: 0;
+}
+.qd-img {
+  max-width: 100%; max-height: 180px; object-fit: contain;
+  border: 1px solid var(--border); margin-top: 4px;
+}
+.qd-meta-row {
+  display: flex; flex-wrap: wrap; gap: 12px;
+  font-family: var(--font-mono); font-size: 0.62rem; color: var(--gray);
 }
 
 @media (max-width: 600px) {

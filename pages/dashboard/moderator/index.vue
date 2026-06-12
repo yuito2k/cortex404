@@ -142,6 +142,8 @@ function escalateReport(r) {
 const myQueueFilter = ref('all')  // all | pending | approved | rejected
 const myQueueSearch = ref('')
 
+function toggleMyQueueExpand(q) { q.expanded = !q.expanded }
+
 //const myQueue = ref([
 //  { id:101, text:'What is the Krebs cycle?',                    stream:'Medical', subject:'Biology',   diff:'Medium', date:'2025-05-09', status:'pending',  adminNote:'' },
 //  { id:102, text:'Solve for x: 3x² + 5x - 2 = 0',             stream:'BUET',    subject:'Math',      diff:'Hard',   date:'2025-05-09', status:'pending',  adminNote:'' },
@@ -180,12 +182,14 @@ async function loadMyQueue() {
     ...r,
     id:        r.id,
     stream:    r.stream,
-    text:      r.question?.english || r.question?.bangla || '',
+    text:      r.question?.english || '',
+    text_bn:   r.question?.bangla || '',
     subj:      r.subject?.english  || '',
     diff:      r.difficulty?.english || r.difficulty_level || '',
     adminNote: r.admin_note ?? '',
     status:    r.status,
     date:      r.created_at?.slice(0, 10) ?? '',
+    expanded:  false,   
   }))
   myQueueLoading.value = false
 }
@@ -984,7 +988,7 @@ function logColor(type) {
             :key="q.id"
             :class="'mq-'+q.status"
           >
-            <div class="mq-top">
+            <!-- <div class="mq-top">
               <div class="mq-meta">
                 <span class="stream-tag">{{ q.stream }}</span>
                 <span class="mono dim">{{ q.subj }}</span>
@@ -998,13 +1002,13 @@ function logColor(type) {
 
             <p class="mq-text">{{ q.text }}</p>
 
-            <!-- Admin note shown only on rejection -->
+            !-- Admin note shown only on rejection --
             <div class="mq-admin-note" v-if="q.status === 'rejected' && q.adminNote">
               <span class="man-label">Admin note</span>
               <span class="man-text">{{ q.adminNote }}</span>
             </div>
 
-            <!-- Status-specific footer -->
+            !-- Status-specific footer --
             <div class="mq-footer">
               <template v-if="q.status === 'pending'">
                 <div class="mq-pending-info">
@@ -1019,6 +1023,123 @@ function logColor(type) {
                 </div>
               </template>
 
+              <template v-else-if="q.status === 'rejected'">
+                <div class="mq-rejected-info">
+                  <span style="color:rgba(255,100,100,0.8);font-size:0.75rem">✕ Rejected by admin</span>
+                  <button class="iso-btn iso-btn--ghost mq-resubmit-btn" @click="openModal('resubmitQ', q)">
+                    ↺ Resubmit with edits
+                  </button>
+                </div>
+              </template>
+            </div> -->
+
+            <div class="mq-top">
+              <div class="mq-meta">
+                <span class="stream-tag">{{ q.stream }}</span>
+                <span class="mono dim">{{ q.subj }}</span>
+                <span class="diff-badge" :class="diffClass(q.diff)">{{ q.diff }}</span>
+              </div>
+              <div class="mq-status-group">
+                <span class="mq-date mono dim">{{ q.date }}</span>
+                <span class="status-badge" :class="q.status">{{ q.status }}</span>
+                <!-- ↓ ADD THIS expand button -->
+                <button
+                  class="iso-btn iso-btn--ghost"
+                  style="font-size:0.65rem;padding:3px 8px"
+                  @click="toggleMyQueueExpand(q)"
+                >{{ q.expanded ? '▲ Collapse' : '▼ Details' }}</button>
+              </div>
+            </div>
+          
+            <!-- QUESTION TEXT (unchanged) -->
+            <p class="mq-text"><span v-if="q.expanded">EN:</span>{{ q.text }}</p>
+            <p v-if="q.expanded" class="mq-text">BN: {{ q.text_bn }}</p>
+          
+            <!-- ↓ ADD THIS expanded detail block -->
+            <div v-if="q.expanded" class="mq-details">
+
+              <!-- Question image -->
+              <div v-if="q.question_image" class="mq-detail-section">
+                <span class="mqd-label">QUESTION IMAGE</span>
+                <img :src="q.question_image" class="mqd-img" />
+              </div>
+            
+              <!-- Stimulus -->
+              <div v-if="q.stimulus?.bangla || q.stimulus?.english" class="mq-detail-section">
+                <span class="mqd-label">STIMULUS</span>
+                <p class="mqd-text">EN: {{ q.stimulus?.english }}</p>
+                <p class="mqd-text">BN: {{ q.stimulus?.bangla }}</p>
+                <img v-if="q.stimulus_image" :src="q.stimulus_image" class="mqd-img" />
+              </div>
+            
+              <!-- Options -->
+              <div class="mq-detail-section">
+                <span class="mqd-label">OPTIONS</span>
+                <div class="mqd-options">
+                  <div
+                    v-for="(opt, i) in (q.options?.english || q.options?.bangla || [])"
+                    :key="i"
+                    class="mqd-option"
+                    :class="{ 'mqd-option--correct': i === q.correct_index }"
+                  >
+                    <span class="mqd-opt-letter">{{ ['A','B','C','D'][i] }}.</span>
+                    {{ opt }} / {{ q.options?.bangla[i] }}
+                    <span v-if="i === q.correct_index" style="margin-left:6px;color:rgba(120,230,120,0.9)">✓</span>
+                  </div>
+                </div>
+              </div>
+            
+              <!-- Explanation -->
+              <div v-if="q.explanation?.bangla || q.explanation?.english" class="mq-detail-section">
+                <span class="mqd-label">EXPLANATION</span>
+                <p class="mqd-text">EN: {{ q.explanation?.english }}</p>
+                <p class="mqd-text">BN: {{ q.explanation?.bangla }}</p>
+              </div>
+            
+              <!-- Metadata row -->
+              <div class="mqd-meta-row">
+                <span v-if="q.chapter?.english">
+                  Chapter: {{ q.chapter?.english }}
+                </span>
+                <span v-if="q.years">
+                  Year: {{ Array.isArray(q.years) ? q.years.map(y => y.english || y).join(', ') : q.years }}
+                </span>
+                <span v-if="q.source?.english">Source: {{ q.source.english.join(', ') }}</span>
+                <!-- <span>Correct: {{ ['A','B','C','D'][q.correct_index] }}</span> -->
+              </div>
+
+              <div class="mqd-meta-row">
+                <span v-if="q.chapter?.bangla">
+                  Chapter: {{ q.chapter?.bangla }}
+                </span>
+                <span v-if="q.years">
+                  Year: {{ Array.isArray(q.years) ? q.years.map(y => y.bangla || y).join(', ') : q.years }}
+                </span>
+                <span v-if="q.source?.bangla">Source: {{ q.source.bangla.join(', ') }}</span>
+                <!-- <span>Correct: {{ ['A','B','C','D'][q.correct_index] }}</span> -->
+              </div>
+              <br>
+            </div>
+          
+            <!-- Admin note on rejection (unchanged) -->
+            <div class="mq-admin-note" v-if="q.status === 'rejected' && q.adminNote">
+              <span class="man-label">Admin note</span>
+              <span class="man-text">{{ q.adminNote }}</span>
+            </div>
+          
+            <!-- Status footer (unchanged) -->
+            <div class="mq-footer">
+              <template v-if="q.status === 'pending'">
+                <div class="mq-pending-info">
+                  <span class="mq-spinner" />
+                  <span class="mono dim" style="font-size:0.65rem">Awaiting admin review</span>
+                </div>
+              </template>
+              <template v-else-if="q.status === 'approved'">
+                <div class="mq-approved-info">
+                  <span style="color:rgba(120,230,120,0.8);font-size:0.75rem">✓ Published to question bank</span>
+                </div>
+              </template>
               <template v-else-if="q.status === 'rejected'">
                 <div class="mq-rejected-info">
                   <span style="color:rgba(255,100,100,0.8);font-size:0.75rem">✕ Rejected by admin</span>
@@ -2552,6 +2673,40 @@ function logColor(type) {
 .qimg-reupload-btn { font-size: 0.65rem !important; padding: 4px 10px !important; }
 .qimg-empty { font-family: var(--font-sans); font-size: 0.72rem; color: var(--gray); }
 .brd-qimg { max-width: 100%; max-height: 160px; object-fit: contain; border: 1px solid var(--border); }
+
+/* Expanded detail panel inside mod queue cards */
+.mq-details {
+  border-top: 1px solid var(--border);
+  margin-top: 10px; padding-top: 12px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.mq-detail-section { display: flex; flex-direction: column; gap: 4px; }
+.mqd-label {
+  font-family: var(--font-mono); font-size: 0.56rem;
+  letter-spacing: 0.12em; color: var(--gray);
+}
+.mqd-text {
+  font-family: var(--font-sans); font-size: 0.8rem;
+  color: var(--white); line-height: 1.5;
+}
+.mqd-options { display: flex; flex-direction: column; gap: 4px; }
+.mqd-option {
+  font-family: var(--font-sans); font-size: 0.76rem;
+  color: var(--gray); display: flex; align-items: center; gap: 6px;
+}
+.mqd-option--correct { color: rgba(120,230,120,0.9); }
+.mqd-opt-letter {
+  font-family: var(--font-mono); font-size: 0.65rem;
+  width: 16px; flex-shrink: 0;
+}
+.mqd-img {
+  max-width: 100%; max-height: 180px; object-fit: contain;
+  border: 1px solid var(--border); margin-top: 4px;
+}
+.mqd-meta-row {
+  display: flex; flex-wrap: wrap; gap: 12px;
+  font-family: var(--font-mono); font-size: 0.62rem; color: var(--gray);
+}
 
 /* ── Cropper modal ────────────────────────────────────────── */
 .cropper-overlay {
