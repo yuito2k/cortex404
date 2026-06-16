@@ -8,7 +8,7 @@
         </svg>
       </button>
       <div class="topbar-breadcrumb">
-        <span class="breadcrumb-root">Cortex404</span>
+        <span class="breadcrumb-root">Dashboard</span>
         <span class="breadcrumb-sep">/</span>
         <span class="breadcrumb-current">{{ pageTitle }}</span>
       </div>
