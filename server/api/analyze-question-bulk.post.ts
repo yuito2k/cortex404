@@ -91,6 +91,7 @@ Rules:
 - All B'18 these type of expression means All Boards (2018) for sourceBN and sourceEN.
 - Don't add A. B. C. D. or ক. খ. গ. ঘ. in the optionsBN and optionsEN. Just add the option text.
 - years is always an array. Even a single year must be wrapped: ["2023"]. Never a plain string.
+- Don't include serial numbers (if present in the image) in questionBN and questionEN text.
 - Return ONLY the JSON object.
 
 Valid subjects and chapters for ${stream}:
