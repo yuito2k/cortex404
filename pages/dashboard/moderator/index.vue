@@ -1,7 +1,11 @@
 <script setup>
 definePageMeta({ middleware: 'auth', layout: 'admin' })
 // Guard: profile.role must be 'moderator' or 'admin'
-const { data: profile } = await useSupabaseClient().from('profiles').select('role').single()
+const userID = useSupabaseUser();
+const { data: profile, error } = await useSupabaseClient().from('profiles').select('role').eq('user_id', userID.value?.id).single();
+if (error) {
+  console.error("Profile fetch failed:", error.message, error.details);
+}
 if (profile?.role === 'admin' || profile?.role === 'moderator') { 
   let x = true
 }

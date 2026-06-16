@@ -1,13 +1,20 @@
 <script setup>
 definePageMeta({ middleware: 'auth', layout: 'admin' })
 // NOTE: In production, also add an admin-role guard here:
-const { data: profile } = await useSupabaseClient().from('profiles').select('role').single()
+const user = useSupabaseUser();
+const { data: profile, error } = await useSupabaseClient().from('profiles').select('role').eq('user_id', user.value?.id).single();
+
+if (error) {
+  console.error("Profile fetch failed:", error.message, error.details);
+}
+
 if (profile?.role !== 'admin') navigateTo('/dashboard')
 
 import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { curriculum } from '~/utils/curriculum'
 import { hashText } from '~/utils/hashQuestion'
 
+const supabaseProfile = useSupabaseClient()
 const supabaseHSC = useSupabaseHSC()
 const supabaseMedical = useSupabaseMedical()
 
@@ -700,7 +707,7 @@ async function loadReviewQueue() {
   let profileMap = {}
   if (submitterIds.length) {
     // profiles lives in one DB (use either client — it's a shared auth table)
-    const { data: profiles } = await useSupabaseClient()
+    const { data: profiles } = await supabaseProfile
       .from('profiles')
       .select('user_id, full_name, avatar_url')
       .in('user_id', submitterIds)
