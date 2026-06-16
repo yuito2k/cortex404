@@ -852,6 +852,35 @@ async function fetchSolvedIds() {
     showAnswer.value = revealed
 }
 
+// Add this ref at the top of your qbank setup
+const masteryAccum = ref<Record<string, {
+  subjectEn: string; subjectBn: string
+  topicEn: string;   topicBn: string
+  stream: string
+  correct: number; wrong: number; skipped: number
+}>>({})
+
+function accumulateMastery(q, isCorrect: boolean | null) {
+  // key = unique per subject+chapter combination
+  const key = `${q.subject?.english}||${q.chapter?.english}||${q.exam}`
+
+  if (!masteryAccum.value[key]) {
+    masteryAccum.value[key] = {
+      subjectEn: q.subject?.english ?? '',
+      subjectBn: q.subject?.bangla  ?? '',
+      topicEn:   q.chapter?.english  ?? '',
+      topicBn:   q.chapter?.bangla   ?? '',
+      stream:    q.exam              ?? '',
+      correct: 0, wrong: 0, skipped: 0,
+    }
+  }
+
+  const entry = masteryAccum.value[key]
+  if (isCorrect === true)  entry.correct++
+  else if (isCorrect === false) entry.wrong++
+  else                          entry.skipped++
+}
+
 async function revealAnswer(qId: number) {
   const q = allQuestions.value.find(x => x.id === qId)
   if (!q) return
@@ -859,7 +888,7 @@ async function revealAnswer(qId: number) {
   solvedIds.value.add(qId)
 
   const chosen = selectedAnswers.value[qId]
-  const isCorrect = chosen !== undefined ? chosen === q.correctIndex : null
+  const isCorrect = chosen !== undefined ? chosen === q.correct_index : null
 
   if (chosen !== undefined) {
     sessionStats.value.attempted++
@@ -871,6 +900,12 @@ async function revealAnswer(qId: number) {
   } else {
     sessionStats.value.attempted++
     sessionStats.value.correct++
+  }
+
+  // Accumulate in memory
+  if (chosen !== undefined) {
+    accumulateMastery(q, isCorrect)
+    flushMastery()
   }
 
   // Persist to DB
@@ -885,6 +920,35 @@ async function revealAnswer(qId: number) {
     })
   }
 }
+
+async function flushMastery() {
+  if (!session.value) return
+  const uid = session.value.user.id
+
+  const calls = Object.values(masteryAccum.value)
+    .filter(e => e.correct + e.wrong + e.skipped > 0)
+    .map(e => supabase.rpc('upsert_mastery', {
+      p_user_id:    uid,
+      p_subject_en: e.subjectEn,
+      p_subject_bn: e.subjectBn,
+      p_topic_en:   e.topicEn,
+      p_topic_bn:   e.topicBn,
+      p_stream:     e.stream,
+      p_correct:    e.correct,
+      p_wrong:      e.wrong,
+      p_skipped:    e.skipped,
+      p_is_exam:    false,
+    }))
+
+  await Promise.all(calls)
+  masteryAccum.value = {}  // reset after flush
+}
+
+// Flush on page leave
+//onBeforeUnmount(() => { flushMastery() })
+
+// Or flush on route change
+//onBeforeRouteLeave(() => { flushMastery() })
 
 function nextQuestion(currentIdx: number) {
   const nextIdx = currentIdx + 1

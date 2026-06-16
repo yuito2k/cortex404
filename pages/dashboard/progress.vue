@@ -120,7 +120,7 @@
         <!-- Weak topics drill-down -->
         <div class="panel">
           <div class="panel-header">
-            <span class="panel-tag">Weak Topics</span>
+            <span class="panel-tag">Topic Mastery</span>
             <NuxtLink to="/dashboard/question-bank" class="panel-link">Practice →</NuxtLink>
           </div>
           <div class="weak-list">

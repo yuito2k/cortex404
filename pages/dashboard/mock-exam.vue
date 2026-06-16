@@ -1393,6 +1393,57 @@ async function saveResult() {
   }))
 
   await supabase.from('question_attempts').insert(attempts)
+
+  // 4. Upsert mastery — group by actual subject+chapter on each question
+  //    (config.subject/chapter may be 'All', so always read from the question itself)
+  
+  type MasteryGroup = {
+    subjectEn: string; subjectBn: string
+    topicEn:   string; topicBn:   string
+    stream:    string
+    correct:   number; wrong: number; skipped: number
+  }
+  
+  const masteryMap = new Map<string, MasteryGroup>()
+  
+  for (const q of questions.value) {
+    const subjectEn = getSubjectStr(q)
+    const subjectBn = (q.subject as any)?.bangla ?? ''
+    const topicEn   = getChapterStr(q)
+    const topicBn   = (q.chapter  as any)?.bangla ?? ''
+    const stream    = q.exam ?? config.stream
+  
+    const key = `${subjectEn}||${topicEn}||${stream}`
+  
+    if (!masteryMap.has(key)) {
+      masteryMap.set(key, { subjectEn, subjectBn, topicEn, topicBn, stream, correct: 0, wrong: 0, skipped: 0 })
+    }
+  
+    const g = masteryMap.get(key)!
+    const ans = answers.value[q.id]
+  
+    if (ans === undefined)          g.skipped++
+    else if (ans === q.correct_index) g.correct++
+    else                              g.wrong++
+  }
+  
+  // Fire one rpc call per group — parallel
+  await Promise.all(
+    Array.from(masteryMap.values()).map(g =>
+      supabase.rpc('upsert_mastery', {
+        p_user_id:    userId,
+        p_subject_en: g.subjectEn,
+        p_subject_bn: g.subjectBn,
+        p_topic_en:   g.topicEn,
+        p_topic_bn:   g.topicBn,
+        p_stream:     g.stream,
+        p_correct:    g.correct,
+        p_wrong:      g.wrong,
+        p_skipped:    g.skipped,
+        p_is_exam:    true,
+      })
+    )
+  )
 }
 
 async function submitExam() {

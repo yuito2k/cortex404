@@ -44,6 +44,7 @@ const pageTitle = computed(() => {
     '/dashboard/question-bank': 'Question Bank',
     '/dashboard/progress': 'Progress',
     '/dashboard/leaderboard': 'Leaderboard',
+    '/dashboard/edtube': 'EdTube',
     '/dashboard/settings': 'Settings',
   }
   return map[route.path] ?? 'Dashboard'

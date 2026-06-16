@@ -413,6 +413,7 @@ create table if not exists public.topic_mastery (
   subject         jsonb not null,
   stream          text not null,
   mastery_percent int not null default 0 check (mastery_percent between 0 and 100),
+  exams_count     int not null default 0,
   question_count  int not null default 0,
   correct_count   int not null default 0,
   wrong_count   int not null default 0,
@@ -422,6 +423,100 @@ create table if not exists public.topic_mastery (
 );
 
 create index if not exists idx_topic_mastery_user on public.topic_mastery(user_id);
+
+create or replace function public.upsert_mastery(
+  p_user_id    uuid,
+  p_subject_en text,
+  p_subject_bn text,
+  p_topic_en   text,
+  p_topic_bn   text,
+  p_stream     text,
+  p_correct    int,
+  p_wrong      int,
+  p_skipped    int,
+  p_is_exam    boolean default false   -- true = mock, false = qbank
+)
+returns void as $$
+declare
+  v_sub_correct  int;
+  v_sub_wrong    int;
+  v_old_mastery  int;
+  v_new_mastery  int;
+begin
+
+  -- ── subject_mastery ─────────────────────────────────────────
+  select correct_count, wrong_count, mastery_percent
+    into v_sub_correct, v_sub_wrong, v_old_mastery
+  from public.subject_mastery
+  where user_id = p_user_id
+    and subject->>'english' = p_subject_en
+    and stream = p_stream;
+
+  v_new_mastery := case
+    when coalesce(v_sub_correct,0) + p_correct + coalesce(v_sub_wrong,0) + p_wrong = 0 then 0
+    else round(
+      (coalesce(v_sub_correct,0) + p_correct)::numeric /
+      (coalesce(v_sub_correct,0) + p_correct + coalesce(v_sub_wrong,0) + p_wrong) * 100
+    )
+  end;
+
+  insert into public.subject_mastery
+    (user_id, subject, stream,
+     mastery_percent, exams_count, question_count,
+     correct_count, wrong_count, skipped_count, trend, updated_at)
+  values
+    (p_user_id,
+     jsonb_build_object('english', p_subject_en, 'bangla', p_subject_bn),
+     p_stream,
+     coalesce(round(p_correct::numeric / nullif(p_correct + p_wrong, 0) * 100), 0),
+     case when p_is_exam then 1 else 0 end,
+     p_correct + p_wrong + p_skipped,
+     p_correct, p_wrong, p_skipped, 0, now())
+  on conflict (user_id, (subject->>'english'), stream) do update set
+    mastery_percent = v_new_mastery,
+    exams_count     = subject_mastery.exams_count + case when p_is_exam then 1 else 0 end,
+    question_count  = subject_mastery.question_count + p_correct + p_wrong + p_skipped,
+    correct_count   = subject_mastery.correct_count  + p_correct,
+    wrong_count     = subject_mastery.wrong_count    + p_wrong,
+    skipped_count   = subject_mastery.skipped_count  + p_skipped,
+    trend           = v_new_mastery - coalesce(v_old_mastery, v_new_mastery),
+    updated_at      = now();
+
+  -- ── topic_mastery ────────────────────────────────────────────
+  insert into public.topic_mastery
+    (user_id, topic, subject, stream,
+     mastery_percent, exams_count, question_count,
+     correct_count, wrong_count, skipped_count, updated_at)
+  values
+    (p_user_id,
+     jsonb_build_object('english', p_topic_en, 'bangla', p_topic_bn),
+     jsonb_build_object('english', p_subject_en, 'bangla', p_subject_bn),
+     p_stream,
+     coalesce(round(p_correct::numeric / nullif(p_correct + p_wrong, 0) * 100), 0),
+     case when p_is_exam then 1 else 0 end,
+     p_correct + p_wrong + p_skipped,
+     p_correct, p_wrong, p_skipped, now())
+  on conflict (user_id, (topic->>'english'), (subject->>'english'), stream) do update set
+    mastery_percent = round(
+      (topic_mastery.correct_count + p_correct)::numeric /
+      nullif(topic_mastery.correct_count + p_correct +
+             topic_mastery.wrong_count   + p_wrong, 0) * 100
+    ),
+    exams_count    = topic_mastery.exams_count + case when p_is_exam then 1 else 0 end,
+    question_count = topic_mastery.question_count + p_correct + p_wrong + p_skipped,
+    correct_count  = topic_mastery.correct_count  + p_correct,
+    wrong_count    = topic_mastery.wrong_count    + p_wrong,
+    skipped_count  = topic_mastery.skipped_count  + p_skipped,
+    updated_at     = now();
+
+end;
+$$ language plpgsql security definer;
+
+create unique index uq_subject_mastery
+  on public.subject_mastery (user_id, (subject->>'english'), stream);
+
+create unique index uq_topic_mastery
+  on public.topic_mastery (user_id, (topic->>'english'), (subject->>'english'), stream);
 
 
 -- ============================================================
