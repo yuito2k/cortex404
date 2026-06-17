@@ -117,6 +117,7 @@ create table if not exists public.questions (
   -- Values seen across all files: HSC, SSC, BUET, Medical, BCS, Bank,
   -- DU (Dhaka Univ), RU (Rajshahi Univ), CU, JU, IU, SUST, KUET, etc.
   exam              text not null,
+  text_book         text,
 
   -- Bilingual text fields (JSONB with { "english": "...", "bangla": "..." })
   -- Null bangla is allowed for purely English content (e.g. English grammar Qs)
@@ -856,6 +857,7 @@ create table if not exists public.question_submissions (
   years            jsonb,
   difficulty       jsonb not null,
   stream           text not null,
+  text_book        text,
   subject          jsonb not null,
   chapter          jsonb not null,
   source           jsonb,             -- e.g. "BUET 2023 Question Paper"

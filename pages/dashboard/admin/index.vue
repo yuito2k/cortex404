@@ -31,6 +31,52 @@ let streamEN = ref('')
 let sourceEN = ref('')
 let sourceBN = ref('')
 
+const textBookEN = ref('')   // this is your actual "selected value"
+const searchQuery = ref('')  // this is what the user types
+const showDropdown = ref(false)
+
+const textBooks = [
+  'Mathematics 1st Paper (Ketab Uddin Ahmed)',
+  'Mathematics 2nd Paper (Ketab Uddin Ahmed)',
+  'Mathematics 1st Paper (Ruponti Prokashoni)',
+  'Mathematics 2nd Paper (Ruponti Prokashoni)',
+  'Physics 1st Paper (Dr. Shahjahan Tapan)',
+  'Physics 2nd Paper (Dr. Shahjahan Tapan)',
+  'Physics 1st Paper (Prof. Md. Ishaq)',
+  'Physics 2nd Paper (Prof. Md. Ishaq)',
+  'Physics 1st Paper (Prof. Shamsuzzaman Selu)',
+  'Physics 2nd Paper (Prof. Shamsuzzaman Selu)',
+  'Chemistry 1st Paper (Hazari-Nag)',
+  'Chemistry 2nd Paper (Hazari-Nag)',
+  'Chemistry 1st Paper (Sanjit kumar Guha)',
+  'Chemistry 2nd Paper (Sanjit kumar Guha)',
+  'Botany (Dr. Md. Abul Hasan)',
+  'Zoology (Gazi Azmal & Gazi Asmat)',
+  'Botany (Dr. Md. Abdul Alim)',
+  'Zoology (Dr. Md. Abdul Alim)',
+  'Botany (Mazedam Begum & Rashida Begum)',
+  'Zoology (Mazedam Begum & Rashida Begum)',
+  'ICT (Mahabubur Rahman)',
+  'ICT (Engr. Mujibur Rahman)',
+]
+
+const filteredBooks = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return textBooks
+  return textBooks.filter(b => b.toLowerCase().includes(q))
+})
+
+function selectBook(s) {
+  textBookEN.value = s
+  searchQuery.value = s
+  showDropdown.value = false
+}
+
+// small delay so the @mousedown on the <li> fires before blur closes the list
+function closeDropdownDelayed() {
+  setTimeout(() => { showDropdown.value = false }, 150)
+}
+
 // ─── Curriculum-driven subject / chapter computed ─────────────
 const availableSubjects = computed(() =>
   streamEN.value ? (curriculum[streamEN.value] ?? []) : []
@@ -367,7 +413,7 @@ function resetBulk() {
   bulkExpanded.value       = []
   bulkRedDotDetected.value = false
   bulkTotalFound.value     = 0
-  streamEN.value = ''
+  //streamEN.value = ''
 }
 
 //async function checkDuplicates(questions) {
@@ -483,6 +529,7 @@ async function saveBulk() {
 
   const payloads = await Promise.all(toSave.map(async q => ({
     exam: streamEN.value,
+    text_book: textBookEN.value,
     question:    { english: q.questionEN || null, bangla: q.questionBN || null },
     question_hash: await hashText(q.questionBN || null),
     options:     { english: q.optionsEN || null,  bangla: q.optionsBN  || [] },
@@ -758,6 +805,7 @@ async function adminApproveQ(q) {
       .from('questions')
       .insert({
         exam:             q.stream,
+        text_book:        q.text_book,
         question:         q.question,
         question_hash:    q.question_hash,
         options:          q.options,
@@ -862,6 +910,7 @@ async function saveQuestion() {
   // Build the row matching your schema
   const payload = {
     exam: streamEN.value,
+    //text_book: textBookEN.value || null,
 
     question: {
       english: questionEN.value,
@@ -1989,8 +2038,39 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                   <label class="mf-label">STREAM (required)</label>
                   <select v-model="streamEN" class="mf-input mf-select">
                     <option value="" disabled>Select stream…</option>
-                    <option v-for="s in ['SSC Science','SSC Arts','SSC Commerce','HSC Science','HSC Arts','HSC Commerce','BUET','Medical','DU','BCS']" :key="s">{{ s }}</option>
+                    <option v-for="s in ['SSC Science','SSC Arts','SSC Commerce','HSC Science','HSC Arts','HSC Commerce','Engineering','Medical','Varsity','BCS']" :key="s">{{ s }}</option>
                   </select>
+                </div>
+                <!--<div class="mf-group">
+                  <label class="mf-label">Text Book (Optional)</label>
+                  <select v-model="textBookEN" style="overflow-y: scroll;" class="mf-input mf-select">
+                    <option value="" disabled>Select Text Book…</option>
+                    <option v-for="s in ['Mathematics 1st Paper (Ketab Uddin Ahmed)','Mathematics 2nd Paper (Ketab Uddin Ahmed)', 'Mathematics 1st Paper (Ruponti Prokashoni)','Mathematics 2nd Paper (Ruponti Prokashoni)','Physics 1st Paper (Dr. Shahjahan Tapan)','Physics 2nd Paper (Dr. Shahjahan Tapan)', 'Physics 1st Paper (Prof. Md. Ishaq)','Physics 2nd Paper (Prof. Md. Ishaq)', 'Physics 1st Paper (Prof. Shamsuzzaman Selu)','Physics 2nd Paper (Prof. Shamsuzzaman Selu)','Chemistry 1st Paper (Hazari-Nag)','Chemistry 2nd Paper (Hazari-Nag)','Chemistry 1st Paper (Sanjit kumar Guha)','Chemistry 2nd Paper (Sanjit kumar Guha)','Botany (Dr. Md. Abul Hasan)','Zoology (Gazi Azmal & Gazi Asmat)','ICT (Mahabubur Rahman)', 'ICT (Engr. Mujibur Rahman)']" :key="s">{{ s }}</option>
+                  </select>
+                </div>-->
+                <div class="mf-group" style="position: relative;">
+                  <label class="mf-label">Text Book (Optional)</label>
+
+                  <input
+                    type="text"
+                    class="mf-input mf-select"
+                    v-model="searchQuery"
+                    @focus="showDropdown = true"
+                    @input="showDropdown = true"
+                    @blur="closeDropdownDelayed"
+                    placeholder="Select Text Book…"
+                    autocomplete="off"
+                  />
+
+                  <ul v-if="showDropdown && filteredBooks.length" class="mf-dropdown-list">
+                    <li
+                      v-for="s in filteredBooks"
+                      :key="s"
+                      @mousedown.prevent="selectBook(s)"
+                    >
+                      {{ s }}
+                    </li>
+                  </ul>
                 </div>
                 <div class="mf-group" style="justify-content:flex-end; padding-top:18px;">
                   <span v-if="bulkRedDotDetected" class="bulk-mode-badge red-dot-badge">🔴 Red-dot mode</span>
@@ -3141,6 +3221,30 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
 .qd-meta-row {
   display: flex; flex-wrap: wrap; gap: 12px;
   font-family: var(--font-mono); font-size: 0.62rem; color: var(--gray);
+}
+
+.mf-dropdown-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #2e2d2d;
+  border: 1px solid #313030;
+  border-radius: 6px;
+  margin-top: 2px;
+  list-style: none;
+  padding: 0;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+.mf-dropdown-list li {
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.mf-dropdown-list li:hover {
+  background: #3f3e3e;
 }
 
 @media (max-width: 600px) {

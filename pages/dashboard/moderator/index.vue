@@ -261,6 +261,52 @@ let explanationBN = ref('')
 let stimulusBN   = ref('')
 let stimulusEN   = ref('')
 
+const textBookEN = ref('')   // this is your actual "selected value"
+const searchQuery = ref('')  // this is what the user types
+const showDropdown = ref(false)
+
+const textBooks = [
+  'Mathematics 1st Paper (Ketab Uddin Ahmed)',
+  'Mathematics 2nd Paper (Ketab Uddin Ahmed)',
+  'Mathematics 1st Paper (Ruponti Prokashoni)',
+  'Mathematics 2nd Paper (Ruponti Prokashoni)',
+  'Physics 1st Paper (Dr. Shahjahan Tapan)',
+  'Physics 2nd Paper (Dr. Shahjahan Tapan)',
+  'Physics 1st Paper (Prof. Md. Ishaq)',
+  'Physics 2nd Paper (Prof. Md. Ishaq)',
+  'Physics 1st Paper (Prof. Shamsuzzaman Selu)',
+  'Physics 2nd Paper (Prof. Shamsuzzaman Selu)',
+  'Chemistry 1st Paper (Hazari-Nag)',
+  'Chemistry 2nd Paper (Hazari-Nag)',
+  'Chemistry 1st Paper (Sanjit kumar Guha)',
+  'Chemistry 2nd Paper (Sanjit kumar Guha)',
+  'Botany (Dr. Md. Abul Hasan)',
+  'Zoology (Gazi Azmal & Gazi Asmat)',
+  'Botany (Dr. Md. Abdul Alim)',
+  'Zoology (Dr. Md. Abdul Alim)',
+  'Botany (Mazedam Begum & Rashida Begum)',
+  'Zoology (Mazedam Begum & Rashida Begum)',
+  'ICT (Mahabubur Rahman)',
+  'ICT (Engr. Mujibur Rahman)',
+]
+
+const filteredBooks = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return textBooks
+  return textBooks.filter(b => b.toLowerCase().includes(q))
+})
+
+function selectBook(s) {
+  textBookEN.value = s
+  searchQuery.value = s
+  showDropdown.value = false
+}
+
+// small delay so the @mousedown on the <li> fires before blur closes the list
+function closeDropdownDelayed() {
+  setTimeout(() => { showDropdown.value = false }, 150)
+}
+
 // ─── Question image (cropped from sheet) ──────────────────────
 const questionImageUrl       = ref('')
 const questionImagePreview   = ref('')
@@ -547,6 +593,7 @@ async function submitNewQuestion() {
 
   const payload = {
     stream:          streamEN.value,
+    //text_book:       textBookEN.value || null,
     question:        { english: questionEN.value || null, bangla: questionBN.value || null },
     question_hash:   questionBN.value ? await hashText(questionBN.value) : null,
     question_image:  questionImageUrl.value || null,
@@ -613,6 +660,7 @@ async function submitBulk() {
 
   const payloads = await Promise.all(toSave.map(async q => ({
     stream:          streamEN.value,
+    text_book:       textBookEN.value || null,
     question:        { english: q.questionEN || null, bangla: q.questionBN || null },
     question_hash:   q.questionBN ? await hashText(q.questionBN) : null,
     question_image:  q.questionImageUrl  || null,
@@ -1736,6 +1784,30 @@ function logColor(type) {
                     <option v-for="s in ['SSC Science','SSC Arts','SSC Commerce','HSC Science','HSC Arts','HSC Commerce','BUET','Medical','DU','BCS']" :key="s">{{ s }}</option>
                   </select>
                 </div>
+                <div class="mf-group" style="position: relative;">
+                  <label class="mf-label">Text Book (Optional)</label>
+
+                  <input
+                    type="text"
+                    class="mf-input mf-select"
+                    v-model="searchQuery"
+                    @focus="showDropdown = true"
+                    @input="showDropdown = true"
+                    @blur="closeDropdownDelayed"
+                    placeholder="Select Text Book…"
+                    autocomplete="off"
+                  />
+
+                  <ul v-if="showDropdown && filteredBooks.length" class="mf-dropdown-list">
+                    <li
+                      v-for="s in filteredBooks"
+                      :key="s"
+                      @mousedown.prevent="selectBook(s)"
+                    >
+                      {{ s }}
+                    </li>
+                  </ul>
+                </div>
                 <div class="mf-group" style="justify-content:flex-end; padding-top:18px;">
                   <span v-if="bulkRedDotDetected" class="bulk-mode-badge red-dot-badge">🔴 Red-dot mode</span>
                   <span v-else-if="bulkResults.length" class="bulk-mode-badge">All questions mode</span>
@@ -2711,6 +2783,33 @@ function logColor(type) {
   display: flex; flex-wrap: wrap; gap: 12px;
   font-family: var(--font-mono); font-size: 0.62rem; color: var(--gray);
 }
+
+.mf-dropdown-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #2e2d2d;
+  border: 1px solid #313030;
+  border-radius: 6px;
+  margin-top: 2px;
+  list-style: none;
+  padding: 0;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+.mf-dropdown-list li {
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.mf-dropdown-list li:hover {
+  background: #3f3e3e;
+}
+
+.mf-select   { cursor: pointer; }
+.mf-select option { background-color: #232222; color: var(--white); }
 
 /* ── Cropper modal ────────────────────────────────────────── */
 .cropper-overlay {
