@@ -13,6 +13,7 @@ if (profile?.role !== 'admin') navigateTo('/dashboard')
 import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { curriculum } from '~/utils/curriculum'
 import { hashText } from '~/utils/hashQuestion'
+import { renderLatexText } from '~/utils/renderLatex'
 
 const supabaseProfile = useSupabaseClient()
 const supabaseHSC = useSupabaseHSC()
@@ -2207,7 +2208,7 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                       </div>
                       <div class="brd-section">
                         <span class="brd-label">English Question</span>
-                        <span class="brd-text">{{ q.questionEN || '—' }} <span class="brd-text" style="font-size:0.7rem; opacity:0.7">({{ q.questionBN || '—' }})</span></span>
+                        <span class="brd-text" v-html="renderLatexText(q.questionEN) || '—'" /><span class="brd-text" v-html="'(' + renderLatexText(q.questionBN) + ')'" style="font-size:0.7rem; opacity:0.7" />
                       </div>
                       <div class="brd-section">
                         <span v-if="q.hasQuestionImage" class="brd-label">QUESTION IMAGE</span>
@@ -2225,14 +2226,14 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                         <span class="brd-label">Options</span>
                         <div class="brd-options">
                           <span v-for="(opt, oi) in ['A','B','C','D']" :key="oi" class="brd-option" :class="{ 'brd-option--correct': q.answerEN === opt }">
-                            <b>{{ opt }}.</b> {{ q.optionsEN[oi] || '—' }}
-                            <span v-if="q.optionsBN[oi]" class="brd-option-bn bn-text"> / {{ q.optionsBN[oi] }}</span>
+                            <b>{{ opt }}.</b> <span v-html="renderLatexText(q.optionsEN[oi]) || '—'" />
+                            <span v-if="q.optionsBN[oi]" class="brd-option-bn bn-text" v-html="'  /  ' + '(' + renderLatexText(q.optionsBN[oi]) + ')'" />
                           </span>
                         </div>
                       </div>
                       <div v-if="q.explanationEN || q.explanationBN" class="brd-section">
                         <span class="brd-label">Explanation</span>
-                        <span v-if="q.explanationEN" class="brd-text">{{ q.explanationEN }} <span v-if="q.explanationBN" class="brd-text" style="font-size:0.7rem; opacity:0.7">({{ q.explanationBN }})</span></span>
+                        <span v-if="q.explanationEN" class="brd-text" v-html="renderLatexText(q.explanationEN)" /> <span v-if="q.explanationBN" class="brd-text" style="font-size:0.7rem; opacity:0.7" v-html="'(' + renderLatexText(q.explanationBN) + ')'" />
                       </div>
                       <div class="brd-section brd-meta-row">
                         <span v-if="q.years?.length"><b>Year:</b> {{ q.years.join(' · ') }}</span>

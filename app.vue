@@ -11,6 +11,7 @@
 </template>
 
 <script setup lang="ts">
+import 'katex/dist/katex.min.css'
 const user = useSupabaseUser()
  
 // If the user clicked "Skip for now" earlier in this browser session,
