@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
     //    query = query.eq('difficulty_level', difficulty)
     //}
 
-    query = query.limit(Number(limit) || 100)
+    //query = query.limit(Number(limit) || 100)
 
     const { data, error } = await query
 

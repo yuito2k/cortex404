@@ -212,7 +212,7 @@
 
             <!-- Question text -->
             <div class="qcard-body" @click="toggleExpand(q.id)">
-              <p class="q-text">{{ q.question[selectedLang] }}</p>
+              <p class="q-text" v-html="renderLatexText(q.question[selectedLang])" />
             </div>
 
             <!-- Expanded: options + answer -->
@@ -233,7 +233,7 @@
                     @click.stop="selectAnswer(q.id, oi)"
                   >
                     <span class="opt-letter">{{ optLetters[oi] }}</span>
-                    <span class="opt-text">{{ opt }}</span>
+                    <span class="opt-text" v-html="renderLatexText(opt)" />
                     <span v-if="showAnswer[q.id] && oi === q.correct_index" class="opt-check">✓</span>
                     <span v-else-if="showAnswer[q.id] && selectedAnswers[q.id] === oi && oi !== q.correct_index" class="opt-x">✗</span>
                   </button>
@@ -252,7 +252,7 @@
                     </button>
                     <div v-if="showAnswer[q.id]" class="explanation-block">
                       <span class="exp-label">EXPLANATION</span>
-                      <p class="exp-text">{{ q.explanation[selectedLang] }}</p>
+                      <p class="exp-text" v-html="renderLatexText(q.explanation[selectedLang])" />
                     </div>
                   </div>
                   <div class="footer-right">
@@ -449,13 +449,15 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'auth', layout: 'dashboard' })
 import { createClient } from '@supabase/supabase-js'
+import { renderLatexText } from '~/utils/renderLatex'
 
 const supabase = useSupabaseClient()
 const session = useSupabaseSession()
 
 const config = useRuntimeConfig()
 
-const { data: profile } = await supabase.from('profiles').select('primary_stream').single()
+const userID = useSupabaseUser();
+const { data: profile } = await supabase.from('profiles').select('primary_stream').eq('user_id', userID.value?.id).single();
 const bookmarkedQuestions = ref<{ id: number; question: any }[]>([])
 
 //async function fetchBookmarks() {

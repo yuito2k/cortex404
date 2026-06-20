@@ -26,7 +26,7 @@ create table if not exists public.profiles (
   bio              text check (char_length(bio) <= 200),
 
   -- Admin panel fields (index.vue Users tab)
-  role             text not null default 'user'     check (role   in ('user','moderator','admin')),
+  role             text not null default 'user'     check (role   in ('user','moderator','admin', 'teacher')),
   status           text not null default 'unverified'   check (status in ('verified','banned','unverified')),
 
   -- Academic context (settings.vue profile tab)

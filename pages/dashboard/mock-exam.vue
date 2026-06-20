@@ -73,7 +73,7 @@
           </div>
 
           <!-- Chapter — only shown when a specific subject is selected -->
-          <div class="config-section chapter-section" v-if="availableChapters.length > 1">
+          <div class="config-section chapter-section" v-if="availableChapters.length > 1 && config.subject !== 'All'">
             <div class="config-section-header">
               <span class="csec-tag">03</span>
               <span class="csec-label">Chapter</span>
@@ -322,7 +322,7 @@
 
           <!-- Stimulus block (shown once for the group) -->
           <div v-if="group.stimulus || group.stimulus_image" class="eq-stimulus-block">
-            <p v-if="group.stimulus" class="eq-stimulus-label">{{ group.stimulus[selectedLang] }}</p>
+            <p v-if="group.stimulus" v-html="renderLatexText(group.stimulus[selectedLang])" class="eq-stimulus-label" />
             <img v-if="group.stimulus_image" :src="group.stimulus_image" class="eq-img" alt="Stimulus" />
           </div>
         
@@ -362,7 +362,7 @@
               </div>-->
 
               <!-- Question text -->
-              <p class="eq-text">{{ q.question[selectedLang] }}</p>
+              <p class="eq-text" v-html="renderLatexText(q.question[selectedLang])" />
 
               <!-- Question image -->
               <img v-if="q.question_image" :src="q.question_image" class="eq-img" alt="Question diagram" />
@@ -376,7 +376,7 @@
                 @click="selectAnswer(q.id, oi)"
               >
                 <span class="opt-letter">{{ optLetters[oi] }}</span>
-                <span class="opt-text">{{ opt }}</span>
+                <span class="opt-text" v-html="renderLatexText(opt)" />
                 <span v-if="answers[q.id] === oi" class="opt-selected-mark">✓</span>
               </button>
             </div>
@@ -542,7 +542,7 @@
           <template v-for="group in filteredReviewGroups" :key="group.questions[0].id">
           <!-- Stimulus shown once per group -->
           <div v-if="group.stimulus || group.stimulus_image" class="eq-stimulus-block">
-            <p v-if="group.stimulus" class="eq-stimulus-label">{{ group.stimulus[selectedLang] }}</p>
+            <p v-if="group.stimulus" class="eq-stimulus-label" v-html="renderLatexText(group.stimulus[selectedLang])" />
             <img v-if="group.stimulus_image" :src="group.stimulus_image" class="eq-img" alt="Stimulus" />
           </div>
         
@@ -571,7 +571,7 @@
             </div>-->
 
             <!-- Question text -->
-            <p class="rc-question">{{ q.question[selectedLang] }}</p>
+            <p class="rc-question" v-html="renderLatexText(q.question[selectedLang])" />
 
             <!-- Question image -->
             <img v-if="q.question_image" :src="q.question_image" class="eq-img" alt="Question diagram" />
@@ -587,7 +587,7 @@
                 }"
               >
                 <span class="rc-opt-letter">{{ optLetters[oi] }}</span>
-                <span class="rc-opt-text">{{ opt }}</span>
+                <span class="rc-opt-text" v-html="renderLatexText(opt)" />
                 <span class="rc-opt-tag">
                   <template v-if="oi === q.correct_index">✓ Correct</template>
                   <template v-else-if="oi === answers[q.id]">✗ Your answer</template>
@@ -597,7 +597,7 @@
             </div>
             <div class="rc-explanation">
               <span class="exp-label">EXPLANATION</span>
-              <p class="exp-text">{{ q.explanation[selectedLang] }}</p>
+              <p class="exp-text" v-html="renderLatexText(q.explanation[selectedLang])" />
             </div>
           </div>
           </template>
@@ -701,8 +701,10 @@
 definePageMeta({ middleware: 'auth', layout: 'dashboard' })
 const supabase = useSupabaseClient()
 const session = useSupabaseSession()
+import { renderLatexText } from '~/utils/renderLatex'
 
-const { data: profile } = await supabase.from('profiles').select('primary_stream').single()
+const userID = useSupabaseUser();
+const { data: profile } = await supabase.from('profiles').select('primary_stream').eq('user_id', userID.value?.id).single();
 
 // ─── Toast ────────────────────────────────────────────────────
 const toast = reactive({ show: false, msg: '', type: 'success' })
@@ -886,12 +888,12 @@ if (profile?.primary_stream.startsWith('HSC')) {
 //]
 
 const subjectMap: Record<string, string[]> = {
-  "HSC Science":     ['All', 'Physics', 'Chemistry', 'Math', 'Biology', 'English', 'ICT'],
-  "HSC Arts":     ['All', 'Bangla', 'English', 'History', 'Geography', 'ICT'],
-  "HSC Commerce":     ['All', 'Accounting', 'Finance', 'Business Studies', 'English', 'ICT'],
-  "SSC Science":     ['All', 'Physics', 'Chemistry', 'Math', 'Biology', 'English', 'ICT'],
-  "SSC Arts":     ['All', 'Bangla', 'English', 'History', 'Geography', 'ICT'],
-  "SSC Commerce":     ['All', 'Accounting', 'Finance', 'Business Studies', 'English', 'ICT'],
+  "HSC Science":     ['All', 'Physics 1st Paper', 'Physics 2nd Paper', 'Chemistry 1st Paper', 'Chemistry 2nd Paper', 'Mathematics 1st Paper', 'Mathematics 2nd Paper', 'Botany', 'Zoology', 'English 1st Paper', 'English 2nd Paper', 'ICT'],
+  "HSC Arts":     ['All', 'Bangla 1st Paper', 'Bangla 2nd Paper', 'English 1st Paper', 'English 2nd Paper', 'History', 'Geography', 'ICT'],
+  "HSC Commerce":     ['All', 'Accounting 1st Paper', 'Accounting 2nd Paper', 'Finance 1st Paper', 'Finance 2nd Paper', 'Business Studies 1st Paper', 'Business Studies 2nd Paper', 'English 1st Paper', 'English 2nd Paper', 'ICT'],
+  "SSC Science":     ['All', 'Physics 1st Paper', 'Physics 2nd Paper', 'Chemistry 1st Paper', 'Chemistry 2nd Paper', 'Mathematics 1st Paper', 'Mathematics 2nd Paper', 'Biology 1st Paper', 'Biology 2nd Paper', 'English 1st Paper', 'English 2nd Paper', 'ICT'],
+  "SSC Arts":     ['All', 'Bangla 1st Paper', 'Bangla 2nd Paper', 'English 1st Paper', 'English 2nd Paper', 'History', 'Geography', 'ICT'],
+  "SSC Commerce":     ['All', 'Accounting 1st Paper', 'Accounting 2nd Paper', 'Finance 1st Paper', 'Finance 2nd Paper', 'Business Studies 1st Paper', 'Business Studies 2nd Paper', 'English 1st Paper', 'English 2nd Paper', 'ICT'],
   BUET:    ['All', 'Physics', 'Chemistry', 'Higher Math'],
   Medical: ['All', 'Biology', 'Chemistry', 'Physics'],
   BCS:     ['All', 'Bangla', 'English', 'Math', 'Bangladesh Affairs', 'General Knowledge'],

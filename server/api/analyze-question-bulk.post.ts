@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
 This image contains a printed exam question sheet with multiple questions.
 
 STEP 1 — RED DOT DETECTION:
-Scan the entire image for red dot (●) markers next to any questions.
+Scan the entire image for red dot (●) markers (only red coloured dot markers, not any other symbols or any other colour marks) next to any questions.
 - If red dots ARE present: extract ONLY the red-dot-marked questions, up to a maximum of 30.
 - If red dots are NOT present: extract ALL questions found, up to a maximum of 30.
 - If fewer than 30 qualifying questions exist, extract all of them.
@@ -108,10 +108,53 @@ Rules:
 - Don't add A. B. C. D. or ক. খ. গ. ঘ. in the optionsBN and optionsEN. Just add the option text.
 - years is always an array. Even a single year must be wrapped: ["2023"]. Never a plain string.
 
+- MCQ options are sometimes printed in a 2-column grid (two options per row, stacked in two rows) rather than a single vertical list — look carefully at the spatial layout before assigning option order.
+- Each option/answer choice is ALWAYS a single, independent, self-contained value. NEVER merge two adjacent options together, and NEVER join two options with a "/", "or", or any other separator inside one optionsBN/optionsEN entry.
+- When options are in a 2-column grid, the typical reading order is: top-left = A, top-right = B, bottom-left = C, bottom-right = D — but always verify against the actual ⓐⓑⓒⓓ or ক-খ-গ-ঘ markers/bullets printed next to each option rather than assuming position alone.
+- If you ever find yourself about to write a "/" or "or" inside a single option's text to join two different-looking expressions, STOP — that means you've misread two separate options as one. Split them into their correct optionsBN[i] / optionsEN[i] slots instead.
+
+- A variable with a bar/overline above it (commonly used for complex conjugates, e.g. z̄, or averages, e.g. x̄) must use @@overline{...} — never write the word "overline" as plain text, and never drop it as a bare letter.
+  EXAMPLE:
+  "the modulus of z̄1 − z2 is" → "the modulus of <<@@overline{z_1} - z_2>> is"
+  "x̄ এর মান" → "<<@@overline{x}>> এর মান"
+
+- Every math/chemistry expression needs BOTH layers together — never one without the other:
+  1. The outer delimiter: <<...>> for inline, [[...]] for display
+  2. Inside that, every LaTeX backslash written as @@
+
+  A segment is correct ONLY if it has both. An @@ command appearing outside of << >> or [[ ]] is WRONG and will not render.
+
+  WRONG: Dividing by @@x^2@@, we get @@lim_{x @@to @@infty} @@frac{5}{7-3/x^2} = @@frac{5}{7-0} = @@frac{5}{7}@@
+  RIGHT: Dividing by <<x^2>>, we get <<@@lim_{x @@to @@infty} @@frac{5}{7-3/x^2} = @@frac{5}{7-0} = @@frac{5}{7}>>
+  
+- The question mark "?" is ordinary punctuation, never part of the math itself — even when it directly follows an expression like "lim x->0 f(x) = ?". Do NOT write it as @@? or include it inside the << >> / [[ ]] wrapper at all. Close the math wrapper right after the last actual mathematical symbol, then place "?" as plain text outside it.
+
+  WRONG: <<\lim_{x \to 0} \frac{f(\frac{\pi}{2}-3x)}{3x} = \?>>
+  RIGHT: <<@@lim_{x @@to 0} @@frac{f(@@frac{@@pi}{2}-3x)}{3x} = >>?
+
+- When a sentence contains a long CHAIN of expressions connected by words ("we get... = ... = ..."), you do not need to open and close a new << >> for every single piece — wrap the entire connected mathematical chain (including the "=" signs joining them) in ONE pair of << >>, as shown in the RIGHT example above. Only break out of << >> for actual prose words like "Dividing by" or "we get".
+
+- Limit expressions must use the proper LaTeX limit command, never write "lim" as a plain variable or "->" as a literal arrow:
+  - Use @@lim_{x @@to @@infty} for "lim as x approaches infinity"
+  - Use @@to for any "approaches/tends to" arrow (never the literal characters "->")
+  - Use @@infty for infinity (never the word "infinity" or the symbol ∞ typed directly, for consistency)
+  EXAMPLE:
+    "lim x->infinity (x^2+6x)/(2x^2+5) = ?" → "<<@@lim_{x @@to @@infty} \frac{x^2+6x}{2x^2+5} = ?>>"
+
+- Greek letters and mathematical/scientific symbols must always be written as their actual sign, never spelled out as a word — in either Bengali or English. This applies inside math expressions AND in surrounding prose when referring to a quantity/variable.
+  - Use: ∞, °, θ, π, ε, η, μ, σ, ρ, λ, γ, α, β, δ, φ, ψ, ω, Δ, Σ, ±, ≤, ≥, ≠, ≈
+  - Never write: "theta", "infinity", "pi", "thita", "পাই", "থিটা", "মিউ", "ডেল্টা", or similar spelled-out forms.
+- This applies even when the source image itself has the word spelled out (e.g. OCR'd handwriting saying "theta") — always normalize it to the symbol in your output.
+- Arithmetic operators must also use signs, not words: +, −, ×, ÷, =, ≠ — never "plus", "minus", "যোগ", "বিয়োগ" when used as a math operator. (Note: if these words are used in ordinary sentence prose unrelated to a specific operation — e.g. "you must add the given values" — leave that prose as normal text; this rule only applies to symbol usage in/around expressions.)
+  EXAMPLES:
+    - "the angle theta is 90 degrees" → "the angle θ is 90°"
+    - "ভর m এবং ত্বরণ a এর গুণফল হলো বল, F = m গুণ a" → "ভর m এবং ত্বরণ a এর গুণফল হলো বল, <<F = m \times a>>"
+    - "resistivity rho of the material" → "resistivity ρ of the material"
+    - "মান পাই এর সমান" → "মান π এর সমান"
+
 - If any text field contains math, physics, or chemistry notation that needs proper typesetting, wrap ONLY that notation using these placeholder delimiters — do NOT use a literal backslash (\) anywhere in your output:
   - Inline math: <<...>>
   - Block/display math: [[...]]
-  - Don't pronounce the math notation in the text (pi, theta, etc.). Just write the math notation (use signs like θ, π, ε, η, μ, σ, ρ, λ, γ, α, β, δ, φ, ψ, ω, +, -, *, /, =, etc. instead of writing them in words).
   - Inside the math, write any LaTeX command using "@@" in place of a backslash. Example: instead of \frac{1}{2}, write @@frac{1}{2}.
   - A vector letter with a hat/cap (circumflex) accent above it denotes a unit vector (e.g. î, ĵ, k̂) and must NEVER be flattened to a plain letter. Wrap it using @@hat{...}: "î" → @@hat{i}, "ĵ" → @@hat{j}, "k̂" → @@hat{k}.
   - A vector letter with an arrow above it (e.g. A with an arrow) should use @@vec{...} the same way.

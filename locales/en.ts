@@ -287,8 +287,8 @@ export default {
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>`,
       },
       {
-        to: '/dashboard/edtube',
-        label: 'EdTube',
+        to: '/dashboard/edverse',
+        label: 'EdVerse',
         badge: null,
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="20" height="15" rx="3"/><polygon points="10 9.5 16 12.5 10 15.5"/></svg>`,
       },

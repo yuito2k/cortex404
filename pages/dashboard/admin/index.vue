@@ -86,9 +86,77 @@ const availableChapters = computed(() =>
   availableSubjects.value.find(s => s.en === subjectEN.value)?.chapters ?? []
 )
 
+// ─── Subject / Chapter manual search (filterable by stream) ──
+const subjectSearchQuery   = ref('')
+const chapterSearchQuery   = ref('')
+const subjectSearchQueryBN   = ref('')
+const chapterSearchQueryBN   = ref('')
+const showSubjectDropdownEN = ref(false)
+const showSubjectDropdownBN = ref(false)
+const showChapterDropdownEN = ref(false)
+const showChapterDropdownBN = ref(false)
+
+const filteredSubjectsList = computed(() => {
+  const q = subjectSearchQuery.value.trim().toLowerCase()
+  if (!q) return availableSubjects.value
+  return availableSubjects.value.filter(s => s.en.toLowerCase().includes(q))
+})
+
+const filteredChaptersList = computed(() => {
+  const q = chapterSearchQuery.value.trim().toLowerCase()
+  if (!q) return availableChapters.value
+  return availableChapters.value.filter(c => c.en.toLowerCase().includes(q))
+})
+
+const filteredSubjectsListBN = computed(() => {
+  const q = subjectSearchQueryBN.value.trim().toLowerCase()
+  if (!q) return availableSubjects.value
+  return availableSubjects.value.filter(s => s.bn.toLowerCase().includes(q))
+})
+
+const filteredChaptersListBN = computed(() => {
+  const q = chapterSearchQueryBN.value.trim().toLowerCase()
+  if (!q) return availableChapters.value
+  return availableChapters.value.filter(c => c.bn.toLowerCase().includes(q))
+})
+
+function selectSubject(s) {
+  subjectEN.value = s.en
+  subjectBN.value = s.bn
+  subjectSearchQuery.value   = s.en
+  subjectSearchQueryBN.value = s.bn
+  showSubjectDropdownEN.value = false
+  showSubjectDropdownBN.value = false
+}
+
+function selectChapter(c) {
+  chapterEN.value = c.en
+  chapterBN.value = c.bn
+  chapterSearchQuery.value   = c.en
+  chapterSearchQueryBN.value = c.bn
+  showChapterDropdownEN.value = false
+  showChapterDropdownBN.value = false
+}
+
+function closeSubjectDropdownDelayedEN() { setTimeout(() => { showSubjectDropdownEN.value = false }, 150) }
+function closeSubjectDropdownDelayedBN() { setTimeout(() => { showSubjectDropdownBN.value = false }, 150) }
+function closeChapterDropdownDelayedEN() { setTimeout(() => { showChapterDropdownEN.value = false }, 150) }
+function closeChapterDropdownDelayedBN() { setTimeout(() => { showChapterDropdownBN.value = false }, 150) }
+
 // Clear downstream selections when parent changes
-watch(subjectEN, () => { chapterEN.value = ''; chapterBN.value = '' })
-watch(streamEN,  () => { subjectEN.value = ''; subjectBN.value = ''; chapterEN.value = ''; chapterBN.value = '' })
+//watch(subjectEN, () => { chapterEN.value = ''; chapterBN.value = '' })
+//watch(streamEN,  () => { subjectEN.value = ''; subjectBN.value = ''; chapterEN.value = ''; chapterBN.value = '' })
+
+watch(subjectEN, () => {
+  chapterEN.value = ''; chapterBN.value = ''
+  chapterSearchQuery.value = ''; chapterSearchQueryBN.value = ''
+})
+watch(streamEN, () => {
+  subjectEN.value = ''; subjectBN.value = ''
+  chapterEN.value = ''; chapterBN.value = ''
+  subjectSearchQuery.value = ''; subjectSearchQueryBN.value = ''
+  chapterSearchQuery.value = ''; chapterSearchQueryBN.value = ''
+})
 
 let yearEN = ref('')
 
@@ -537,8 +605,8 @@ async function saveBulk() {
     explanation: (q.explanationEN || q.explanationBN)
       ? { english: q.explanationEN || null, bangla: q.explanationBN || null }
       : null,
-    subject:     { english: q.subjectEN || null,   bangla: q.subjectBN   || null },
-    chapter:     { english: q.chapterEN || null,   bangla: q.chapterBN   || null },
+    subject:     { english: subjectSearchQuery.value ? subjectSearchQuery.value : q.subjectEN || null,   bangla: subjectSearchQueryBN.value ? subjectSearchQueryBN.value : q.subjectBN || null },
+    chapter:     { english: chapterSearchQuery.value ? chapterSearchQuery.value : q.chapterEN || null,   bangla: chapterSearchQueryBN.value ? chapterSearchQueryBN.value : q.chapterBN || null },
     difficulty:  { english: q.difficulty || null,  bangla: difficultyBanglaMap[q.difficulty] || null },
     years: q.years?.length
       ? q.years.map(y => ({ english: y, bangla: toBengaliDigits(y) }))
@@ -2073,6 +2141,86 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                     </li>
                   </ul>
                 </div>
+                
+                <div class="mf-group" style="position: relative;">
+                  <label class="mf-label">Subject (Optional)</label>
+                  <input
+                    type="text"
+                    class="mf-input mf-select"
+                    v-model="subjectSearchQuery"
+                    :disabled="!streamEN"
+                    @focus="showSubjectDropdownEN = true"
+                    @input="showSubjectDropdownEN = true"
+                    @blur="closeSubjectDropdownDelayedEN"
+                    :placeholder="streamEN ? 'Select subject…' : 'Select stream first'"
+                    autocomplete="off"
+                  />
+                  <ul v-if="showSubjectDropdownEN && filteredSubjectsList.length" class="mf-dropdown-list">
+                    <li v-for="s in filteredSubjectsList" :key="s.en" @mousedown.prevent="selectSubject(s)">
+                      {{ s.en }}
+                    </li>
+                  </ul>
+                </div>
+
+                <div class="mf-group" style="position: relative;">
+                  <label class="mf-label">Chapter (Optional)</label>
+                  <input
+                    type="text"
+                    class="mf-input mf-select"
+                    v-model="chapterSearchQuery"
+                    :disabled="!subjectEN"
+                    @focus="showChapterDropdownEN = true"
+                    @input="showChapterDropdownEN = true"
+                    @blur="closeChapterDropdownDelayedEN"
+                    :placeholder="subjectEN ? 'Select chapter…' : 'Select subject first'"
+                    autocomplete="off"
+                  />
+                  <ul v-if="showChapterDropdownEN && filteredChaptersList.length" class="mf-dropdown-list">
+                    <li v-for="c in filteredChaptersList" :key="c.en" @mousedown.prevent="selectChapter(c)">
+                      {{ c.en }}
+                    </li>
+                  </ul>
+                </div>
+
+                <div class="mf-group" style="position: relative;">
+                  <label class="mf-label">Subject BN (Optional)</label>
+                  <input
+                    type="text"
+                    class="mf-input mf-select"
+                    v-model="subjectSearchQueryBN"
+                    :disabled="!streamEN"
+                    @focus="showSubjectDropdownBN = true"
+                    @input="showSubjectDropdownBN = true"
+                    @blur="closeSubjectDropdownDelayedBN"
+                    :placeholder="streamEN ? 'Select subject…' : 'Select stream first'"
+                    autocomplete="off"
+                  />
+                  <ul v-if="showSubjectDropdownBN && filteredSubjectsListBN.length" class="mf-dropdown-list">
+                    <li v-for="s in filteredSubjectsListBN" :key="s.bn" @mousedown.prevent="selectSubject(s)">
+                      {{ s.bn }}
+                    </li>
+                  </ul>
+                </div>
+
+                <div class="mf-group" style="position: relative;">
+                  <label class="mf-label">Chapter BN (Optional)</label>
+                  <input
+                    type="text"
+                    class="mf-input mf-select"
+                    v-model="chapterSearchQueryBN"
+                    :disabled="!subjectEN"
+                    @focus="showChapterDropdownBN = true"
+                    @input="showChapterDropdownBN = true"
+                    @blur="closeChapterDropdownDelayedBN"
+                    :placeholder="subjectEN ? 'Select chapter…' : 'Select subject first'"
+                    autocomplete="off"
+                  />
+                  <ul v-if="showChapterDropdownBN && filteredChaptersListBN.length" class="mf-dropdown-list">
+                    <li v-for="c in filteredChaptersListBN" :key="c.bn" @mousedown.prevent="selectChapter(c)">
+                      {{ c.bn }}
+                    </li>
+                  </ul>
+                </div>
                 <div class="mf-group" style="justify-content:flex-end; padding-top:18px;">
                   <span v-if="bulkRedDotDetected" class="bulk-mode-badge red-dot-badge">🔴 Red-dot mode</span>
                   <span v-else-if="bulkResults.length" class="bulk-mode-badge">All questions mode</span>
@@ -2158,7 +2306,7 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                         <span v-if="q.lowConfidence" class="flag-badge flag-warn" title="Low confidence — review carefully">⚠</span>
                         <span v-if="q.isDuplicate"   class="flag-badge flag-dup"  title="Already exists in database">DUP</span>
                       </span>
-                      <span class="btc-q bulk-q-text">{{ q.questionEN }}</span>
+                      <span class="btc-q bulk-q-text" v-html="renderLatexText(q.questionEN)"/>
                       <span class="btc-meta bulk-meta-text">
                         <span class="bulk-subject">{{ q.subjectEN || '—' }}</span>
                         <span class="bulk-chapter">{{ q.chapterEN || '—' }}</span>
@@ -2203,8 +2351,8 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                           </span>
                         </div>
                       
-                        <span v-if="q.stimulusEN" class="brd-text bn-text">{{ q.stimulusEN }}</span>
-                        <span v-if="q.stimulusBN" class="brd-text" style="opacity:0.7; font-size:0.72rem">({{ q.stimulusBN }})</span>
+                        <span v-if="q.stimulusEN" v-html="renderLatexText(q.stimulusEN)" class="brd-text bn-text"/>
+                        <span v-if="q.stimulusBN" v-html="renderLatexText(q.stimulusBN)" class="brd-text" style="opacity:0.7; font-size:0.72rem"/>
                       </div>
                       <div class="brd-section">
                         <span class="brd-label">English Question</span>
