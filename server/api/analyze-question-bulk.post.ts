@@ -2,6 +2,22 @@
 import { GoogleGenAI } from '@google/genai'
 import { curriculum } from '~/utils/curriculum'
 
+// Safety net: if the model emits "@@command" without the required <<>> / [[]]
+// wrapper (most common in short optionsEN/optionsBN entries), auto-wrap the
+// whole string so renderLatexText can still pick it up on the client.
+function autoWrapStrayLatex(text: string): string {
+  if (typeof text !== 'string') return text
+  if (text.includes('@@') && !text.includes('<<') && !text.includes('[[')) {
+    return `<<${text}>>`
+  }
+  return text
+}
+
+function fixOptionsArray(arr: unknown): unknown {
+  if (!Array.isArray(arr)) return arr
+  return arr.map(autoWrapStrayLatex)
+}
+
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
   const form = await readMultipartFormData(event)
@@ -200,9 +216,16 @@ ${subjectList || '(none defined yet — leave subjectEN, subjectBN, chapterEN, c
     const clean = raw.replace(/^```json\s*/, '').replace(/```$/, '').trim()
 
     // Validate it's parseable JSON before returning
-    JSON.parse(clean)
+    const parsedObj = JSON.parse(clean)
 
-    return { result: clean }
+    // Safety net: auto-wrap any stray @@ LaTeX in options that the model
+    // forgot to enclose in << >> / [[ ]]
+    for (const q of parsedObj.questions ?? []) {
+      q.optionsEN = fixOptionsArray(q.optionsEN)
+      q.optionsBN = fixOptionsArray(q.optionsBN)
+    }
+
+    return { result: JSON.stringify(parsedObj) }
   } catch (error: any) {
     throw createError({ statusCode: 500, message: error.message || 'Gemini API Error' })
   }

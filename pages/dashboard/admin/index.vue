@@ -13,6 +13,7 @@ if (profile?.role !== 'admin') navigateTo('/dashboard')
 import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { curriculum } from '~/utils/curriculum'
 import { hashText } from '~/utils/hashQuestion'
+import { sources } from '~/utils/sources'
 import { renderLatexText } from '~/utils/renderLatex'
 
 const supabaseProfile = useSupabaseClient()
@@ -85,6 +86,61 @@ const availableSubjects = computed(() =>
 const availableChapters = computed(() =>
   availableSubjects.value.find(s => s.en === subjectEN.value)?.chapters ?? []
 )
+
+const sourceSearchQueryEN = ref('')
+const sourceSearchQueryBN = ref('')
+const yearSearchQueryEN   = ref('')
+const yearSearchQueryBN   = ref('')
+
+const showSourceDropdownEN = ref(false)
+const showSourceDropdownBN = ref(false)
+const showYearDropdownEN   = ref(false)
+const showYearDropdownBN   = ref(false)
+
+const currentYear = new Date().getFullYear()
+const years = Array.from({ length: 15 }, (_, i) => {
+  const en = String(currentYear - i)
+  return { en, bn: toBengaliDigits(en) }
+})
+
+const filteredSourcesEN = computed(() => {
+  const q = sourceSearchQueryEN.value.trim().toLowerCase()
+  return q ? sources.filter(s => s.en.toLowerCase().includes(q)) : sources
+})
+const filteredSourcesBN = computed(() => {
+  const q = sourceSearchQueryBN.value.trim().toLowerCase()
+  return q ? sources.filter(s => s.bn.toLowerCase().includes(q)) : sources
+})
+const filteredYearsEN = computed(() => {
+  const q = yearSearchQueryEN.value.trim()
+  return q ? years.filter(y => y.en.includes(q)) : years
+})
+const filteredYearsBN = computed(() => {
+  const q = yearSearchQueryBN.value.trim()
+  return q ? years.filter(y => y.bn.includes(q)) : years
+})
+
+function selectSource(s) {
+  sourceEN.value = s.en
+  sourceBN.value = s.bn
+  sourceSearchQueryEN.value = s.en
+  sourceSearchQueryBN.value = s.bn
+  showSourceDropdownEN.value = false
+  showSourceDropdownBN.value = false
+}
+function selectYear(y) {
+  yearEN.value = y.en
+  // if you keep a yearBN ref for the fallback display, set it too
+  yearSearchQueryEN.value = y.en
+  yearSearchQueryBN.value = y.bn
+  showYearDropdownEN.value = false
+  showYearDropdownBN.value = false
+}
+
+function closeSourceDropdownDelayedEN() { setTimeout(() => { showSourceDropdownEN.value = false }, 150) }
+function closeSourceDropdownDelayedBN() { setTimeout(() => { showSourceDropdownBN.value = false }, 150) }
+function closeYearDropdownDelayedEN()   { setTimeout(() => { showYearDropdownEN.value = false }, 150) }
+function closeYearDropdownDelayedBN()   { setTimeout(() => { showYearDropdownBN.value = false }, 150) }
 
 // ─── Subject / Chapter manual search (filterable by stream) ──
 const subjectSearchQuery   = ref('')
@@ -172,6 +228,32 @@ let explanationBN = ref('')
 
 let statusQuestion = ref('')
 
+const cropperForBulkSheet = ref(false)  // true = cropping the main bulk-upload sheet image itself
+
+function openBulkSheetCropper() {
+  if (!bulkImgFile.value) return
+  cropperImgFile.value     = bulkImgFile.value
+  cropperForBulkIdx.value  = null
+  cropperForStimulus.value = false
+  cropperForBulkSheet.value = true
+  cropperOpen.value        = true
+  nextTick(() => {
+    const el = document.getElementById('cropper-img')
+    if (!el) return
+    if (cropperInstance.value) cropperInstance.value.destroy()
+    cropperInstance.value = new Cropper(el, {
+      viewMode:      1,
+      dragMode:      'move',
+      autoCropArea:  0.9,   // start near full-image since this is a trim/de-skew crop, not a tight extract
+      movable:       true,
+      zoomable:      true,
+      scalable:      false,
+      responsive:    true,
+      background:    false,
+    })
+  })
+}
+
 // ─── Question image (cropped from sheet) ──────────────────────
 const questionImageUrl      = ref('')   // final public URL after upload
 const questionImagePreview  = ref('')   // local blob URL for preview before upload
@@ -214,6 +296,7 @@ function closeCropper() {
   if (cropperInstance.value) { cropperInstance.value.destroy(); cropperInstance.value = null }
   cropperOpen.value    = false
   cropperImgFile.value = null
+  cropperForBulkSheet.value = false
 }
 
 async function confirmCrop() {
@@ -222,6 +305,25 @@ async function confirmCrop() {
 
   try {
     const canvas = cropperInstance.value.getCroppedCanvas({ maxWidth: 1200, imageSmoothingQuality: 'high' })
+
+    // ── Bulk sheet crop: just replace bulkImgFile locally, no upload ──
+    if (cropperForBulkSheet.value) {
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.95))
+      const baseName = (bulkImgFile.value?.name || 'sheet').replace(/\.[^.]+$/, '')
+      const croppedFile = new File([blob], `${baseName}-cropped.jpg`, { type: 'image/jpeg' })
+
+      bulkImgFile.value    = croppedFile
+      bulkImgPreview.value = canvas.toDataURL('image/jpeg', 0.95)
+
+      // previous parse results are now stale against the new image
+      bulkResults.value  = []
+      bulkSelected.value = []
+      bulkExpanded.value = []
+
+      showToast('Sheet image cropped ✓')
+      closeCropper()
+      return
+    }
 
     const stream  = streamEN.value
     const subject = (cropperForBulkIdx.value !== null ? bulkResults.value[cropperForBulkIdx.value]?.subjectEN : subjectEN.value) || 'unknown'
@@ -608,10 +710,17 @@ async function saveBulk() {
     subject:     { english: subjectSearchQuery.value ? subjectSearchQuery.value : q.subjectEN || null,   bangla: subjectSearchQueryBN.value ? subjectSearchQueryBN.value : q.subjectBN || null },
     chapter:     { english: chapterSearchQuery.value ? chapterSearchQuery.value : q.chapterEN || null,   bangla: chapterSearchQueryBN.value ? chapterSearchQueryBN.value : q.chapterBN || null },
     difficulty:  { english: q.difficulty || null,  bangla: difficultyBanglaMap[q.difficulty] || null },
-    years: q.years?.length
-      ? q.years.map(y => ({ english: y, bangla: toBengaliDigits(y) }))
-      : null,
-    source:      { english: q.sourceEN || null,    bangla: q.sourceBN || null },
+    // years: q.years?.length
+    //   ? q.years.map(y => ({ english: y, bangla: toBengaliDigits(y) }))
+    //   : null,
+    // source:      { english: q.sourceEN || null,    bangla: q.sourceBN || null },
+    source: { 
+      english: sourceSearchQueryEN.value ? sourceSearchQueryEN.value : q.sourceEN || null, 
+      bangla:  sourceSearchQueryBN.value ? sourceSearchQueryBN.value : q.sourceBN || null 
+    },
+    years: yearSearchQueryEN.value
+      ? [{ english: yearSearchQueryEN.value, bangla: yearSearchQueryBN.value || toBengaliDigits(yearSearchQueryEN.value) }]
+      : (q.years?.length ? q.years.map(y => ({ english: y, bangla: toBengaliDigits(y) })) : null),
     correct_index:    answerIndexMap[q.answerEN] ?? 0,
     is_verified: true,
     difficulty_level: q.difficulty?.toLowerCase() || 'medium',
@@ -2221,6 +2330,82 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                     </li>
                   </ul>
                 </div>
+                <div class="mf-group" style="position: relative;">
+                  <label class="mf-label">Source EN (Optional)</label>
+                  <input
+                    type="text"
+                    class="mf-input mf-select"
+                    v-model="sourceSearchQueryEN"
+                    @focus="showSourceDropdownEN = true"
+                    @input="showSourceDropdownEN = true"
+                    @blur="closeSourceDropdownDelayedEN"
+                    placeholder="Select source…"
+                    autocomplete="off"
+                  />
+                  <ul v-if="showSourceDropdownEN && filteredSourcesEN.length" class="mf-dropdown-list">
+                    <li v-for="s in filteredSourcesEN" :key="s.en" @mousedown.prevent="selectSource(s)">
+                      {{ s.en }}
+                    </li>
+                  </ul>
+                </div>
+
+                <div class="mf-group" style="position: relative;">
+                  <label class="mf-label">Source BN (Optional)</label>
+                  <input
+                    type="text"
+                    class="mf-input mf-select"
+                    v-model="sourceSearchQueryBN"
+                    @focus="showSourceDropdownBN = true"
+                    @input="showSourceDropdownBN = true"
+                    @blur="closeSourceDropdownDelayedBN"
+                    placeholder="উৎস নির্বাচন করুন…"
+                    autocomplete="off"
+                  />
+                  <ul v-if="showSourceDropdownBN && filteredSourcesBN.length" class="mf-dropdown-list">
+                    <li v-for="s in filteredSourcesBN" :key="s.bn" @mousedown.prevent="selectSource(s)">
+                      {{ s.bn }}
+                    </li>
+                  </ul>
+                </div>
+
+                <div class="mf-group" style="position: relative;">
+                  <label class="mf-label">Year EN (Optional)</label>
+                  <input
+                    type="text"
+                    class="mf-input mf-select"
+                    v-model="yearSearchQueryEN"
+                    @focus="showYearDropdownEN = true"
+                    @input="showYearDropdownEN = true"
+                    @blur="closeYearDropdownDelayedEN"
+                    placeholder="Select year…"
+                    autocomplete="off"
+                  />
+                  <ul v-if="showYearDropdownEN && filteredYearsEN.length" class="mf-dropdown-list">
+                    <li v-for="y in filteredYearsEN" :key="y.en" @mousedown.prevent="selectYear(y)">
+                      {{ y.en }}
+                    </li>
+                  </ul>
+                </div>
+
+                <div class="mf-group" style="position: relative;">
+                  <label class="mf-label">Year BN (Optional)</label>
+                  <input
+                    type="text"
+                    class="mf-input mf-select"
+                    v-model="yearSearchQueryBN"
+                    @focus="showYearDropdownBN = true"
+                    @input="showYearDropdownBN = true"
+                    @blur="closeYearDropdownDelayedBN"
+                    placeholder="সাল নির্বাচন করুন…"
+                    autocomplete="off"
+                  />
+                  <ul v-if="showYearDropdownBN && filteredYearsBN.length" class="mf-dropdown-list">
+                    <li v-for="y in filteredYearsBN" :key="y.bn" @mousedown.prevent="selectYear(y)">
+                      {{ y.bn }}
+                    </li>
+                  </ul>
+                </div>
+                
                 <div class="mf-group" style="justify-content:flex-end; padding-top:18px;">
                   <span v-if="bulkRedDotDetected" class="bulk-mode-badge red-dot-badge">🔴 Red-dot mode</span>
                   <span v-else-if="bulkResults.length" class="bulk-mode-badge">All questions mode</span>
@@ -2255,6 +2440,15 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                 >
                   <span v-if="bulkParsing" class="img-spinner">◌</span>
                   {{ bulkParsing ? 'Analyzing image…' : !streamEN ? 'Select a stream first' : '⚡ Parse Questions' }}
+                </button>
+                <button
+                  v-if="bulkImgFile"
+                  class="iso-btn iso-btn--ghost"
+                  :disabled="bulkParsing"
+                  @click="openBulkSheetCropper"
+                  style="font-size:0.72rem"
+                >
+                  ✂ Crop
                 </button>
                 <button v-if="bulkImgFile" class="iso-btn iso-btn--ghost" @click="resetBulk" style="font-size:0.72rem">Clear</button>
               </div>
@@ -2325,14 +2519,14 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                     </div>
 
                     <!-- Expanded detail -->
-                    <div v-if="bulkExpanded[i]" class="bulk-row-detail">
+                    <!-- <div v-if="bulkExpanded[i]" class="bulk-row-detail">
                       <div v-if="q.stimulusBN || q.stimulusEN" class="brd-section brd-stimulus">
                         <span class="brd-label">
                           STIMULUS
                           <span class="stimulus-link-badge">🔗 linked</span>
                         </span>
                       
-                        <!-- Stimulus image — above text -->
+                        !-- Stimulus image — above text --
                         <div v-if="q.hasStimulusImage" class="stimulus-img-wrap">
                           <img
                             v-if="q.stimulusImagePreview || q.stimulusImageUrl"
@@ -2394,6 +2588,164 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                         </span>
                         <span v-if="q.subjectEN" class="bn-text"><b>Subject:</b> {{ q.subjectEN }} <span v-if="q.subjectBN" style="font-size:0.65rem; opacity:0.7">({{ q.subjectBN }})</span></span>
                         <span v-if="q.chapterEN" class="bn-text"><b>Chapter:</b> {{ q.chapterEN }} <span v-if="q.chapterBN" style="font-size:0.65rem; opacity:0.7">({{ q.chapterBN }})</span></span>
+                      </div>
+                    </div> -->
+                    <!-- Expanded detail -->
+                    <div v-if="bulkExpanded[i]" class="bulk-row-detail">
+
+                      <!-- Stimulus -->
+                      <div v-if="q.stimulusBN || q.stimulusEN || q.hasStimulusImage" class="brd-section brd-stimulus">
+                        <span class="brd-label">
+                          STIMULUS
+                          <span class="stimulus-link-badge">🔗 linked</span>
+                        </span>
+
+                        <div v-if="q.hasStimulusImage" class="stimulus-img-wrap">
+                          <img
+                            v-if="q.stimulusImagePreview || q.stimulusImageUrl"
+                            :src="q.stimulusImagePreview || q.stimulusImageUrl"
+                            class="brd-qimg"
+                          />
+                          <button
+                            class="iso-btn iso-btn--ghost"
+                            style="font-size:0.68rem; margin-top:6px; width:fit-content"
+                            @click="openCropper(bulkImgFile, i, true)"
+                          >
+                            {{ q.stimulusImageUrl ? '✎ Re-crop stimulus' : '✂ Crop stimulus image' }}
+                          </button>
+                          <span v-if="q.stimulusImageUrl" class="stimulus-auto-filled">
+                            ✓ auto-filled on linked questions
+                          </span>
+                        </div>
+
+                        <textarea class="brd-edit-textarea" v-model="q.stimulusEN" rows="2" placeholder="Stimulus (English)"></textarea>
+                        <span v-if="q.stimulusEN" class="brd-preview" v-html="renderLatexText(q.stimulusEN)"></span>
+
+                        <textarea class="brd-edit-textarea bn-text" v-model="q.stimulusBN" rows="2" placeholder="Stimulus (Bangla)" style="opacity:0.85; font-size:0.72rem"></textarea>
+                        <span v-if="q.stimulusBN" class="brd-preview bn-text" v-html="renderLatexText(q.stimulusBN)" style="font-size:0.7rem; opacity:0.7"></span>
+                      </div>
+
+                      <!-- Question -->
+                      <div class="brd-section">
+                        <span class="brd-label">English Question</span>
+                        <textarea class="brd-edit-textarea" v-model="q.questionEN" rows="2" placeholder="Question (English)"></textarea>
+                        <span v-if="q.questionEN" class="brd-preview" v-html="renderLatexText(q.questionEN)"></span>
+
+                        <textarea class="brd-edit-textarea bn-text" v-model="q.questionBN" rows="2" placeholder="প্রশ্ন (বাংলা)" style="font-size:0.7rem; opacity:0.85"></textarea>
+                        <span v-if="q.questionBN" class="brd-preview bn-text" v-html="renderLatexText(q.questionBN)" style="font-size:0.7rem; opacity:0.7"></span>
+                      </div>
+
+                      <!-- Question image -->
+                      <div class="brd-section">
+                        <span v-if="q.hasQuestionImage" class="brd-label">QUESTION IMAGE</span>
+                        <img v-if="q.questionImagePreview || q.questionImageUrl" :src="q.questionImagePreview || q.questionImageUrl" class="brd-qimg" />
+                        <button
+                          v-if="q.hasQuestionImage"
+                          class="iso-btn iso-btn--ghost"
+                          style="font-size:0.68rem; margin-top:6px; width:fit-content"
+                          @click="openCropper(bulkImgFile, i)"
+                        >
+                          {{ q.questionImageUrl ? '✎ Re-crop' : '✂ Crop image' }}
+                        </button>
+                      </div>
+
+                      <!-- Options -->
+                      <div class="brd-section">
+                        <span class="brd-label">Options (click letter to set correct answer)</span>
+                        <div class="brd-options">
+                          <span v-for="(opt, oi) in ['A','B','C','D']" :key="oi" class="brd-option brd-option--edit" :class="{ 'brd-option--correct': q.answerEN === opt }">
+                            <button
+                              type="button"
+                              class="brd-option-letter"
+                              :class="{ 'is-correct': q.answerEN === opt }"
+                              @click="q.answerEN = opt"
+                              :title="'Mark ' + opt + ' as correct answer'"
+                            >{{ opt }}</button>
+                            <span class="brd-option-edit-col">
+                              <input type="text" class="brd-edit-input" v-model="q.optionsEN[oi]" :placeholder="'Option ' + opt + ' (EN)'" />
+                              <span v-if="q.optionsEN[oi]" class="brd-preview" v-html="renderLatexText(q.optionsEN[oi])"></span>
+
+                              <input type="text" class="brd-edit-input bn-text" v-model="q.optionsBN[oi]" :placeholder="'Option ' + opt + ' (BN)'" />
+                              <span v-if="q.optionsBN[oi]" class="brd-preview bn-text" v-html="renderLatexText(q.optionsBN[oi])" style="font-size:0.7rem; opacity:0.7"></span>
+                              <br>
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+
+                      <!-- Explanation -->
+                      <div class="brd-section">
+                        <span class="brd-label">Explanation</span>
+                        <textarea class="brd-edit-textarea" v-model="q.explanationEN" rows="2" placeholder="Explanation (English)"></textarea>
+                        <span v-if="q.explanationEN" class="brd-preview" v-html="renderLatexText(q.explanationEN)"></span>
+
+                        <textarea class="brd-edit-textarea bn-text" v-model="q.explanationBN" rows="2" placeholder="ব্যাখ্যা (বাংলা)" style="font-size:0.7rem; opacity:0.85"></textarea>
+                        <span v-if="q.explanationBN" class="brd-preview bn-text" v-html="renderLatexText(q.explanationBN)" style="font-size:0.7rem; opacity:0.7"></span>
+                      </div>
+
+                      <!-- Meta: difficulty / year / source / subject / chapter -->
+                      <div class="brd-section brd-meta-row brd-meta-row--edit">
+                        <label>
+                          <b>Difficulty:</b>
+                          <select v-model="q.difficulty" class="brd-edit-select">
+                            <option value="Easy">Easy</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Hard">Hard</option>
+                          </select>
+                        </label>
+
+                        <label>
+                          <b>Year:</b>
+                          <input
+                            type="text"
+                            class="brd-edit-input brd-edit-input--small"
+                            :value="(q.years || []).join(', ')"
+                            @change="q.years = $event.target.value.split(',').map(s => s.trim()).filter(Boolean)"
+                            placeholder="e.g. 2023, 2024"
+                          />
+                        </label>
+
+                        <label>
+                          <b>Source EN:</b>
+                          <input
+                            type="text"
+                            class="brd-edit-input brd-edit-input--small"
+                            :value="(q.sourceEN || []).join(', ')"
+                            @change="q.sourceEN = $event.target.value.split(',').map(s => s.trim()).filter(Boolean)"
+                            placeholder="e.g. Dhaka Board"
+                          />
+                        </label>
+
+                        <label>
+                          <b>Source BN:</b>
+                          <input
+                            type="text"
+                            class="brd-edit-input brd-edit-input--small bn-text"
+                            :value="(q.sourceBN || []).join(', ')"
+                            @change="q.sourceBN = $event.target.value.split(',').map(s => s.trim()).filter(Boolean)"
+                            placeholder="যেমন: ঢাকা বোর্ড"
+                          />
+                        </label>
+
+                        <label>
+                          <b>Subject EN:</b>
+                          <input type="text" class="brd-edit-input brd-edit-input--small" v-model="q.subjectEN" placeholder="Subject" />
+                        </label>
+
+                        <label>
+                          <b>Subject BN:</b>
+                          <input type="text" class="brd-edit-input brd-edit-input--small bn-text" v-model="q.subjectBN" placeholder="বিষয়" />
+                        </label>
+
+                        <label>
+                          <b>Chapter EN:</b>
+                          <input type="text" class="brd-edit-input brd-edit-input--small" v-model="q.chapterEN" placeholder="Chapter" />
+                        </label>
+
+                        <label>
+                          <b>Chapter BN:</b>
+                          <input type="text" class="brd-edit-input brd-edit-input--small bn-text" v-model="q.chapterBN" placeholder="অধ্যায়" />
+                        </label>
                       </div>
                     </div>
                   </div>
@@ -3223,6 +3575,39 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
   font-family: var(--font-sans); font-size: 0.7rem; color: var(--gray);
 }
 .bn-text { font-family: 'Noto Sans Bengali', sans-serif; }
+
+.brd-edit-textarea, .brd-edit-input, .brd-edit-select {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.78rem;
+  padding: 6px 8px;
+  color: var(--white);
+  /*border: 1px solid var(--border-color, #ddd);*/
+  border-radius: 4px;
+  background: var(--input-bg, #302f2f);
+  resize: vertical;
+}
+.brd-edit-input--small { width: auto; min-width: 160px; }
+
+.brd-preview {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--text-muted, #666);
+  padding: 2px 4px;
+  border-left: 2px solid var(--accent, #1aa37a);
+  margin-top: 2px;
+}
+
+.brd-option--edit { display: flex; align-items: center; gap: 6px; }
+.brd-option-edit-col { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.brd-option-letter {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid #ccc; background: #fff; cursor: pointer; font-size: 0.7rem;
+}
+.brd-option-letter.is-correct { background: #1aa37a; color: #fff; border-color: #1aa37a; }
+
+.brd-meta-row--edit { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+.brd-meta-row--edit label { display: flex; flex-direction: column; gap: 3px; font-size: 0.72rem; }
 
 /* Save bar */
 .bulk-save-bar {
