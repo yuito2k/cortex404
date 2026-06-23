@@ -13,7 +13,7 @@
         </p>
       </div>
       <div class="welcome-right">
-        <NuxtLink to="/dashboard/mock-exam" class="iso-btn iso-btn--fill">
+        <NuxtLink to="/dashboard/exams" class="iso-btn iso-btn--fill">
           Start Today's Exam →
         </NuxtLink>
         <NuxtLink to="/dashboard/question-bank" class="iso-btn iso-btn--ghost">

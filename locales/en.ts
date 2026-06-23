@@ -263,6 +263,12 @@ export default {
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>`,
       },
       {
+        to: '/dashboard/exams',
+        label: 'Exams',
+        badge: null,
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/><path d="M4 6h4M4 10h8M4 14h4"/></svg>`,
+      },
+      {
         to: '/dashboard/mock-exam',
         label: 'Mock Exam',
         badge: null,
@@ -273,6 +279,18 @@ export default {
         label: 'Question Bank',
         badge: '1M+',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 4v16"/></svg>`,
+      },
+      {
+        to: '/dashboard/textbook',
+        label: 'Textbook',
+        badge: null,
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>`,
+      },
+      {
+        to: '/dashboard/model-test',
+        label: 'Model Test',
+        badge: null,
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><path d="M9 12h6M9 16h6"/><path d="M12 20l1.5-3h-3L12 20z"/></svg>`,
       },
       {
         to: '/dashboard/progress',
@@ -287,10 +305,22 @@ export default {
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>`,
       },
       {
+        to: '/dashboard/omr-checker',
+        label: 'OMR Checker',
+        badge: null,
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="1.5" fill="currentColor"/><circle cx="15" cy="9" r="1.5"/><circle cx="9" cy="15" r="1.5"/><circle cx="15" cy="15" r="1.5" fill="currentColor"/></svg>`,
+      },
+      {
         to: '/dashboard/edverse',
         label: 'EdVerse',
         badge: null,
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="20" height="15" rx="3"/><polygon points="10 9.5 16 12.5 10 15.5"/></svg>`,
+      },
+      {
+        to: '/dashboard/routine',
+        label: 'Routine',
+        badge: null,
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M9 16l2 2 4-4"/></svg>`,
       },
     ],
   },

@@ -31,7 +31,7 @@
       </button>
 
       <!-- Quick exam start -->
-      <NuxtLink to="/dashboard/mock-exam" class="iso-btn iso-btn--fill topbar-cta">
+      <NuxtLink to="/dashboard/exams" class="iso-btn iso-btn--fill topbar-cta">
         Start Exam →
       </NuxtLink>
     </div>

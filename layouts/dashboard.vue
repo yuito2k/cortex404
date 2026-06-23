@@ -40,11 +40,15 @@ const mobileMenuOpen = ref(false)
 const pageTitle = computed(() => {
   const map: Record<string, string> = {
     '/dashboard': 'Overview',
+    '/dashboard/exams': 'Exams',
     '/dashboard/mock-exam': 'Mock Exam',
     '/dashboard/question-bank': 'Question Bank',
+    '/dashboard/textbook': 'Textbook',
+    '/dashboard/model-test': 'Model Test',
     '/dashboard/progress': 'Progress',
     '/dashboard/leaderboard': 'Leaderboard',
     '/dashboard/edverse': 'EdVerse',
+    '/dashboard/routine': 'Routine',
     '/dashboard/settings': 'Settings',
   }
   return map[route.path] ?? 'Dashboard'
