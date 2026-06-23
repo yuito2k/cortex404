@@ -65,35 +65,93 @@
         </div>
       </div>
 
-      <!-- ══ SECTION 02 — TEXTBOOK PICKER ══════════════════════════ -->
+      <!-- ══ SECTION 02 — STREAM ═══════════════════════════════════ -->
       <div class="config-block">
         <div class="config-section-header">
           <span class="csec-tag">02</span>
+          <span class="csec-label">Select Stream</span>
+          <span v-if="selectedStream" class="csec-hint">
+            <span class="sh-dot" />{{ selectedStream }}
+          </span>
+        </div>
+        <div class="stream-grid">
+          <button
+            v-for="s in examStreams"
+            :key="s.id"
+            class="stream-card"
+            :class="{ active: selectedStream === s.id, 'no-books': !subjectsForStream(s.id).length }"
+            @click="onStreamSelect(s.id)"
+          >
+            <span class="stream-icon" v-html="s.icon" />
+            <span class="stream-name">{{ s.name }}</span>
+            <span class="stream-desc">{{ s.desc }}</span>
+            <span v-if="!subjectsForStream(s.id).length" class="stream-no-books">No textbooks</span>
+            <span v-if="selectedStream === s.id" class="stream-check">✓</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ══ SECTION 03 — SUBJECT ═══════════════════════════════════ -->
+      <div v-if="selectedStream && subjectsForStream(selectedStream).length" class="config-block">
+        <div class="config-section-header">
+          <span class="csec-tag">03</span>
+          <span class="csec-label">Select Subject</span>
+          <span v-if="selectedSubject" class="csec-hint">
+            <span class="sh-dot" />{{ selectedSubject }}
+          </span>
+        </div>
+        <div class="subject-pills-wrap">
+          <button
+            v-for="subj in subjectsForStream(selectedStream)"
+            :key="subj"
+            class="subject-pill"
+            :class="{ active: selectedSubject === subj }"
+            @click="onSubjectSelect(subj)"
+          >
+            <span class="sp-icon" v-html="subjectIcon(subj)" />
+            <span class="sp-label">{{ subj }}</span>
+            <span class="sp-count">{{ (subjectToBooks[subj] || []).length }} books</span>
+            <span v-if="selectedSubject === subj" class="sp-check">✓</span>
+          </button>
+        </div>
+      </div>
+
+      <div v-else-if="selectedStream && !subjectsForStream(selectedStream).length" class="config-block no-books-block">
+        <div class="config-section-header">
+          <span class="csec-tag">03</span>
+          <span class="csec-label">No Textbooks Available</span>
+        </div>
+        <div class="no-books-msg">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28" height="28">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <p>No textbook questions are available for <strong>{{ selectedStream }}</strong> yet.</p>
+          <p class="nb-sub">Try HSC Science, BUET or Medical for the best coverage.</p>
+        </div>
+      </div>
+
+      <!-- ══ SECTION 04 — TEXTBOOK ══════════════════════════════════ -->
+      <div v-if="selectedSubject && booksForSelectedSubject.length" class="config-block">
+        <div class="config-section-header">
+          <span class="csec-tag">04</span>
           <span class="csec-label">Select Textbook</span>
           <span v-if="selectedBook" class="csec-hint selected-hint">
             <span class="sh-dot" />{{ selectedBook }}
           </span>
         </div>
-        <div class="book-groups">
-          <div v-for="group in textbookGroups" :key="group.subject" class="book-group">
-            <div class="book-group-header">
-              <span class="bg-icon" v-html="group.icon" />
-              <span class="bg-label">{{ group.subject }}</span>
-            </div>
-            <div class="book-grid">
-              <button
-                v-for="book in group.books"
-                :key="book"
-                class="book-card"
-                :class="{ active: selectedBook === book }"
-                @click="onBookSelect(book)"
-              >
-                <span class="book-paper">{{ getPaper(book) }}</span>
-                <span class="book-author">{{ getAuthor(book) }}</span>
-                <span v-if="selectedBook === book" class="book-check">✓</span>
-              </button>
-            </div>
-          </div>
+        <div class="book-grid book-grid--standalone">
+          <button
+            v-for="book in booksForSelectedSubject"
+            :key="book"
+            class="book-card"
+            :class="{ active: selectedBook === book }"
+            @click="onBookSelect(book)"
+          >
+            <span class="book-subject-tag">{{ getSubjectPrefix(book) }}</span>
+            <span v-if="book.includes('Paper')" class="book-paper">{{ getPaper(book) }}</span>
+            <span class="book-author">{{ getAuthor(book) }}</span>
+            <span v-if="selectedBook === book" class="book-check">✓</span>
+          </button>
         </div>
       </div>
 
@@ -104,7 +162,7 @@
           <!-- Chapter -->
           <div class="config-section" v-if="availableChapters.length > 1">
             <div class="config-section-header">
-              <span class="csec-tag">03</span>
+              <span class="csec-tag">05</span>
               <span class="csec-label">Chapter</span>
               <span class="csec-hint">Filter by chapter</span>
             </div>
@@ -122,7 +180,7 @@
           <!-- Q Count + Duration -->
           <div class="config-section">
             <div class="config-section-header">
-              <span class="csec-tag">{{ availableChapters.length > 1 ? '04' : '03' }}</span>
+              <span class="csec-tag">{{ availableChapters.length > 1 ? '06' : '05' }}</span>
               <span class="csec-label">Questions &amp; Duration</span>
             </div>
             <div class="dual-config">
@@ -156,7 +214,7 @@
           <!-- Difficulty Mix -->
           <div class="config-section">
             <div class="config-section-header">
-              <span class="csec-tag">{{ availableChapters.length > 1 ? '05' : '04' }}</span>
+              <span class="csec-tag">{{ availableChapters.length > 1 ? '07' : '06' }}</span>
               <span class="csec-label">Difficulty Mix</span>
             </div>
             <div class="diff-options">
@@ -970,33 +1028,124 @@ const textBooks = [
   'ICT (Engr. Mujibur Rahman)',
 ]
 
-const textbookGroups = [
+// ── Exam streams ───────────────────────────────────────────
+const examStreams = [
   {
-    subject: 'Mathematics',
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M12 4v16M4 12h16"/><circle cx="12" cy="12" r="9"/></svg>`,
-    books: textBooks.filter(b => b.startsWith('Mathematics')),
+    id: 'HSC Science',
+    name: 'HSC Science',
+    desc: 'Higher Secondary · Science',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>`,
   },
   {
-    subject: 'Physics',
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>`,
-    books: textBooks.filter(b => b.startsWith('Physics')),
+    id: 'HSC Arts',
+    name: 'HSC Arts',
+    desc: 'Higher Secondary · Humanities',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>`,
   },
   {
-    subject: 'Chemistry',
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M9 3h6M10 3v6l-5 9a1 1 0 0 0 .9 1.5h12.2a1 1 0 0 0 .9-1.5L14 9V3"/></svg>`,
-    books: textBooks.filter(b => b.startsWith('Chemistry')),
+    id: 'HSC Commerce',
+    name: 'HSC Commerce',
+    desc: 'Higher Secondary · Business',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
   },
   {
-    subject: 'Biology',
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M12 22V12M12 12C12 7 7 3 7 3s2 6 5 9M12 12c0-5 5-9 5-9s-2 6-5 9"/></svg>`,
-    books: textBooks.filter(b => b.startsWith('Botany') || b.startsWith('Zoology')),
+    id: 'SSC Science',
+    name: 'SSC Science',
+    desc: 'Secondary · Science',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>`,
   },
   {
-    subject: 'ICT',
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`,
-    books: textBooks.filter(b => b.startsWith('ICT')),
+    id: 'Medical',
+    name: 'Medical',
+    desc: 'MBBS · BDS Admission',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`,
+  },
+  {
+    id: 'BUET',
+    name: 'BUET',
+    desc: 'Engineering Admission',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`,
+  },
+  {
+    id: 'DU',
+    name: 'DU',
+    desc: 'Dhaka University Admission',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+  },
+  {
+    id: 'BCS',
+    name: 'BCS',
+    desc: 'Civil Service Exam',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`,
   },
 ]
+
+// ── Stream → Subject mapping ────────────────────────────────
+const streamToSubjectsMap: Record<string, string[]> = {
+  'HSC Science': [
+    'Mathematics 1st Paper', 'Mathematics 2nd Paper',
+    'Physics 1st Paper',     'Physics 2nd Paper',
+    'Chemistry 1st Paper',   'Chemistry 2nd Paper',
+    'Botany', 'Zoology', 'ICT',
+  ],
+  'HSC Arts':    [],
+  'HSC Commerce':[],
+  'SSC Science': [
+    'Mathematics 1st Paper', 'Mathematics 2nd Paper',
+    'Physics 1st Paper',     'Physics 2nd Paper',
+    'Chemistry 1st Paper',   'Chemistry 2nd Paper',
+    'Botany', 'Zoology', 'ICT',
+  ],
+  'Medical': [
+    'Physics 1st Paper', 'Physics 2nd Paper',
+    'Chemistry 1st Paper', 'Chemistry 2nd Paper',
+    'Botany', 'Zoology',
+  ],
+  'BUET': [
+    'Mathematics 1st Paper', 'Mathematics 2nd Paper',
+    'Physics 1st Paper',     'Physics 2nd Paper',
+    'Chemistry 1st Paper',   'Chemistry 2nd Paper',
+  ],
+  'DU': [
+    'Mathematics 1st Paper', 'Mathematics 2nd Paper',
+    'Physics 1st Paper',     'Physics 2nd Paper',
+    'Chemistry 1st Paper',   'Chemistry 2nd Paper',
+    'Botany', 'Zoology', 'ICT',
+  ],
+  'BCS': [],
+}
+
+// ── Subject → Books mapping ─────────────────────────────────
+const subjectToBooks: Record<string, string[]> = {
+  'Mathematics 1st Paper': textBooks.filter(b => b.startsWith('Mathematics 1st Paper')),
+  'Mathematics 2nd Paper': textBooks.filter(b => b.startsWith('Mathematics 2nd Paper')),
+  'Physics 1st Paper':     textBooks.filter(b => b.startsWith('Physics 1st Paper')),
+  'Physics 2nd Paper':     textBooks.filter(b => b.startsWith('Physics 2nd Paper')),
+  'Chemistry 1st Paper':   textBooks.filter(b => b.startsWith('Chemistry 1st Paper')),
+  'Chemistry 2nd Paper':   textBooks.filter(b => b.startsWith('Chemistry 2nd Paper')),
+  'Botany':                textBooks.filter(b => b.startsWith('Botany')),
+  'Zoology':               textBooks.filter(b => b.startsWith('Zoology')),
+  'ICT':                   textBooks.filter(b => b.startsWith('ICT')),
+}
+
+function subjectsForStream(streamId: string): string[] {
+  return (streamToSubjectsMap[streamId] ?? []).filter(s => (subjectToBooks[s] ?? []).length > 0)
+}
+
+function subjectIcon(subj: string): string {
+  if (subj.startsWith('Math'))     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M12 4v16M4 12h16"/></svg>`
+  if (subj.startsWith('Physics'))  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>`
+  if (subj.startsWith('Chem'))     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M9 3h6M10 3v6l-5 9h14l-5-9V3"/></svg>`
+  if (subj === 'Botany')           return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M12 22V12M12 12C12 7 7 3 7 3s2 6 5 9"/><path d="M12 12c0-5 5-9 5-9s-2 6-5 9"/></svg>`
+  if (subj === 'Zoology')          return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>`
+  if (subj.startsWith('ICT'))      return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`
+}
+
+function getSubjectPrefix(book: string): string {
+  const match = book.match(/^([A-Za-z]+(?:\s+[A-Za-z]+)?\s+(?:1st|2nd)\s+Paper|Botany|Zoology|ICT)/)
+  return match ? match[1] : ''
+}
 
 function getPaper(book: string): string {
   if (book.includes('1st Paper')) return '1st Paper'
@@ -1010,9 +1159,36 @@ function getAuthor(book: string): string {
 }
 
 // ── Global state ───────────────────────────────────────────
-const mode         = ref<'mock' | 'qbank'>('mock')
-const selectedBook = ref<string | null>(null)
-const phase        = ref<'setup' | 'exam' | 'results'>('setup')
+const mode            = ref<'mock' | 'qbank'>('mock')
+const selectedStream  = ref<string | null>(null)
+const selectedSubject = ref<string | null>(null)
+const selectedBook    = ref<string | null>(null)
+const phase           = ref<'setup' | 'exam' | 'results'>('setup')
+
+const booksForSelectedSubject = computed<string[]>(() =>
+  selectedSubject.value ? (subjectToBooks[selectedSubject.value] ?? []) : []
+)
+
+function onStreamSelect(streamId: string) {
+  if (selectedStream.value === streamId) return
+  selectedStream.value  = streamId
+  selectedSubject.value = null
+  selectedBook.value    = null
+  availableChapters.value = []
+  qbAllQuestions.value    = []
+  qbFiltered.value        = []
+  qbChapters.value        = []
+}
+
+function onSubjectSelect(subj: string) {
+  if (selectedSubject.value === subj) return
+  selectedSubject.value = subj
+  selectedBook.value    = null
+  availableChapters.value = []
+  qbAllQuestions.value    = []
+  qbFiltered.value        = []
+  qbChapters.value        = []
+}
 
 async function onBookSelect(book: string) {
   selectedBook.value = book
@@ -1020,7 +1196,6 @@ async function onBookSelect(book: string) {
   availableChapters.value = []
   qbSelectedChapter.value = ''
   qbChapters.value = []
-  // load chapters for the new book
   await loadChapters()
   if (mode.value === 'qbank') {
     await qbFetchQuestions()
@@ -1533,6 +1708,24 @@ watch(mode, async (newMode) => {
   }
 })
 
+// When stream changes, reset cascade below
+watch(selectedStream, () => {
+  selectedSubject.value   = null
+  selectedBook.value      = null
+  availableChapters.value = []
+  qbAllQuestions.value    = []
+  qbFiltered.value        = []
+})
+
+// When subject changes, reset book + qbank data
+watch(selectedSubject, () => {
+  selectedBook.value      = null
+  availableChapters.value = []
+  qbAllQuestions.value    = []
+  qbFiltered.value        = []
+  qbChapters.value        = []
+})
+
 onMounted(async () => {
   if (!session.value) return
   // Load bookmarks
@@ -1655,42 +1848,98 @@ onUnmounted(() => { stopTimer(); observer?.disconnect() })
   padding: 2px 7px;
 }
 
-/* ══ Textbook picker ══════════════════════════════════════════ */
-.book-groups { display: flex; flex-direction: column; gap: 0; }
-
-.book-group { border-top: 1px solid var(--border); }
-
-.book-group-header {
-  display: flex; align-items: center; gap: 8px;
-  padding: 0.7rem 1.6rem;
-  background: rgba(240,240,234,0.02);
+/* ══ Stream grid ══════════════════════════════════════════════ */
+.stream-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 1px; background: var(--border);
+  border-top: 1px solid var(--border);
 }
-.bg-icon { color: var(--gray); display: flex; align-items: center; }
-.bg-label { font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--gray); }
+.stream-card {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 1.1rem 1.2rem; position: relative;
+  background: #0a0a0a; border: none; cursor: pointer;
+  text-align: left; transition: all 0.18s ease;
+}
+.stream-card:hover:not(.no-books) { background: rgba(240,240,234,0.04); }
+.stream-card.active { background: rgba(240,240,234,0.07); box-shadow: inset 0 0 0 1px var(--white); }
+.stream-card.no-books { opacity: 0.4; cursor: not-allowed; }
+.stream-icon { color: var(--gray); margin-bottom: 3px; }
+.stream-card.active .stream-icon { color: var(--white); }
+.stream-name { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700; color: var(--white); letter-spacing: 0.03em; }
+.stream-desc { font-size: 0.65rem; color: var(--gray); }
+.stream-no-books { font-family: var(--font-mono); font-size: 0.55rem; color: var(--gray); opacity: 0.6; border: 1px solid var(--border); padding: 2px 6px; align-self: flex-start; }
+.stream-check {
+  position: absolute; top: 10px; right: 12px;
+  font-family: var(--font-mono); font-size: 0.6rem; color: var(--white);
+  background: rgba(120,230,120,0.15); border: 1px solid rgba(120,230,120,0.4);
+  padding: 2px 7px;
+}
 
+/* ══ Subject pills ════════════════════════════════════════════ */
+.subject-pills-wrap {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1px; background: var(--border); border-top: 1px solid var(--border);
+}
+.subject-pill {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0.95rem 1.2rem; position: relative;
+  background: #0a0a0a; border: none; cursor: pointer;
+  text-align: left; transition: all 0.18s ease;
+}
+.subject-pill:hover { background: rgba(240,240,234,0.04); }
+.subject-pill.active { background: rgba(240,240,234,0.08); box-shadow: inset 0 0 0 1px var(--white); }
+.sp-icon { color: var(--gray); flex-shrink: 0; }
+.subject-pill.active .sp-icon { color: var(--white); }
+.sp-label { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; color: var(--white); flex: 1; }
+.sp-count { font-family: var(--font-mono); font-size: 0.58rem; color: var(--gray); border: 1px solid var(--border); padding: 2px 6px; white-space: nowrap; }
+.sp-check {
+  font-family: var(--font-mono); font-size: 0.6rem; color: rgba(120,230,120,0.9);
+  background: rgba(120,230,120,0.1); border: 1px solid rgba(120,230,120,0.3);
+  padding: 2px 7px; flex-shrink: 0;
+}
+
+/* ══ No books block ═══════════════════════════════════════════ */
+.no-books-block { }
+.no-books-msg {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 2rem 1.5rem; text-align: center; color: var(--gray); border-top: 1px solid var(--border);
+}
+.no-books-msg p { font-size: 0.82rem; color: var(--gray); line-height: 1.5; }
+.no-books-msg strong { color: var(--white); }
+.nb-sub { font-size: 0.72rem !important; color: var(--border-bright) !important; }
+
+/* ══ Textbook picker (standalone, no groups) ══════════════════ */
 .book-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 8px; padding: 0.8rem 1.6rem 1rem;
 }
+.book-grid--standalone {
+  gap: 1px; background: var(--border); border-top: 1px solid var(--border);
+  padding: 0;
+}
 
 .book-card {
-  display: flex; flex-direction: column; gap: 4px;
-  padding: 0.8rem 1rem; position: relative;
-  border: 1px solid var(--border); background: transparent; cursor: pointer;
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 1rem 1.2rem; position: relative;
+  border: none; background: #0a0a0a; cursor: pointer;
   text-align: left; transition: all 0.18s ease;
-  box-shadow: 2px 2px 0 0 rgba(240,240,234,0.03);
 }
-.book-card:hover { border-color: var(--border-bright); background: rgba(240,240,234,0.03); }
-.book-card.active { border-color: var(--white); background: rgba(240,240,234,0.07); box-shadow: 3px 3px 0 0 rgba(240,240,234,0.1); }
+.book-card:hover { background: rgba(240,240,234,0.05); }
+.book-card.active { background: rgba(240,240,234,0.09); box-shadow: inset 0 0 0 1px var(--white); }
 
+.book-subject-tag {
+  font-family: var(--font-mono); font-size: 0.58rem; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--gray);
+}
 .book-paper {
-  font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700;
+  font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700;
   color: var(--white); letter-spacing: 0.03em;
 }
-.book-author { font-size: 0.68rem; color: var(--gray); line-height: 1.3; }
+.book-author { font-size: 0.7rem; color: var(--gray); line-height: 1.35; }
 .book-check {
-  position: absolute; top: 8px; right: 10px;
+  position: absolute; top: 10px; right: 12px;
   font-family: var(--font-mono); font-size: 0.6rem; color: rgba(120,230,120,0.9);
+  background: rgba(120,230,120,0.1); border: 1px solid rgba(120,230,120,0.3); padding: 2px 7px;
 }
 
 /* ══ Filter pills (shared) ════════════════════════════════════ */
@@ -2212,6 +2461,10 @@ onUnmounted(() => { stopTimer(); observer?.disconnect() })
 .eq-stimulus { background: rgba(240,240,234,0.04); border-left: 3px solid var(--border-bright); padding: 12px 16px; border-radius: 4px; }
 
 /* ══ Responsive ══════════════════════════════════════════════ */
+@media (max-width: 1200px) {
+  .stream-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
 @media (max-width: 1100px) {
   .exam-body     { grid-template-columns: 1fr; }
   .results-body  { grid-template-columns: 1fr; }
@@ -2220,12 +2473,19 @@ onUnmounted(() => { stopTimer(); observer?.disconnect() })
   .qbank-sidebar { display: grid; grid-template-columns: repeat(2, 1fr); }
   .result-stats-row { grid-template-columns: repeat(2, 1fr); }
   .diff-options  { grid-template-columns: repeat(2, 1fr); }
+  .stream-grid   { grid-template-columns: repeat(4, 1fr); }
+}
+
+@media (max-width: 900px) {
+  .stream-grid { grid-template-columns: repeat(4, 1fr); }
 }
 
 @media (max-width: 768px) {
   .tb-header { flex-direction: column; align-items: flex-start; }
   .mode-grid { grid-template-columns: 1fr 1fr; }
-  .book-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .stream-grid { grid-template-columns: repeat(2, 1fr); }
+  .subject-pills-wrap { grid-template-columns: repeat(2, 1fr); }
+  .book-grid--standalone { grid-template-columns: repeat(2, 1fr); }
   .dual-config { grid-template-columns: 1fr; }
   .exam-topbar { padding: 0 0.75rem; gap: 0.5rem; }
   .etb-chip { display: none; }
@@ -2243,13 +2503,17 @@ onUnmounted(() => { stopTimer(); observer?.disconnect() })
 @media (max-width: 480px) {
   .tb-header { padding: 1.2rem; }
   .page-title { font-size: 1.4rem; }
-  .config-block { }
   .config-section-header { padding: 1rem 1.2rem 0; }
   .config-section { padding: 1rem 1.2rem; }
-  .book-grid { grid-template-columns: 1fr 1fr; gap: 6px; padding: 0.6rem 1.2rem 0.8rem; }
-  .book-card { padding: 0.6rem 0.8rem; }
-  .book-paper { font-size: 0.68rem; }
-  .book-author { font-size: 0.62rem; }
+  .stream-grid { grid-template-columns: repeat(2, 1fr); }
+  .subject-pills-wrap { grid-template-columns: 1fr; }
+  .book-grid--standalone { grid-template-columns: 1fr 1fr; }
+  .book-card { padding: 0.75rem 1rem; }
+  .book-paper { font-size: 0.7rem; }
+  .book-author { font-size: 0.65rem; }
+  .stream-card { padding: 0.9rem 1rem; }
+  .stream-name { font-size: 0.68rem; }
+  .stream-desc { font-size: 0.6rem; }
   .mode-grid { grid-template-columns: 1fr; }
   .diff-options { grid-template-columns: 1fr 1fr; }
   .result-stats-row { grid-template-columns: 1fr 1fr; }
@@ -2263,5 +2527,7 @@ onUnmounted(() => { stopTimer(); observer?.disconnect() })
   .page-btn { font-size: 0.6rem !important; padding: 7px 10px !important; }
   .search-input { font-size: 0.82rem !important; }
   .filter-status { padding: 0.6rem 1rem; }
+  .sp-label { font-size: 0.68rem; }
+  .sp-count { display: none; }
 }
 </style>

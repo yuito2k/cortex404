@@ -528,6 +528,70 @@ function reviewOptClass(q, idx) {
   if (answers.value[q.id] === idx && idx !== q.answer) return 'rc-wrong'
   return ''
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// PATCH for: pages/dashboard/hsc-ssc-exam.vue
+// PURPOSE:   Auto-start from query params when launched by exams.vue
+//
+// WHERE TO ADD:  Inside <script setup>, AFTER all the existing refs/state
+//               declarations (after line ~280, before the computed section).
+//               Add this entire block.
+// ════════════════════════════════════════════════════════════════════════════
+ 
+// ─── QUERY PARAM AUTO-START ──────────────────────────────────────────────────
+// Reads query params set by exams.vue → navigateTo({ path, query: { ... } })
+// Supported params:
+//   stream    — 'hsc' | 'ssc'
+//   group     — 'hsc_science' | 'hsc_arts' | 'hsc_commerce' | 'ssc_science' | etc.
+//   autostart — '1' to skip setup and start the exam immediately
+//   examId    — (optional) the preset exam id, stored for analytics later
+//   title     — (optional) preset exam title shown in setup header
+const route = useRoute()
+ 
+onMounted(() => {
+  const q = route.query
+ 
+  // Only auto-configure if autostart=1 is present
+  if (q.autostart !== '1') return
+ 
+  // Map stream → exam type key used by examTypes object
+  const streamToType = {
+    hsc: 'hsc',
+    ssc: 'ssc',
+  }
+ 
+  const examTypeKey  = streamToType[q.stream]  // 'hsc' | 'ssc'
+  const groupKey     = q.group                  // e.g. 'hsc_science'
+ 
+  // Validate — both must be valid for the auto-start to proceed
+  if (!examTypeKey || !examTypes[examTypeKey]) return
+  const typeConfig = examTypes[examTypeKey]
+  const groupExists = typeConfig.groups.find(g => g.key === groupKey)
+  if (!groupExists) return
+ 
+  // Set selections (same as user tapping them in setup UI)
+  selectedExamType.value  = examTypeKey
+  selectedGroupKey.value  = groupKey
+ 
+  // Show start modal briefly so user sees the exam config, then auto-start.
+  // If you prefer to skip the modal entirely, call startExam() directly.
+  nextTick(() => {
+    // Small delay so the setup phase renders before modal appears
+    setTimeout(() => {
+      showStartModal.value = true
+    }, 300)
+  })
+})
+ 
+// ════════════════════════════════════════════════════════════════════════════
+// OPTIONAL: If you also want to show the preset exam title in the setup header
+// instead of the generic "Board Exam Prep", add this computed:
+// ════════════════════════════════════════════════════════════════════════════
+ 
+const presetExamTitle = computed(() => route.query.title || null)
+ 
+// Then in the template, replace the hardcoded <p> description with:
+// <p class="page-desc">{{ presetExamTitle || 'Full mock exams for HSC & SSC...' }}</p>
 </script>
 
 <template>

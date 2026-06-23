@@ -491,6 +491,92 @@ function reviewOptClass(q, idx) {
 }
 
 const pct = (v) => `${v}%`
+
+// ════════════════════════════════════════════════════════════════════════════
+// PATCH for: pages/dashboard/admission-exam.vue  (FIXED)
+// PURPOSE:   Auto-start from query params when launched by exams.vue
+//
+// WHERE TO ADD:
+//   Inside script setup, paste this block AFTER the existing helper
+//   functions section (after `const pct = (v) => ...` near line 493),
+//   but BEFORE the closing /script tag.
+//
+// NOTE: Do NOT paste inside an existing function — this is top-level code.
+// ════════════════════════════════════════════════════════════════════════════
+ 
+// ─── QUERY PARAM AUTO-START ──────────────────────────────────────────────────
+//
+// exams.vue passes these query params via navigateTo():
+//   stream    — 'medical' | 'varsity'
+//   group     — 'medical' | 'varsity' (generic) or a specific key like 'mbbs', 'du'
+//   autostart — '1'
+//   examId    — preset exam id (optional, for analytics)
+//   title     — preset exam title (optional, display only)
+//
+// Mapping from exams.vue `group` values → actual examConfigs keys:
+//   'medical'  → 'mbbs'   (default medical exam)
+//   'varsity'  → 'du'     (default varsity exam — most attended)
+//   any specific key ('mbbs', 'bds', 'afmc', 'du', 'cu', 'ju' etc.) → use directly
+//
+// ─────────────────────────────────────────────────────────────────────────────
+ 
+const _route = useRoute()
+ 
+const _groupToExamKey = {
+  // Generic values from exams.vue catalogue
+  medical:  'mbbs',
+  varsity:  'du',
+  // Specific keys passed directly (future-proof)
+  mbbs:     'mbbs',
+  bds:      'bds',
+  afmc:     'afmc',
+  du:       'du',
+  cu:       'cu',
+  ju:       'ju',
+  ru:       'ru',
+  ku:       'ku',
+  sust:     'sust',
+}
+ 
+onMounted(() => {
+  const q = _route.query
+  if (q.autostart !== '1') return
+ 
+  // Resolve which examConfigs key to use
+  const examKey = _groupToExamKey[q.group] || _groupToExamKey[q.stream]
+  if (!examKey || !examConfigs[examKey]) return
+ 
+  // Step 1: set selectedExam (mirrors selectExam())
+  selectedExam.value = examKey
+  selectedUnit.value = ''
+  kaOptionalSubjects.value = []
+ 
+  const cfg = examConfigs[examKey]
+ 
+  // Step 2: wait for Vue to flush reactivity so `canStart` and `config`
+  // computed values are updated before we try to show anything
+  nextTick(() => {
+    if (cfg.requiresUnit) {
+      // DU requires a unit — we can't fully auto-start.
+      // Pre-select the exam and scroll the unit picker into view.
+      // The student picks a unit, then hits "Start Exam →" themselves.
+      setTimeout(() => {
+        const unitEl = document.querySelector('.unit-selector')
+        if (unitEl) unitEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 400)
+    } else {
+      // Non-DU exams: canStart is now true, show the negative marking modal.
+      // Another nextTick ensures the DOM has fully rendered with the new state.
+      nextTick(() => {
+        showNegativeWarning.value = true
+      })
+    }
+  })
+})
+ 
+// Optional: expose preset title for display in template
+// Usage in template: {{ _presetTitle || 'Admission Mock Tests' }}
+const _presetTitle = computed(() => _route.query.title || null)
 </script>
 
 <template>

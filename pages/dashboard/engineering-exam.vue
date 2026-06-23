@@ -476,6 +476,61 @@ function reviewOptClass(q, idx) {
   if (answers.value[q.id] === idx && idx !== q.answer) return 'rc-wrong'
   return ''
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// PATCH for: pages/dashboard/engineering-exam.vue
+// PURPOSE:   Auto-start from query params when launched by exams.vue
+//
+// WHERE TO ADD:  Inside <script setup>, AFTER all the existing refs/state
+//               declarations (after line ~229, before the computed section).
+//               Add this entire block.
+// ════════════════════════════════════════════════════════════════════════════
+ 
+// ─── QUERY PARAM AUTO-START ──────────────────────────────────────────────────
+// Reads query params set by exams.vue → navigateTo({ path, query: { ... } })
+// Supported params:
+//   group     — 'buet' | 'ruet' | 'kuet' | 'cuet'
+//               Note: for engineering exams, `group` IS the exam type key.
+//               The exams.vue catalogue uses group = 'buet', 'ruet', etc.
+//   autostart — '1' to skip setup and show start modal
+//   examId    — (optional) preset exam id for analytics
+//   title     — (optional) preset exam title
+const route = useRoute()
+ 
+onMounted(() => {
+  const q = route.query
+ 
+  if (q.autostart !== '1') return
+ 
+  // For engineering, the `group` query param maps directly to the examTypes key
+  // e.g. group='buet' → examTypes['buet']
+  // exams.vue sets group = 'buet' | 'ruet' | 'kuet' | 'cuet'
+  const examTypeKey = q.group  // 'buet' | 'ruet' | 'kuet' | 'cuet'
+ 
+  if (!examTypeKey || !examTypes[examTypeKey]) return
+ 
+  // Engineering exams have exactly one group per exam type
+  // (e.g. examTypes.buet.groups[0].key === 'buet')
+  const typeConfig  = examTypes[examTypeKey]
+  const groupKey    = typeConfig.groups[0]?.key
+ 
+  if (!groupKey) return
+ 
+  selectedExamType.value  = examTypeKey
+  selectedGroupKey.value  = groupKey
+ 
+  nextTick(() => {
+    setTimeout(() => {
+      showStartModal.value = true
+    }, 300)
+  })
+})
+ 
+// ════════════════════════════════════════════════════════════════════════════
+// OPTIONAL preset title display
+// ════════════════════════════════════════════════════════════════════════════
+ 
+const presetExamTitle = computed(() => route.query.title || null)
 </script>
 
 <template>
