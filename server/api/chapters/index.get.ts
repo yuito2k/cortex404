@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 export default defineEventHandler(async (event) => {
     //const supabase = await serverSupabaseClient(event)
     const config = useRuntimeConfig(event)
-    const { stream, subject } = getQuery(event)
+    const { stream, subject, text_book } = getQuery(event)
 
     if (!stream) throw createError({ statusCode: 400, message: 'stream is required' })
 
@@ -21,6 +21,10 @@ export default defineEventHandler(async (event) => {
 
     if (subject && subject !== 'All') {
         query = query.eq('subject->>english', subject)
+    }
+
+    if (text_book && text_book !== 'All') {
+        query = query.eq('text_book', text_book)
     }
 
     const { data, error } = await query

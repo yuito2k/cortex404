@@ -20,6 +20,9 @@ const supabaseProfile = useSupabaseClient()
 const supabaseHSC = useSupabaseHSC()
 const supabaseMedical = useSupabaseMedical()
 
+let stimulusEN = ref('')
+let stimulusBN = ref('')
+
 let questionEN = ref('')
 let questionBN = ref('')
 
@@ -259,6 +262,11 @@ const questionImageUrl      = ref('')   // final public URL after upload
 const questionImagePreview  = ref('')   // local blob URL for preview before upload
 const questionImageUploading = ref(false)
 
+const stimulusImageUrl      = ref('')   // final public URL after upload
+const stimulusImagePreview  = ref('')   // local blob URL for preview before upload
+const stimulusImageUploading = ref(false)
+
+
 // ─── Manual crop UI ───────────────────────────────────────────
 const cropperOpen        = ref(false)
 const cropperImgFile     = ref(null)   // the source image file for cropping
@@ -358,15 +366,39 @@ async function confirmCrop() {
     if (cropperForBulkIdx.value !== null) {
       if (cropperForStimulus.value) {
         // Get the stimulus text of the cropped row
-        const stimulusText = bulkResults.value[cropperForBulkIdx.value]?.stimulusBN
+        // ------------------------------------------
+        //const stimulusText = bulkResults.value[cropperForBulkIdx.value]?.stimulusBN
       
-        // Auto-fill ALL questions sharing the same stimulus
-        bulkResults.value.forEach(q => {
-          if (q.stimulusBN && q.stimulusBN === stimulusText) {
-            q.stimulusImageUrl     = url
-            q.stimulusImagePreview = preview
-          }
-        })
+        //// Auto-fill ALL questions sharing the same stimulus
+        //bulkResults.value.forEach(q => {
+        //  if (q.stimulusBN && q.stimulusBN === stimulusText) {
+        //    q.stimulusImageUrl     = url
+        //    q.stimulusImagePreview = preview
+        //  }
+        //})
+        // ------------------------------------------
+
+        // ----------------------//----------------------
+        const sourceQ   = bulkResults.value[cropperForBulkIdx.value]
+        const groupId   = sourceQ?.stimulusGroupId
+
+        if (groupId !== null && groupId !== undefined) {
+          // Only fill questions sharing the exact same stimulus group
+          bulkResults.value.forEach(q => {
+            if (q.stimulusGroupId === groupId) {
+              q.stimulusImageUrl     = url
+              q.stimulusImagePreview = preview
+            }
+          })
+          const count = bulkResults.value.filter(q => q.stimulusGroupId === groupId).length
+          showToast(`Stimulus image applied to ${count} linked question${count > 1 ? 's' : ''} ✓`)
+        } else {
+          // Question has no stimulus group — apply only to this one question
+          sourceQ.stimulusImageUrl     = url
+          sourceQ.stimulusImagePreview = preview
+          showToast('Stimulus image uploaded ✓')
+        }
+        // --------------//-----------------
       } else {
         bulkResults.value[cropperForBulkIdx.value].questionImageUrl     = url
         bulkResults.value[cropperForBulkIdx.value].questionImagePreview = preview
@@ -653,6 +685,22 @@ async function parseBulk() {
     bulkSelected.value = bulkResults.value.map(q => !q.isDuplicate)
     bulkExpanded.value = bulkResults.value.map(() => false)
 
+    // ----------------------------------------------------
+    const stimulusGroupMap = new Map()
+    let stimulusGroupCounter = 0
+
+    bulkResults.value.forEach(q => {
+      if (q.stimulusBN?.trim()) {
+        if (!stimulusGroupMap.has(q.stimulusBN.trim())) {
+          stimulusGroupMap.set(q.stimulusBN.trim(), ++stimulusGroupCounter)
+        }
+        q.stimulusGroupId = stimulusGroupMap.get(q.stimulusBN.trim())
+      } else {
+        q.stimulusGroupId = null  // no stimulus — never auto-fills
+      }
+    })
+    // ----------------------------------------------------
+
     // Crop question images for any question that has one
     //const cropsNeeded = bulkResults.value.filter(q => q.hasQuestionImage && q.questionImageCrop)
     //for (const q of cropsNeeded) {
@@ -769,9 +817,93 @@ function showToast(msg, type = 'success') {
   setTimeout(() => toast.show = false, 3500)
 }
 
+//const expandedRows = ref(new Set())
+//
+//function toggleExpand(id) {
+//  if (expandedRows.value.has(id)) {
+//    expandedRows.value.delete(id)
+//  } else {
+//    expandedRows.value.add(id)
+//  }
+//}
+
 // ─── Modals ───────────────────────────────────────────────────
 const modal = reactive({ show: false, type: null, data: null })
-function openModal(type, data = null) { modal.show = true; modal.type = type; modal.data = data }
+async function openModal(type, data = null) {
+  modal.show = true
+  modal.type = type
+  modal.data = data
+
+  if (type === 'editQuestion' && data) {
+    await nextTick()
+    // Stream must be set first — it drives subject/chapter dropdowns
+    streamEN.value      = data.stream ?? data.exam ?? ''
+    await nextTick()
+    
+    stimulusEN.value    = data.stimulus?.english ?? ''
+    stimulusBN.value    = data.stimulus?.bangla  ?? ''
+
+    stimulusImageUrl.value     = data.stimulus_image ?? ''
+    stimulusImagePreview.value = data.stimulus_image ?? ''
+
+    questionEN.value    = data.question?.english ?? ''
+    questionBN.value    = data.question?.bangla  ?? ''
+
+    questionImageUrl.value     = data.question_image ?? ''
+    questionImagePreview.value = data.question_image ?? ''
+
+    // Subject/chapter search boxes need to show the value too
+    subjectEN.value          = data.subject?.english ?? ''
+    subjectBN.value          = data.subject?.bangla  ?? ''
+    await nextTick()
+    subjectSearchQuery.value = data.subject?.english ?? ''
+    subjectSearchQueryBN.value = data.subject?.bangla ?? ''
+
+    chapterEN.value          = data.chapter?.english ?? ''
+    chapterBN.value          = data.chapter?.bangla  ?? ''
+    chapterSearchQuery.value = data.chapter?.english ?? ''
+    chapterSearchQueryBN.value = data.chapter?.bangla ?? ''
+
+    explanationEN.value = data.explanation?.english ?? ''
+    explanationBN.value = data.explanation?.bangla  ?? ''
+
+    difficultyEN.value  = data.difficulty?.english ?? data.difficulty_level ?? ''
+
+    // correct_index (0–3) → letter (A–D)
+    answerEN.value = ['A', 'B', 'C', 'D'][data.correct_index] ?? ''
+
+    optionsEN.value = data.options?.english ?? []
+    optionsBN.value = data.options?.bangla  ?? []
+
+    yearEN.value   = data.years?.map(year => year.english).join(", ") ?? ''
+    yearSearchQueryEN.value = data.years?.[0]?.english ?? ''
+    yearSearchQueryBN.value = data.years?.[0]?.bangla  ?? ''
+
+    if (Array.isArray(data.source.english)) {
+      sourceEN.value = data.source.english.join(", ")
+      sourceSearchQueryEN.value = data.source.english.join(", ")
+    } else {
+      sourceEN.value = data.source.english
+      sourceSearchQueryEN.value = data.source.english
+    }
+    if (Array.isArray(data.source.bangla)) {
+      sourceBN.value = data.source.bangla.join(", ")
+      sourceSearchQueryBN.value = data.source.bangla.join(", ")
+    } else {
+      sourceBN.value = data.source.bangla
+      sourceSearchQueryBN.value = data.source.bangla
+    }
+
+    textBookEN.value = data.text_book ?? ''
+    searchQuery.value = data.text_book ?? ''
+
+    statusQuestion.value = data.status ?? ''
+  }
+
+  if (type === 'addQuestion') {
+    resetQuestionForm()
+  }
+}
 function closeModal() { modal.show = false; modal.type = null; modal.data = null }
 
 // Handle quick actions from topbar or AdminQuickActions
@@ -1048,9 +1180,31 @@ const qSearch = ref('')
 const qStream = ref('All')
 const qDiff   = ref('All')
 const qStatus = ref('All')
-const streams     = ['All','SSC','HSC Science','HSC Arts','HSC Commerce','BUET','Medical','DU','BCS','Bank']
+const streams     = ['All','SSC Science','SSC Arts', 'SSC Commerce','HSC Science','HSC Arts','HSC Commerce','BUET', 'KUET', 'RUET', 'CUET','Medical','DU', 'JU', 'CU', 'RU','BCS','Bank']
 const difficulties = ['All','Easy','Medium','Hard']
 const qStatuses   = ['All','Published','Draft','Flagged']
+
+const qSubject = ref('All')
+const qChapter = ref('All')
+
+const availableQSubjects = computed(() => {
+  let list = questions.value
+  if (qStream.value !== 'All') list = list.filter(q => q.stream === qStream.value)
+  const subjects = [...new Set(list.map(q => q.subject?.english).filter(Boolean))].sort()
+  return ['All', ...subjects]
+})
+
+const availableQChapters = computed(() => {
+  let list = questions.value
+  if (qStream.value !== 'All') list = list.filter(q => q.stream === qStream.value)
+  if (qSubject.value !== 'All') list = list.filter(q => q.subject?.english === qSubject.value)
+  const chapters = [...new Set(list.map(q => q.chapter?.english).filter(Boolean))].sort()
+  return ['All', ...chapters]
+})
+
+// Reset chapter when subject changes, reset both when stream changes
+watch(qSubject, () => { qChapter.value = 'All'; qPage.value = 1 })
+watch(qStream,  () => { qSubject.value = 'All'; qChapter.value = 'All'; qPage.value = 1 })
 
 function toBengaliDigits(str) {
   return str.replace(/[0-9]/g, d => '০১২৩৪৫৬৭৮৯'[d])
@@ -1138,69 +1292,213 @@ async function saveQuestion() {
     question_image: questionImageUrl.value || null,
   }
 
-  // Edit vs Add
-  if (modal.type === 'editQuestion' && modal.data?.id) {
-    const supabase = streamEN.value.startsWith('HSC') ? supabaseHSC : supabaseMedical
+  const supabase = streamEN.value.startsWith('HSC') ? supabaseHSC : supabaseMedical
 
-    const { error } = await supabase
-      .from('questions')
-      .update({ ...payload, updated_at: new Date().toISOString() })
-      .eq('id', modal.data.id)
+  const { error } = await supabase
+    .from('questions')
+    .insert(payload)
 
-    if (error) {
-      console.error(error)
-      showToast('Failed to update question.')
-      return
-    }
-    showToast('Question updated.')
-
-  } else {
-    const supabase = streamEN.value.startsWith('HSC') ? supabaseHSC : supabaseMedical
-
-    const { error } = await supabase
-      .from('questions')
-      .insert(payload)
-
-    if (error) {
-      console.error(error)
-      showToast('Failed to save question.')
-      return
-    }
-    showToast('Question saved.')
+  if (error) {
+    console.error(error)
+    showToast('Failed to save question.')
+    return
   }
+  showToast('Question saved.')
 }
 
-const questions = ref([
-  { id:1,  text:'What is the SI unit of electric charge?',           stream:'HSC Science',    subject:'Physics',  diff:'Easy',   status:'Published', reports:0 },
-  { id:2,  text:'Solve: lim(x→0) sin(x)/x',                        stream:'BUET',   subject:'Math',     diff:'Medium', status:'Published', reports:1 },
-  { id:3,  text:'Which organelle is called the powerhouse of the cell?', stream:'Medical',subject:'Biology',diff:'Easy',status:'Published', reports:0 },
-  { id:4,  text:'The Treaty of Westphalia was signed in which year?',stream:'BCS',    subject:'History',  diff:'Medium', status:'Draft',     reports:0 },
-  { id:5,  text:'What is the valency of carbon?',                   stream:'SSC',    subject:'Chemistry',diff:'Easy',   status:'Published', reports:0 },
-  { id:6,  text:'Binary representation of decimal 255 is?',         stream:'BUET',   subject:'CS',       diff:'Easy',   status:'Published', reports:0 },
-  { id:7,  text:'Who wrote "Amar Sonar Bangla"?',                   stream:'BCS',    subject:'Bangla',   diff:'Easy',   status:'Flagged',   reports:3 },
-  { id:8,  text:"What is Avogadro's number?",                       stream:'HSC Science',    subject:'Chemistry',diff:'Medium', status:'Published', reports:0 },
-  { id:9,  text:'Find the derivative of e^(2x)',                    stream:'DU',     subject:'Math',     diff:'Medium', status:'Published', reports:0 },
-  { id:10, text:'Bangladesh gained independence in which year?',    stream:'SSC',    subject:'History',  diff:'Easy',   status:'Published', reports:0 },
-])
+async function editQuestion() {
+  const answerIndexMap = { A: 0, B: 1, C: 2, D: 3 }
+  const difficultyBanglaMap = {
+    Easy: 'সহজ',
+    Medium: 'মাধ্যম',
+    Hard: 'কঠিন',
+  }
+  const correctIndex = answerIndexMap[answerEN.value]
+
+  let qID = modal.data.id
+  const supabase = modal.data.exam.startsWith('HSC') ? supabaseHSC : supabaseMedical
+
+  let sourceItemsEN = sourceEN.value?.split(',').map(item => item.trim())
+  let sourceItemsBN = sourceBN.value?.split(',').map(item => item.trim())
+
+  const payload = {
+    exam: streamEN.value,
+    text_book: textBookEN.value || null,
+
+    stimulus: {
+      english: stimulusEN.value || null,
+      bangla: stimulusBN.value || null,
+    },
+
+    stimulus_image: stimulusImageUrl.value || null,
+    stimulus_hash: modal.data.stimulus_hash,
+
+    question: {
+      english: questionEN.value,
+      bangla: questionBN.value || null,
+    },
+
+    question_hash: modal.data.question_hash,
+
+    options: {
+      english: optionsEN.value,        // already an array ["A text","B text","C text","D text"]
+      bangla: optionsBN.value || [],
+    },
+
+    explanation: explanationEN.value || explanationBN.value
+      ? { english: explanationEN.value || null, bangla: explanationBN.value || null }
+      : null,
+
+    subject: {
+      english: subjectEN.value,
+      bangla: subjectBN.value || null,
+    },
+
+    chapter: {
+      english: chapterEN.value,
+      bangla: chapterBN.value || null,
+    },
+
+    difficulty: {
+      english: difficultyEN.value,
+      bangla: difficultyBanglaMap[difficultyEN.value] || null,
+    },
+
+    source: {
+      english: sourceItemsEN.length === 1 ? sourceItemsEN[0] : sourceItemsEN || null,
+      bangla: sourceItemsBN.length === 1 ? sourceItemsBN[0] : sourceItemsBN || null,
+    },
+
+    //years: yearEN.value
+    //  ? [{ english: yearEN.value, bangla: toBengaliDigits(yearEN.value) }]
+    //  : null, // TODO: seems a little wrong here (maybe)
+    years: yearEN.value.split(',').map(item => {
+        const cleanYear = item.trim();
+        return {
+          english: cleanYear,
+          bangla: toBengaliDigits(cleanYear) // Converts each year individually
+        };
+      }),
+
+    is_verified: true,
+
+    correct_index: correctIndex,
+    difficulty_level: difficultyEN.value?.toLowerCase() || 'medium',  // scalar col too
+    status: statusQuestion.value?.toLowerCase() || 'published',
+    question_image: questionImageUrl.value || null,
+  }
+
+  const { error } = await supabase
+    .from('questions')
+    .update({ ...payload, updated_at: new Date().toISOString() })
+    .eq('id', qID)
+
+  if (error) {
+    console.error(error)
+    showToast('Failed to update question.')
+    return
+  }
+  showToast('Question updated.')
+  await loadQuestions()
+  closeModal()
+  resetQuestionForm()
+}
+
+// ─── Questions tab state ───────────────────────────────────────
+const questions    = ref([])
+const qLoading     = ref(false)
+const qPage        = ref(1)
+const qPageSize    = 50
+
+async function loadQuestions() {
+  qLoading.value = true
+  questions.value = []
+
+  const [hscRes, medRes] = await Promise.all([
+    supabaseHSC.from('questions')
+      .select('*')
+      .order('id', { ascending: false }),
+      //.limit(500),
+    supabaseMedical.from('questions')
+      .select('*')
+      .order('id', { ascending: false }),
+      //.limit(500),
+  ])
+
+  const rows = [...(hscRes.data ?? []), ...(medRes.data ?? [])]
+
+  questions.value = rows.map(r => ({
+    ...r,                                          // keep full raw data for the edit modal
+    text:    r.question?.english ?? '',
+    stream:  r.exam,
+    //subject: r.subject?.english  ?? '',
+    diff:    r.difficulty?.english ?? r.difficulty_level ?? '',
+    status:  r.status === 'published' ? 'Published' : r.status === 'draft' ? 'Draft' : 'Flagged',
+    reports: 0,
+  }))
+
+  qLoading.value = false
+}
+
+loadQuestions()   // call on mount
 
 const filteredQuestions = computed(() => {
   let list = questions.value
-  if (qSearch.value) { const q = qSearch.value.toLowerCase(); list = list.filter(q2 => q2.text.toLowerCase().includes(q)) }
-  if (qStream.value !== 'All') list = list.filter(q => q.stream === qStream.value)
-  if (qDiff.value !== 'All')   list = list.filter(q => q.diff === qDiff.value)
-  if (qStatus.value !== 'All') list = list.filter(q => q.status === qStatus.value)
+  if (qSearch.value)        { const q = qSearch.value.toLowerCase(); list = list.filter(q2 => q2.text.toLowerCase().includes(q)) }
+  if (qStream.value  !== 'All') list = list.filter(q => q.stream === qStream.value)
+  if (qSubject.value !== 'All') list = list.filter(q => q.subject?.english === qSubject.value)
+  if (qChapter.value !== 'All') list = list.filter(q => q.chapter?.english === qChapter.value)
+  if (qDiff.value    !== 'All') list = list.filter(q => q.diff === qDiff.value)
+  if (qStatus.value  !== 'All') list = list.filter(q => q.status === qStatus.value)
   return list
 })
 
-function deleteQuestion(q) {
+const totalQPages = computed(() => Math.ceil(filteredQuestions.value.length / qPageSize))
+
+const paginatedQuestions = computed(() => {
+  const start = (qPage.value - 1) * qPageSize
+  return filteredQuestions.value.slice(start, start + qPageSize)
+})
+
+// Reset to page 1 whenever filters change
+//watch([qSearch, qStream, qDiff, qStatus], () => { qPage.value = 1 })
+// replace the existing watch
+watch([qSearch, qStream, qDiff, qStatus, qSubject, qChapter], () => { qPage.value = 1 })
+
+async function deleteQuestion(q) {
+  const supabase = q.stream.startsWith('HSC') ? supabaseHSC : supabaseMedical
+  const { error } = await supabase.from('questions').delete().eq('id', q.id)
+  if (error) { showToast(error.message, 'error'); return }
   questions.value = questions.value.filter(x => x.id !== q.id)
   logAction('delete', `Deleted question #${q.id}`)
   showToast('Question deleted.', 'error')
 }
-function toggleQStatus(q) {
-  q.status = q.status === 'Published' ? 'Draft' : 'Published'
-  logAction('publish', `${q.status === 'Published' ? 'Published' : 'Unpublished'} question #${q.id}`)
+
+async function toggleQStatus(q) {
+  const newStatus = q.status === 'Published' ? 'draft' : 'published'
+  const supabase  = q.stream.startsWith('HSC') ? supabaseHSC : supabaseMedical
+  const { error } = await supabase.from('questions').update({ status: newStatus }).eq('id', q.id)
+  if (error) { showToast(error.message, 'error'); return }
+  q.status = newStatus === 'published' ? 'Published' : 'Draft'
+  logAction('publish', `${q.status} question #${q.id}`)
   showToast(`Question ${q.status.toLowerCase()}.`)
+}
+
+const expandedRows = ref(new Set())
+const rawViewRows  = ref(new Set())  // tracks which rows are in raw JSON mode
+
+function toggleExpand(id) {
+  if (expandedRows.value.has(id)) {
+    expandedRows.value.delete(id)
+    rawViewRows.value.delete(id)   // clean up raw state too
+  } else {
+    expandedRows.value.add(id)
+  }
+}
+
+function toggleRawView(id) {
+  if (rawViewRows.value.has(id)) rawViewRows.value.delete(id)
+  else rawViewRows.value.add(id)
 }
 
 // ─── Exam Results tab ─────────────────────────────────────────
@@ -1499,6 +1797,19 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
           <div class="fb-pills">
             <button v-for="s in streams" :key="s" class="pill" :class="{active:qStream===s}" @click="qStream=s">{{ s }}</button>
           </div>
+          <!-- Subject filter -->
+          <select v-model="qSubject" class="q-filter-select">
+            <option v-for="s in availableQSubjects" :key="s" :value="s">
+              {{ s === 'All' ? 'All Subjects' : s }}
+            </option>
+          </select>
+
+          <!-- Chapter filter — only shows when a subject is selected -->
+          <select v-model="qChapter" class="q-filter-select" v-if="qSubject !== 'All'">
+            <option v-for="c in availableQChapters" :key="c" :value="c">
+              {{ c === 'All' ? 'All Chapters' : c }}
+            </option>
+          </select>
           <div class="fb-pills">
             <button v-for="d in difficulties" :key="d" class="pill" :class="{active:qDiff===d,[diffClass(d)]:d!=='All'}" @click="qDiff=d">{{ d }}</button>
           </div>
@@ -1511,29 +1822,173 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
         <div class="panel table-panel">
           <div class="table-scroll"><div class="data-table questions-table">
             <div class="dt-head">
-              <span>#</span><span>Question</span><span>Stream</span>
+              <span>ID</span><span>Question</span><span>Stream</span>
               <span>Subject</span><span>Difficulty</span><span>Status</span>
               <span>Reports</span><span>Actions</span>
             </div>
-            <div class="dt-row" v-for="q in filteredQuestions" :key="q.id">
-              <span class="mono dim">{{ q.id }}</span>
-              <span class="q-text">{{ q.text }}</span>
-              <span class="stream-tag">{{ q.stream }}</span>
-              <span class="mono dim">{{ q.subject }}</span>
-              <span class="diff-badge" :class="diffClass(q.diff)">{{ q.diff }}</span>
-              <span class="status-badge" :class="q.status.toLowerCase()">{{ q.status }}</span>
-              <span class="reports-count" :class="q.reports > 0 ? 'has-reports' : ''">{{ q.reports }}</span>
-              <div class="dt-actions">
-                <button class="act-btn view" @click="openModal('editQuestion', q)" title="Edit">✎</button>
-                <button class="act-btn" :class="q.status==='Published'?'ban':'unban'" @click="toggleQStatus(q)">
-                  {{ q.status === 'Published' ? '◻' : '▣' }}
-                </button>
-                <button class="act-btn ban" @click="deleteQuestion(q)" title="Delete">✕</button>
+            <!-- Replace your v-for block with this -->
+            <template v-for="q in paginatedQuestions" :key="q.id">
+              <!-- Original row — completely unchanged -->
+              <div class="dt-row">
+                <span class="mono dim">{{ q.id }}</span>
+                <span class="q-text" v-html="renderLatexText(q.text)"></span>
+                <span class="stream-tag">{{ q.stream }}</span>
+                <span class="mono dim">{{ q.subject.english }}</span>
+                <span class="diff-badge" :class="diffClass(q.diff)">{{ q.diff }}</span>
+                <span class="status-badge" :class="q.status.toLowerCase()">{{ q.status }}</span>
+                <span class="reports-count" :class="q.reports > 0 ? 'has-reports' : ''">{{ q.reports }}</span>
+                <div class="dt-actions">
+                  <button class="act-btn expand" @click="toggleExpand(q.id)" :title="expandedRows.has(q.id) ? 'Collapse' : 'Expand'">
+                    {{ expandedRows.has(q.id) ? '▲' : '▼' }}
+                  </button>
+                  <button class="act-btn view" @click="openModal('editQuestion', q)" title="Edit">✎</button>
+                  <!--<button class="act-btn" :class="q.status==='Published'?'ban':'unban'" @click="toggleQStatus(q)">
+                    {{ q.status === 'Published' ? '◻' : '▣' }}
+                  </button>-->
+                  <button class="act-btn ban" @click="deleteQuestion(q)" title="Delete">✕</button>
+                </div>
               </div>
-            </div>
+            
+              <!-- Expanded panel sits OUTSIDE dt-row, spans full grid width naturally -->
+              <!--<div
+                v-if="expandedRows.has(q.id)"
+                class="dt-expanded"
+                style="grid-column: 1 / -1;"
+              >
+                <div class="expand-grid">
+                  <div class="expand-field" v-for="(value, key) in q" :key="key">
+                    <span class="expand-label">{{ key }}</span>
+                    <span class="expand-value">{{ typeof value === 'object' ? JSON.stringify(value, null, 2) : value }}</span>
+                  </div>
+                </div>
+              </div>-->
+
+              <div
+                v-if="expandedRows.has(q.id)"
+                class="dt-expanded"
+                style="grid-column: 1 / -1;"
+              >
+                <!-- Toggle bar -->
+                <div class="expand-toolbar">
+                  <span class="expand-title mono">Question #{{ q.id }}</span>
+                  <div class="expand-view-toggle">
+                    <button
+                      class="view-toggle-btn"
+                      :class="{ active: !rawViewRows.has(q.id) }"
+                      @click="rawViewRows.delete(q.id) || rawViewRows.value.delete(q.id)"
+                    >Preview</button>
+                    <button
+                      class="view-toggle-btn"
+                      :class="{ active: rawViewRows.has(q.id) }"
+                      @click="toggleRawView(q.id)"
+                    >Raw</button>
+                  </div>
+                </div>
+              
+                <!-- PREVIEW MODE -->
+                <div v-if="!rawViewRows.has(q.id)" class="expand-preview">
+
+                  <div class="ep-section" v-if="q.stimulus_image">
+                    <span class="ep-label">Stimulus Image</span>
+                    <img :src="q.stimulus_image" class="ep-img" />
+                  </div>
+                
+                  <div class="ep-section" v-if="q.stimulus?.english || q.stimulus?.bangla">
+                    <span class="ep-label">Stimulus</span>
+                    <p class="ep-text" v-html="renderLatexText(q.stimulus?.english)"></p>
+                    <p class="ep-text ep-bn" v-html="renderLatexText(q.stimulus?.bangla)"></p>
+                  </div>
+
+                  <div class="ep-section" v-if="q.question_image">
+                    <span class="ep-label">Question Image</span>
+                    <img :src="q.question_image" class="ep-img" />
+                  </div>
+                
+                  <div class="ep-section">
+                    <span class="ep-label">Question</span>
+                    <p class="ep-text" v-html="renderLatexText(q.question?.english)"></p>
+                    <p class="ep-text ep-bn" v-html="renderLatexText(q.question?.bangla)"></p>
+                  </div>
+                
+                  <div class="ep-section" v-if="q.options?.english?.length">
+                    <span class="ep-label">Options</span>
+                    <div class="ep-options">
+                      <div
+                        v-for="(opt, i) in q.options.english"
+                        :key="i"
+                        class="ep-option"
+                        :class="{ 'ep-option--correct': i === q.correct_index }"
+                      >
+                        <span class="ep-opt-letter">{{ ['A','B','C','D'][i] }}</span>
+                        <span v-html="renderLatexText(opt)"></span>
+                        <span class="ep-opt-bn" v-if="q.options.bangla?.[i]" v-html="' / ' + renderLatexText(q.options.bangla[i])"></span>
+                        <span class="ep-correct-tag" v-if="i === q.correct_index">✓ correct</span>
+                      </div>
+                    </div>
+                  </div>
+                
+                  <div class="ep-section" v-if="q.explanation?.english || q.explanation?.bangla">
+                    <span class="ep-label">Explanation</span>
+                    <p class="ep-text" v-html="renderLatexText(q.explanation?.english)"></p>
+                    <p class="ep-text ep-bn" v-html="renderLatexText(q.explanation?.bangla)"></p>
+                  </div>
+                
+                  <div class="ep-meta-row">
+                    <span><b>(Stream:</b> {{ q.stream }})</span>
+                    <span><b>(Subject:</b> {{ q.subject?.english }})</span>
+                    <span><b>(Chapter:</b> {{ q.chapter?.english }})</span>
+                    <span><b>(Difficulty:</b> {{ q.diff }})</span>
+                    <span><b>(Status:</b> {{ q.status }})</span>
+                    <span><b>(Year:</b> {{ q.years?.map(y => y.english).join(', ') }})</span>
+                    <span><b>(Source:</b>{{ Array.isArray(q.source?.english) ? q.source.english.join(', ') : q.source?.english }})</span>
+                    <span v-if="q.text_book"><b>(Textbook:</b> {{ q.text_book }})</span>
+                  </div>
+
+                  <div class="ep-meta-row">
+                    <span><b>(Stream:</b> {{ q.stream }})</span>
+                    <span><b>(Subject:</b> {{ q.subject?.bangla }})</span>
+                    <span><b>(Chapter:</b> {{ q.chapter?.bangla }})</span>
+                    <span><b>(Difficulty:</b> {{ q.diff }})</span>
+                    <span><b>(Status:</b> {{ q.status }})</span>
+                    <span><b>(Year:</b> {{ q.years?.map(y => y.bangla).join(', ') }})</span>
+                    <span><b>(Source:</b>{{ Array.isArray(q.source?.bangla) ? q.source.bangla.join(', ') : q.source?.bangla }})</span>
+                    <span v-if="q.text_book"><b>(Textbook:</b> {{ q.text_book }})</span>
+                  </div>
+                
+                </div>
+              
+                <!-- RAW MODE -->
+                <div v-else class="expand-raw">
+                  <pre class="raw-pre">{{ JSON.stringify(q, null, 2) }}</pre>
+                </div>
+              
+              </div>
+            </template>
           </div>
           </div><!-- /table-scroll -->
-          <div class="dt-footer mono">{{ filteredQuestions.length }} questions</div>
+          <!--<div class="dt-footer mono">{{ filteredQuestions.length }} questions</div>-->
+          <div class="dt-footer mono">
+            <span>{{ filteredQuestions.length }} questions</span>
+
+            <div class="q-pagination" v-if="totalQPages > 1">
+              <button class="pg-btn" :disabled="qPage === 1" @click="qPage = 1">«</button>
+              <button class="pg-btn" :disabled="qPage === 1" @click="qPage--">‹</button>
+            
+              <template v-for="p in totalQPages" :key="p">
+                <!-- show first, last, current ±1, and ellipsis -->
+                <template v-if="p === 1 || p === totalQPages || Math.abs(p - qPage) <= 1">
+                  <button class="pg-btn" :class="{ active: p === qPage }" @click="qPage = p">{{ p }}</button>
+                </template>
+                <span v-else-if="p === 2 && qPage > 4" class="pg-ellipsis">…</span>
+                <span v-else-if="p === totalQPages - 1 && qPage < totalQPages - 3" class="pg-ellipsis">…</span>
+              </template>
+            
+              <button class="pg-btn" :disabled="qPage === totalQPages" @click="qPage++">›</button>
+              <button class="pg-btn" :disabled="qPage === totalQPages" @click="qPage = totalQPages">»</button>
+            </div>
+          
+            <span class="mono dim">page {{ qPage }} / {{ totalQPages }}</span>
+          </div>
         </div>
       </div>
 
@@ -2061,6 +2516,46 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                   <span v-if="singleLowConfidence" class="flag-badge flag-warn">⚠ Low Confidence — review carefully</span>
                   <span v-if="singleIsDuplicate"   class="flag-badge flag-dup">DUP — possible duplicate in database</span>
                 </div>
+                <label class="mf-label">STIMULUS TEXT (English)</label>
+                <textarea v-model="stimulusEN" class="mf-input mf-textarea" placeholder="Enter question…" rows="3"></textarea>
+                <label class="mf-label">STIMULUS TEXT (Bengali)</label>
+                <textarea v-model="stimulusBN" class="mf-input mf-textarea" placeholder="Enter question…" rows="3"></textarea>
+              </div>
+
+              <div class="mf-group">
+                <label class="mf-label">STIMULUS IMAGE <span style="opacity:0.5;font-size:0.6rem">(auto-filled if detected · optional)</span></label>
+                <div class="qimg-field" style="background-color: #1A1A1A;">
+                  <div v-if="stimulusImageUploading" class="qimg-uploading">
+                    <span class="img-spinner">◌</span> Cropping &amp; uploading…
+                  </div>
+                  <div v-else-if="stimulusImagePreview || stimulusImageUrl" class="qimg-preview-wrap">
+                    <img :src="stimulusImagePreview || stimulusImageUrl" class="qimg-preview" />
+                    <div class="qimg-actions">
+                      <span class="qimg-status">{{ stimulusImageUrl ? '✓ Uploaded' : '⏳ Preview only' }}</span>
+                      <button class="iso-btn iso-btn--ghost qimg-reupload-btn" @click="openCropper(imgFile, null)">
+                        Re-crop
+                      </button>
+                      <label class="iso-btn iso-btn--ghost qimg-reupload-btn">
+                        Re-upload
+                        <input type="file" accept="image/*" style="display:none" @change="onQuestionImageReupload" />
+                      </label>
+                      <button class="iso-btn iso-btn--ghost" style="font-size:0.65rem" @click="questionImageUrl = ''; questionImagePreview = ''">Remove</button>
+                    </div>
+                  </div>
+                  <div v-else class="qimg-empty">
+                    <label class="qimg-upload-label">
+                      <span>📎 Upload question image manually</span>
+                      <input type="file" accept="image/*" style="display:none" @change="onQuestionImageReupload" />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mf-group">
+                <div class="single-flags" v-if="singleIsDuplicate || singleLowConfidence">
+                  <span v-if="singleLowConfidence" class="flag-badge flag-warn">⚠ Low Confidence — review carefully</span>
+                  <span v-if="singleIsDuplicate"   class="flag-badge flag-dup">DUP — possible duplicate in database</span>
+                </div>
                 <label class="mf-label">QUESTION TEXT (English)</label>
                 <textarea v-model="questionEN" class="mf-input mf-textarea" placeholder="Enter question…" rows="3"></textarea>
                 <label class="mf-label">QUESTION TEXT (Bengali)</label>
@@ -2200,9 +2695,13 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                 <textarea v-model="explanationBN" class="mf-input mf-textarea" rows="2" placeholder="Explain the answer…"></textarea>
               </div>
             </div>
-            <div v-if="modal.type === 'editQuestion' || addQuestionTab === 'single'" class="modal-actions">
+            <div v-if="modal.type === 'addQuestion' && addQuestionTab === 'single'" class="modal-actions">
               <button class="iso-btn iso-btn--ghost" @click="closeModal()">Cancel</button>
               <button class="iso-btn iso-btn--fill" @click="saveQuestion(); resetQuestionForm(); closeModal()">Save Question</button>
+            </div>
+            <div v-if="modal.type === 'editQuestion'" class="modal-actions">
+              <button class="iso-btn iso-btn--ghost" @click="closeModal()">Cancel</button>
+              <button class="iso-btn iso-btn--fill" @click="editQuestion(); resetQuestionForm(); closeModal()">Update Question</button>
             </div>
 
             <!-- ══════════════════════════════════════════════
@@ -3788,5 +4287,215 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
   }
   .btc-meta { display: none; }
   .bulk-row-detail { padding-left: 12px; }
+}
+
+/* Expanded row — uses grid-column via inline style, no conflicts */
+.dt-expanded {
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid #6c63ff;
+  padding: 14px 18px;
+  animation: expandSlide 0.18s ease;
+}
+
+.expand-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px 20px;
+}
+
+.expand-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.expand-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #666;
+}
+
+.expand-value {
+  font-size: 0.8rem;
+  color: #ccc;
+  word-break: break-word;
+  white-space: pre-wrap; /* handles JSON nicely */
+}
+
+@keyframes expandSlide {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.dt-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  font-size: 0.7rem;
+  color: var(--gray);
+}
+
+.q-pagination {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.pg-btn {
+  min-width: 28px;
+  height: 26px;
+  padding: 0 6px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--gray);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.pg-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.06);
+  color: var(--white);
+}
+.pg-btn.active {
+  background: rgba(255,255,255,0.1);
+  color: var(--white);
+  border-color: rgba(255,255,255,0.3);
+}
+.pg-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.pg-ellipsis {
+  color: var(--gray);
+  font-size: 0.7rem;
+  padding: 0 2px;
+}
+
+.q-filter-select {
+  background: #2e2d2d;
+  border: 1px solid var(--border);
+  color: var(--white);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.q-filter-select:hover {
+  background: #3f3e3e;
+}
+
+/* Expand toolbar */
+.expand-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.expand-title { font-size: 0.68rem; color: var(--gray); }
+
+.expand-view-toggle {
+  display: flex;
+  gap: 2px;
+}
+.view-toggle-btn {
+  padding: 3px 10px;
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--gray);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.view-toggle-btn.active {
+  background: rgba(255,255,255,0.08);
+  color: var(--white);
+  border-color: rgba(255,255,255,0.25);
+}
+
+/* Preview mode */
+.expand-preview { display: flex; flex-direction: column; gap: 12px; }
+
+.ep-section { display: flex; flex-direction: column; gap: 3px; }
+.ep-label {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--gray);
+}
+.ep-text { font-size: 0.82rem; color: var(--white); line-height: 1.5; margin: 0; }
+.ep-bn   { color: var(--gray); font-size: 0.78rem; }
+
+.ep-options { display: flex; flex-direction: column; gap: 5px; }
+.ep-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--gray);
+  padding: 4px 8px;
+  border-radius: 3px;
+}
+.ep-option--correct {
+  color: rgba(120, 230, 120, 0.95);
+  background: rgba(120, 230, 120, 0.05);
+}
+.ep-opt-letter {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  width: 16px;
+  flex-shrink: 0;
+}
+.ep-opt-bn   { opacity: 0.6; font-size: 0.72rem; }
+.ep-correct-tag {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: rgba(120, 230, 120, 0.7);
+}
+
+.ep-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--gray);
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.ep-meta-row b { color: rgba(255,255,255,0.4); margin-right: 4px; font-weight: normal; }
+
+.ep-img {
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+/* Raw mode */
+.expand-raw { overflow-x: auto; }
+.raw-pre {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: #a8d8a8;
+  background: rgba(0,0,0,0.3);
+  padding: 12px 14px;
+  margin: 0;
+  white-space: pre;
+  line-height: 1.6;
+  border-radius: 3px;
 }
 </style>

@@ -171,6 +171,7 @@ CREATE OR REPLACE FUNCTION get_random_questions(
   p_exam text,
   p_subject text DEFAULT NULL,
   p_chapter text DEFAULT NULL,
+  p_text_book text DEFAULT NULL,
   p_difficulty text DEFAULT NULL,
   p_limit int DEFAULT 100
 )
@@ -182,6 +183,7 @@ BEGIN
     AND exam = p_exam
     AND (p_subject IS NULL OR subject->>'english' = p_subject)
     AND (p_chapter IS NULL OR chapter->>'english' = p_chapter)
+    AND (p_text_book IS NULL OR text_book = p_text_book)
     -- AND (p_difficulty IS NULL OR difficulty_level = p_difficulty)
   ORDER BY random()
   LIMIT p_limit;

@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 export default defineEventHandler(async (event) => {
     //const supabase = await serverSupabaseClient(event)
     const config = useRuntimeConfig(event)
-    const { stream, subject, chapter, difficulty, limit } = getQuery(event)
+    const { stream, subject, chapter, text_book, difficulty, limit } = getQuery(event)
 
     const supabase = createClient(
         stream.startsWith('HSC') ? config.public.supabaseCortexHSC_URL : config.public.supabaseCortexMedical_URL,
@@ -40,6 +40,7 @@ export default defineEventHandler(async (event) => {
             p_exam: stream,
             p_subject: (subject && subject !== 'All') ? subject : null,
             p_chapter: (chapter && chapter !== 'All') ? chapter : null,
+            p_text_book: (text_book && text_book !== 'All') ? text_book : null,
             //p_difficulty: (difficulty && difficulty !== 'mixed') ? difficulty : null,
             p_limit: Number(limit) || 100,
         })

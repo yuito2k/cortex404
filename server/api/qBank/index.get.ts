@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 export default defineEventHandler(async (event) => {
     //const supabase = await serverSupabaseClient(event)
     const config = useRuntimeConfig(event)
-    const { stream, subject, chapter, difficulty, limit } = getQuery(event)
+    const { stream, subject, chapter, text_book, difficulty, limit } = getQuery(event)
 
     const supabase = createClient(
         stream.startsWith('HSC') ? config.public.supabaseCortexHSC_URL : config.public.supabaseCortexMedical_URL,
@@ -25,6 +25,10 @@ export default defineEventHandler(async (event) => {
         if (chapter !== 'undefined') {
             query = query.eq('chapter->>english', chapter)
         }
+    }
+
+    if (text_book && text_book !== 'All') {
+        query = query.eq('text_book', text_book)
     }
 
     //if (difficulty && difficulty !== 'mixed') {
