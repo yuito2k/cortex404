@@ -2,88 +2,92 @@
 definePageMeta({ middleware: 'auth', layout: 'dashboard' })
 
 // ─── QUESTION BANK ───────────────────────────────────────────────────────────
-const questionBank = {
-  medical: {
-    biology: [
-      { id: 'm-bio-1', text: 'Which of the following is NOT a function of the liver?', options: ['Bile secretion', 'Insulin production', 'Glycogen storage', 'Detoxification'], answer: 1, chapter: 'Digestive System', year: '2023', difficulty: 'medium',
-        explanation: 'Insulin is produced by the beta cells of the islets of Langerhans in the pancreas, not the liver. The liver performs bile secretion (for fat digestion), glycogen storage (energy reserve), and detoxification (filtering toxins from blood).' },
-      { id: 'm-bio-2', text: 'The site of fertilization in the human female reproductive system is:', options: ['Uterus', 'Ovary', 'Fallopian tube', 'Cervix'], answer: 2, chapter: 'Reproduction', year: '2022', difficulty: 'easy',
-        explanation: 'Fertilization normally occurs in the ampulla region of the fallopian tube (oviduct). The egg is released from the ovary during ovulation and travels into the fallopian tube where it meets the sperm. If implantation occurs outside the uterus (e.g. in the tube), it is called an ectopic pregnancy.' },
-      { id: 'm-bio-3', text: 'Which blood group is known as the "universal donor"?', options: ['A+', 'B+', 'O−', 'AB+'], answer: 2, chapter: 'Circulatory System', year: '2023', difficulty: 'easy',
-        explanation: 'O− (O negative) is the universal donor because its red blood cells lack A, B, and Rh antigens on their surface. This means O− blood can be transfused to patients of any blood group without triggering an immune reaction. AB+ is the universal recipient.' },
-      { id: 'm-bio-4', text: 'The functional unit of the kidney is:', options: ['Glomerulus', 'Nephron', 'Bowman\'s capsule', 'Loop of Henle'], answer: 1, chapter: 'Excretion', year: '2022', difficulty: 'easy',
-        explanation: 'The nephron is the structural and functional unit of the kidney. Each kidney contains about 1 million nephrons. A nephron consists of the Bowman\'s capsule, glomerulus, proximal convoluted tubule, loop of Henle, and distal convoluted tubule — all of which are parts of the nephron, not independent units.' },
-      { id: 'm-bio-5', text: 'Myelin sheath is produced by which cells in the peripheral nervous system?', options: ['Astrocytes', 'Schwann cells', 'Oligodendrocytes', 'Microglia'], answer: 1, chapter: 'Nervous System', year: '2021', difficulty: 'hard',
-        explanation: 'In the peripheral nervous system (PNS), Schwann cells wrap around individual axons to form the myelin sheath. In the central nervous system (CNS), this role is performed by oligodendrocytes. Astrocytes provide structural and nutritional support, while microglia are the immune cells of the CNS.' },
-      { id: 'm-bio-6', text: 'During aerobic respiration, the net gain of ATP from one molecule of glucose is:', options: ['2 ATP', '4 ATP', '36-38 ATP', '24 ATP'], answer: 2, chapter: 'Cell Biology', year: '2023', difficulty: 'medium',
-        explanation: 'Aerobic respiration of one glucose molecule yields a net gain of 36–38 ATP. This comes from: glycolysis (net 2 ATP), Krebs cycle (2 ATP), and oxidative phosphorylation via the electron transport chain (32–34 ATP). Anaerobic respiration only yields 2 net ATP.' },
-      { id: 'm-bio-7', text: 'Which hormone is responsible for the "fight or flight" response?', options: ['Cortisol', 'Adrenaline (Epinephrine)', 'Thyroxine', 'Insulin'], answer: 1, chapter: 'Endocrine System', year: '2022', difficulty: 'easy',
-        explanation: 'Adrenaline (epinephrine), secreted by the adrenal medulla, triggers the fight-or-flight response. It increases heart rate, dilates airways, increases blood glucose, and redirects blood to muscles. Cortisol is a stress hormone from the adrenal cortex that works more slowly over longer periods.' },
-      { id: 'm-bio-8', text: 'The process by which plants make their own food is called:', options: ['Respiration', 'Transpiration', 'Photosynthesis', 'Fermentation'], answer: 2, chapter: 'Plant Biology', year: '2023', difficulty: 'easy',
-        explanation: 'Photosynthesis is the process by which plants, algae, and cyanobacteria convert light energy (usually from the sun) into chemical energy stored as glucose, using CO₂ and water: 6CO₂ + 6H₂O + light → C₆H₁₂O₆ + 6O₂. Transpiration is water loss through stomata; respiration releases energy.' },
-    ],
-    chemistry: [
-      { id: 'm-chem-1', text: 'The pH of blood is maintained at approximately:', options: ['6.4–6.8', '7.35–7.45', '7.8–8.0', '6.0–7.0'], answer: 1, chapter: 'Acids & Bases', year: '2023', difficulty: 'medium',
-        explanation: 'Normal human blood pH is maintained within the narrow range of 7.35–7.45 (slightly alkaline). This is regulated by buffer systems (bicarbonate, phosphate, protein), the lungs (CO₂ elimination), and the kidneys. A pH below 7.35 is acidosis; above 7.45 is alkalosis — both are life-threatening.' },
-      { id: 'm-chem-2', text: 'Which of the following is an example of a noble gas?', options: ['Fluorine', 'Nitrogen', 'Argon', 'Chlorine'], answer: 2, chapter: 'Periodic Table', year: '2022', difficulty: 'easy',
-        explanation: 'Noble gases (Group 18) are helium (He), neon (Ne), argon (Ar), krypton (Kr), xenon (Xe), and radon (Rn). They have full outer electron shells making them chemically inert. Fluorine and Chlorine are halogens (Group 17); Nitrogen is a Group 15 nonmetal.' },
-      { id: 'm-chem-3', text: 'Haemoglobin contains which metal ion?', options: ['Zinc (Zn²⁺)', 'Copper (Cu²⁺)', 'Iron (Fe²⁺)', 'Magnesium (Mg²⁺)'], answer: 2, chapter: 'Coordination Chemistry', year: '2023', difficulty: 'easy',
-        explanation: 'Haemoglobin contains iron (Fe²⁺) at the centre of the haem group (a porphyrin ring). Each haemoglobin molecule has 4 haem groups, each capable of binding one O₂ molecule. Iron deficiency causes anaemia. Note: Chlorophyll contains Mg²⁺, and many enzymes use Zn²⁺ or Cu²⁺.' },
-      { id: 'm-chem-4', text: 'The hybridization of carbon in methane (CH₄) is:', options: ['sp', 'sp²', 'sp³', 'sp³d'], answer: 2, chapter: 'Organic Chemistry', year: '2021', difficulty: 'medium',
-        explanation: 'In methane (CH₄), carbon forms 4 single bonds with no double/triple bonds and no lone pairs. This requires sp³ hybridization — mixing one s orbital with three p orbitals to form 4 equivalent sp³ hybrid orbitals arranged tetrahedrally (109.5° bond angles). sp = linear; sp² = trigonal planar (e.g. ethene).' },
-    ],
-    physics: [
-      { id: 'm-phy-1', text: 'Which principle explains why blood pressure is measured in mmHg?', options: ['Archimedes\' Principle', 'Pascal\'s Law', 'Bernoulli\'s Principle', 'Boyle\'s Law'], answer: 1, chapter: 'Fluid Mechanics', year: '2023', difficulty: 'hard',
-        explanation: 'Pascal\'s Law states that pressure applied to a confined fluid is transmitted equally in all directions. Blood pressure measurement relies on this — a mercury column (sphygmomanometer) measures the pressure exerted by blood on vessel walls. The unit mmHg refers to the height of a mercury column that the pressure can support.' },
-      { id: 'm-phy-2', text: 'The unit of electric potential difference is:', options: ['Ampere', 'Ohm', 'Volt', 'Watt'], answer: 2, chapter: 'Electricity', year: '2022', difficulty: 'easy',
-        explanation: 'The Volt (V) is the SI unit of electric potential difference (voltage). 1 Volt = 1 Joule per Coulomb (J/C). Ampere (A) measures current (charge per second), Ohm (Ω) measures resistance, and Watt (W) measures power. Ohm\'s Law: V = IR.' },
-      { id: 'm-phy-3', text: 'X-rays are part of which spectrum?', options: ['Sound waves', 'Electromagnetic spectrum', 'Mechanical waves', 'Matter waves'], answer: 1, chapter: 'Modern Physics', year: '2023', difficulty: 'easy',
-        explanation: 'X-rays are a form of electromagnetic radiation with wavelengths of 0.01–10 nm, sitting between ultraviolet and gamma rays on the electromagnetic spectrum. They travel at the speed of light (3×10⁸ m/s) and require no medium. Sound and mechanical waves need a medium; matter waves (de Broglie) describe particle wave-like behaviour.' },
-    ],
-  },
-  varsity: {
-    bangla: [
-      { id: 'v-ban-1', text: '"আমার সোনার বাংলা" কবিতাটি কে রচনা করেছেন?', options: ['কাজী নজরুল ইসলাম', 'রবীন্দ্রনাথ ঠাকুর', 'জীবনানন্দ দাশ', 'মাইকেল মধুসূদন দত্ত'], answer: 1, chapter: 'বাংলা সাহিত্য', year: '2023', difficulty: 'easy',
-        explanation: '"আমার সোনার বাংলা" কবিতাটি রবীন্দ্রনাথ ঠাকুর ১৯০৫ সালে বঙ্গভঙ্গ আন্দোলনের পরিপ্রেক্ষিতে রচনা করেন। এটি ১৯৭১ সালে বাংলাদেশের জাতীয় সংগীত হিসেবে গৃহীত হয়। প্রথম দশটি লাইন সংগীত হিসেবে ব্যবহৃত হয়।' },
-      { id: 'v-ban-2', text: '"বিদ্রোহী" কবিতাটি কোন কবির রচনা?', options: ['রবীন্দ্রনাথ ঠাকুর', 'শামসুর রাহমান', 'কাজী নজরুল ইসলাম', 'সুফিয়া কামাল'], answer: 2, chapter: 'বাংলা কবিতা', year: '2022', difficulty: 'easy',
-        explanation: '"বিদ্রোহী" কবিতাটি কাজী নজরুল ইসলাম ১৯২১ সালে রচনা করেন এবং ১৯২২ সালে বিজলী পত্রিকায় প্রকাশিত হয়। এটি বাংলা সাহিত্যের অন্যতম বিখ্যাত কবিতা। নজরুল ইসলাম "বিদ্রোহী কবি" নামে পরিচিত এবং বাংলাদেশের জাতীয় কবি।' },
-      { id: 'v-ban-3', text: 'বাংলা ব্যাকরণ অনুযায়ী "সন্ধি" কত প্রকার?', options: ['২ প্রকার', '৩ প্রকার', '৪ প্রকার', '৫ প্রকার'], answer: 1, chapter: 'বাংলা ব্যাকরণ', year: '2023', difficulty: 'medium',
-        explanation: 'বাংলা ব্যাকরণে সন্ধি তিন প্রকার: (১) স্বরসন্ধি — দুটি স্বরবর্ণের মিলন, (২) ব্যঞ্জনসন্ধি — ব্যঞ্জনবর্ণের সাথে স্বর বা ব্যঞ্জনের মিলন, এবং (৩) বিসর্গসন্ধি — বিসর্গের সাথে স্বর বা ব্যঞ্জনের মিলন।' },
-      { id: 'v-ban-4', text: '"পদ্মা নদীর মাঝি" উপন্যাসটির রচয়িতা কে?', options: ['শরৎচন্দ্র চট্টোপাধ্যায়', 'রবীন্দ্রনাথ ঠাকুর', 'মানিক বন্দ্যোপাধ্যায়', 'বঙ্কিমচন্দ্র চট্টোপাধ্যায়'], answer: 2, chapter: 'বাংলা উপন্যাস', year: '2022', difficulty: 'easy',
-        explanation: '"পদ্মা নদীর মাঝি" মানিক বন্দ্যোপাধ্যায়ের বিখ্যাত উপন্যাস, ১৯৩৬ সালে প্রকাশিত। এটি পদ্মা নদীর জেলেদের জীবন নিয়ে রচিত। মানিক বন্দ্যোপাধ্যায় বাংলা সাহিত্যের একজন প্রথিতযশা কথাসাহিত্যিক, যিনি মার্কসীয় দর্শনে বিশ্বাসী ছিলেন।' },
-    ],
-    english: [
-      { id: 'v-eng-1', text: 'Choose the correct passive form of: "The teacher teaches the students."', options: ['The students are taught by the teacher.', 'The students were taught by the teacher.', 'The students have been taught by the teacher.', 'The students is taught by the teacher.'], answer: 0, chapter: 'Grammar', year: '2023', difficulty: 'medium',
-        explanation: 'The active sentence uses simple present tense ("teaches"). The passive of simple present is: Subject + am/is/are + past participle + by + agent. Since "students" is plural, we use "are taught". Option B uses past tense; C uses present perfect; D incorrectly uses "is" with a plural subject.' },
-      { id: 'v-eng-2', text: 'What is the synonym of "Eloquent"?', options: ['Silent', 'Fluent', 'Dull', 'Harsh'], answer: 1, chapter: 'Vocabulary', year: '2022', difficulty: 'medium',
-        explanation: '"Eloquent" means expressing ideas fluently and persuasively in speech or writing. Its synonym is "Fluent" — both describe a smooth, effortless command of language. "Silent" is the antonym; "Dull" means boring or lacking excitement; "Harsh" means rough or unpleasant.' },
-      { id: 'v-eng-3', text: 'Which of the following is a correct sentence?', options: ['She don\'t know the answer.', 'She doesn\'t knows the answer.', 'She doesn\'t know the answer.', 'She not know the answer.'], answer: 2, chapter: 'Grammar', year: '2023', difficulty: 'easy',
-        explanation: 'With third person singular subjects (he/she/it) in simple present tense, we use "doesn\'t" (does not) with the base form of the verb. Option A is wrong ("don\'t" is for I/you/we/they). Option B is wrong (double marking: "doesn\'t knows"). Option D is missing the auxiliary verb.' },
-    ],
-    math: [
-      { id: 'v-math-1', text: 'If log₂8 = x, what is the value of x?', options: ['2', '3', '4', '6'], answer: 1, chapter: 'Logarithm', year: '2023', difficulty: 'easy',
-        explanation: 'log₂8 = x means 2ˣ = 8. Since 2³ = 8, x = 3. Remember: logₐb = c means aᶜ = b. Key logarithm rule: log₂(2ⁿ) = n. Here, 8 = 2³, so log₂8 = 3.' },
-      { id: 'v-math-2', text: 'The roots of the equation x² − 5x + 6 = 0 are:', options: ['2 and 3', '1 and 6', '−2 and −3', '2 and −3'], answer: 0, chapter: 'Algebra', year: '2022', difficulty: 'easy',
-        explanation: 'Factorising x² − 5x + 6 = 0: we need two numbers that multiply to +6 and add to −5. Those numbers are −2 and −3: (x − 2)(x − 3) = 0. So x = 2 or x = 3. Verify: 2+3=5 ✓ and 2×3=6 ✓.' },
-      { id: 'v-math-3', text: 'The value of sin²θ + cos²θ is always equal to:', options: ['0', '2', '1', 'Depends on θ'], answer: 2, chapter: 'Trigonometry', year: '2023', difficulty: 'easy',
-        explanation: 'sin²θ + cos²θ = 1 is the fundamental Pythagorean trigonometric identity. It holds for all values of θ and can be derived from the Pythagorean theorem applied to a unit circle (radius = 1). Other identities: 1 + tan²θ = sec²θ and 1 + cot²θ = cosec²θ.' },
-      { id: 'v-math-4', text: 'What is the derivative of f(x) = x³ + 2x² − 5?', options: ['3x² + 4x', '3x² + 4x − 5', 'x² + 4x', '3x + 4'], answer: 0, chapter: 'Calculus', year: '2022', difficulty: 'medium',
-        explanation: 'Using the power rule d/dx(xⁿ) = nxⁿ⁻¹: d/dx(x³) = 3x², d/dx(2x²) = 4x, d/dx(−5) = 0 (constant). So f\'(x) = 3x² + 4x. Common mistake: carrying the constant −5 into the derivative (option B). Constants always differentiate to zero.' },
-    ],
-    ict: [
-      { id: 'v-ict-1', text: 'Which of the following is NOT a programming language?', options: ['Python', 'HTML', 'Java', 'C++'], answer: 1, chapter: 'Programming', year: '2023', difficulty: 'easy',
-        explanation: 'HTML (HyperText Markup Language) is a markup language, not a programming language. It defines the structure and content of web pages using tags but has no logic, conditions, or loops. Python, Java, and C++ are full programming languages with variables, control flow, and functions.' },
-      { id: 'v-ict-2', text: 'The binary equivalent of decimal number 10 is:', options: ['1010', '1100', '1001', '0110'], answer: 0, chapter: 'Number System', year: '2022', difficulty: 'medium',
-        explanation: 'Convert 10 to binary by successive division by 2: 10÷2=5 R0, 5÷2=2 R1, 2÷2=1 R0, 1÷2=0 R1. Reading remainders bottom to top: 1010. Verify: 1×2³ + 0×2² + 1×2¹ + 0×2⁰ = 8+0+2+0 = 10 ✓.' },
-    ],
-    general_knowledge: [
-      { id: 'v-gk-1', text: 'Bangladesh gained independence in which year?', options: ['1947', '1952', '1971', '1975'], answer: 2, chapter: 'Bangladesh Affairs', year: '2023', difficulty: 'easy',
-        explanation: 'Bangladesh gained independence on 26 March 1971, when Sheikh Mujibur Rahman declared independence. The Liberation War lasted until 16 December 1971 (Victory Day), when Pakistani forces surrendered. 1947 was the partition of British India; 1952 was the Language Movement; 1975 was the political upheaval after independence.' },
-      { id: 'v-gk-2', text: 'The capital of Australia is:', options: ['Sydney', 'Melbourne', 'Canberra', 'Brisbane'], answer: 2, chapter: 'World Geography', year: '2022', difficulty: 'medium',
-        explanation: 'Canberra is the capital of Australia, chosen as a compromise between the rival cities of Sydney and Melbourne. It was purpose-built as the capital and became the seat of government in 1927. Sydney is the largest city and Melbourne is the second largest — a common confusion.' },
-    ],
-  }
-}
+
+const { admissionQuestionBank } = useQuestionBank()
+const questionBank = admissionQuestionBank
+
+//const questionBank = {
+//  medical: {
+//    biology: [
+//      { id: 'm-bio-1', text: 'Which of the following is NOT a function of the liver?', options: ['Bile secretion', 'Insulin production', 'Glycogen storage', 'Detoxification'], answer: 1, chapter: 'Digestive System', year: '2023', difficulty: 'medium',
+//        explanation: 'Insulin is produced by the beta cells of the islets of Langerhans in the pancreas, not the liver. The liver performs bile secretion (for fat digestion), glycogen storage (energy reserve), and detoxification (filtering toxins from blood).' },
+//      { id: 'm-bio-2', text: 'The site of fertilization in the human female reproductive system is:', options: ['Uterus', 'Ovary', 'Fallopian tube', 'Cervix'], answer: 2, chapter: 'Reproduction', year: '2022', difficulty: 'easy',
+//        explanation: 'Fertilization normally occurs in the ampulla region of the fallopian tube (oviduct). The egg is released from the ovary during ovulation and travels into the fallopian tube where it meets the sperm. If implantation occurs outside the uterus (e.g. in the tube), it is called an ectopic pregnancy.' },
+//      { id: 'm-bio-3', text: 'Which blood group is known as the "universal donor"?', options: ['A+', 'B+', 'O−', 'AB+'], answer: 2, chapter: 'Circulatory System', year: '2023', difficulty: 'easy',
+//        explanation: 'O− (O negative) is the universal donor because its red blood cells lack A, B, and Rh antigens on their surface. This means O− blood can be transfused to patients of any blood group without triggering an immune reaction. AB+ is the universal recipient.' },
+//      { id: 'm-bio-4', text: 'The functional unit of the kidney is:', options: ['Glomerulus', 'Nephron', 'Bowman\'s capsule', 'Loop of Henle'], answer: 1, chapter: 'Excretion', year: '2022', difficulty: 'easy',
+//        explanation: 'The nephron is the structural and functional unit of the kidney. Each kidney contains about 1 million nephrons. A nephron consists of the Bowman\'s capsule, glomerulus, proximal convoluted tubule, loop of Henle, and distal convoluted tubule — all of which are parts of the nephron, not independent units.' },
+//      { id: 'm-bio-5', text: 'Myelin sheath is produced by which cells in the peripheral nervous system?', options: ['Astrocytes', 'Schwann cells', 'Oligodendrocytes', 'Microglia'], answer: 1, chapter: 'Nervous System', year: '2021', difficulty: 'hard',
+//        explanation: 'In the peripheral nervous system (PNS), Schwann cells wrap around individual axons to form the myelin sheath. In the central nervous system (CNS), this role is performed by oligodendrocytes. Astrocytes provide structural and nutritional support, while microglia are the immune cells of the CNS.' },
+//      { id: 'm-bio-6', text: 'During aerobic respiration, the net gain of ATP from one molecule of glucose is:', options: ['2 ATP', '4 ATP', '36-38 ATP', '24 ATP'], answer: 2, chapter: 'Cell Biology', year: '2023', difficulty: 'medium',
+//        explanation: 'Aerobic respiration of one glucose molecule yields a net gain of 36–38 ATP. This comes from: glycolysis (net 2 ATP), Krebs cycle (2 ATP), and oxidative phosphorylation via the electron transport chain (32–34 ATP). Anaerobic respiration only yields 2 net ATP.' },
+//      { id: 'm-bio-7', text: 'Which hormone is responsible for the "fight or flight" response?', options: ['Cortisol', 'Adrenaline (Epinephrine)', 'Thyroxine', 'Insulin'], answer: 1, chapter: 'Endocrine System', year: '2022', difficulty: 'easy',
+//        explanation: 'Adrenaline (epinephrine), secreted by the adrenal medulla, triggers the fight-or-flight response. It increases heart rate, dilates airways, increases blood glucose, and redirects blood to muscles. Cortisol is a stress hormone from the adrenal cortex that works more slowly over longer periods.' },
+//      { id: 'm-bio-8', text: 'The process by which plants make their own food is called:', options: ['Respiration', 'Transpiration', 'Photosynthesis', 'Fermentation'], answer: 2, chapter: 'Plant Biology', year: '2023', difficulty: 'easy',
+//        explanation: 'Photosynthesis is the process by which plants, algae, and cyanobacteria convert light energy (usually from the sun) into chemical energy stored as glucose, using CO₂ and water: 6CO₂ + 6H₂O + light → C₆H₁₂O₆ + 6O₂. Transpiration is water loss through stomata; respiration releases energy.' },
+//    ],
+//    chemistry: [
+//      { id: 'm-chem-1', text: 'The pH of blood is maintained at approximately:', options: ['6.4–6.8', '7.35–7.45', '7.8–8.0', '6.0–7.0'], answer: 1, chapter: 'Acids & Bases', year: '2023', difficulty: 'medium',
+//        explanation: 'Normal human blood pH is maintained within the narrow range of 7.35–7.45 (slightly alkaline). This is regulated by buffer systems (bicarbonate, phosphate, protein), the lungs (CO₂ elimination), and the kidneys. A pH below 7.35 is acidosis; above 7.45 is alkalosis — both are life-threatening.' },
+//      { id: 'm-chem-2', text: 'Which of the following is an example of a noble gas?', options: ['Fluorine', 'Nitrogen', 'Argon', 'Chlorine'], answer: 2, chapter: 'Periodic Table', year: '2022', difficulty: 'easy',
+//        explanation: 'Noble gases (Group 18) are helium (He), neon (Ne), argon (Ar), krypton (Kr), xenon (Xe), and radon (Rn). They have full outer electron shells making them chemically inert. Fluorine and Chlorine are halogens (Group 17); Nitrogen is a Group 15 nonmetal.' },
+//      { id: 'm-chem-3', text: 'Haemoglobin contains which metal ion?', options: ['Zinc (Zn²⁺)', 'Copper (Cu²⁺)', 'Iron (Fe²⁺)', 'Magnesium (Mg²⁺)'], answer: 2, chapter: 'Coordination Chemistry', year: '2023', difficulty: 'easy',
+//        explanation: 'Haemoglobin contains iron (Fe²⁺) at the centre of the haem group (a porphyrin ring). Each haemoglobin molecule has 4 haem groups, each capable of binding one O₂ molecule. Iron deficiency causes anaemia. Note: Chlorophyll contains Mg²⁺, and many enzymes use Zn²⁺ or Cu²⁺.' },
+//      { id: 'm-chem-4', text: 'The hybridization of carbon in methane (CH₄) is:', options: ['sp', 'sp²', 'sp³', 'sp³d'], answer: 2, chapter: 'Organic Chemistry', year: '2021', difficulty: 'medium',
+//        explanation: 'In methane (CH₄), carbon forms 4 single bonds with no double/triple bonds and no lone pairs. This requires sp³ hybridization — mixing one s orbital with three p orbitals to form 4 equivalent sp³ hybrid orbitals arranged tetrahedrally (109.5° bond angles). sp = linear; sp² = trigonal planar (e.g. ethene).' },
+//    ],
+//    physics: [
+//      { id: 'm-phy-1', text: 'Which principle explains why blood pressure is measured in mmHg?', options: ['Archimedes\' Principle', 'Pascal\'s Law', 'Bernoulli\'s Principle', 'Boyle\'s Law'], answer: 1, chapter: 'Fluid Mechanics', year: '2023', difficulty: 'hard',
+//        explanation: 'Pascal\'s Law states that pressure applied to a confined fluid is transmitted equally in all directions. Blood pressure measurement relies on this — a mercury column (sphygmomanometer) measures the pressure exerted by blood on vessel walls. The unit mmHg refers to the height of a mercury column that the pressure can support.' },
+//      { id: 'm-phy-2', text: 'The unit of electric potential difference is:', options: ['Ampere', 'Ohm', 'Volt', 'Watt'], answer: 2, chapter: 'Electricity', year: '2022', difficulty: 'easy',
+//        explanation: 'The Volt (V) is the SI unit of electric potential difference (voltage). 1 Volt = 1 Joule per Coulomb (J/C). Ampere (A) measures current (charge per second), Ohm (Ω) measures resistance, and Watt (W) measures power. Ohm\'s Law: V = IR.' },
+//      { id: 'm-phy-3', text: 'X-rays are part of which spectrum?', options: ['Sound waves', 'Electromagnetic spectrum', 'Mechanical waves', 'Matter waves'], answer: 1, chapter: 'Modern Physics', year: '2023', difficulty: 'easy',
+//        explanation: 'X-rays are a form of electromagnetic radiation with wavelengths of 0.01–10 nm, sitting between ultraviolet and gamma rays on the electromagnetic spectrum. They travel at the speed of light (3×10⁸ m/s) and require no medium. Sound and mechanical waves need a medium; matter waves (de Broglie) describe particle wave-like behaviour.' },
+//    ],
+//  },
+//  varsity: {
+//    bangla: [
+//      { id: 'v-ban-1', text: '"আমার সোনার বাংলা" কবিতাটি কে রচনা করেছেন?', options: ['কাজী নজরুল ইসলাম', 'রবীন্দ্রনাথ ঠাকুর', 'জীবনানন্দ দাশ', 'মাইকেল মধুসূদন দত্ত'], answer: 1, chapter: 'বাংলা সাহিত্য', year: '2023', difficulty: 'easy',
+//        explanation: '"আমার সোনার বাংলা" কবিতাটি রবীন্দ্রনাথ ঠাকুর ১৯০৫ সালে বঙ্গভঙ্গ আন্দোলনের পরিপ্রেক্ষিতে রচনা করেন। এটি ১৯৭১ সালে বাংলাদেশের জাতীয় সংগীত হিসেবে গৃহীত হয়। প্রথম দশটি লাইন সংগীত হিসেবে ব্যবহৃত হয়।' },
+//      { id: 'v-ban-2', text: '"বিদ্রোহী" কবিতাটি কোন কবির রচনা?', options: ['রবীন্দ্রনাথ ঠাকুর', 'শামসুর রাহমান', 'কাজী নজরুল ইসলাম', 'সুফিয়া কামাল'], answer: 2, chapter: 'বাংলা কবিতা', year: '2022', difficulty: 'easy',
+//        explanation: '"বিদ্রোহী" কবিতাটি কাজী নজরুল ইসলাম ১৯২১ সালে রচনা করেন এবং ১৯২২ সালে বিজলী পত্রিকায় প্রকাশিত হয়। এটি বাংলা সাহিত্যের অন্যতম বিখ্যাত কবিতা। নজরুল ইসলাম "বিদ্রোহী কবি" নামে পরিচিত এবং বাংলাদেশের জাতীয় কবি।' },
+//      { id: 'v-ban-3', text: 'বাংলা ব্যাকরণ অনুযায়ী "সন্ধি" কত প্রকার?', options: ['২ প্রকার', '৩ প্রকার', '৪ প্রকার', '৫ প্রকার'], answer: 1, chapter: 'বাংলা ব্যাকরণ', year: '2023', difficulty: 'medium',
+//        explanation: 'বাংলা ব্যাকরণে সন্ধি তিন প্রকার: (১) স্বরসন্ধি — দুটি স্বরবর্ণের মিলন, (২) ব্যঞ্জনসন্ধি — ব্যঞ্জনবর্ণের সাথে স্বর বা ব্যঞ্জনের মিলন, এবং (৩) বিসর্গসন্ধি — বিসর্গের সাথে স্বর বা ব্যঞ্জনের মিলন।' },
+//      { id: 'v-ban-4', text: '"পদ্মা নদীর মাঝি" উপন্যাসটির রচয়িতা কে?', options: ['শরৎচন্দ্র চট্টোপাধ্যায়', 'রবীন্দ্রনাথ ঠাকুর', 'মানিক বন্দ্যোপাধ্যায়', 'বঙ্কিমচন্দ্র চট্টোপাধ্যায়'], answer: 2, chapter: 'বাংলা উপন্যাস', year: '2022', difficulty: 'easy',
+//        explanation: '"পদ্মা নদীর মাঝি" মানিক বন্দ্যোপাধ্যায়ের বিখ্যাত উপন্যাস, ১৯৩৬ সালে প্রকাশিত। এটি পদ্মা নদীর জেলেদের জীবন নিয়ে রচিত। মানিক বন্দ্যোপাধ্যায় বাংলা সাহিত্যের একজন প্রথিতযশা কথাসাহিত্যিক, যিনি মার্কসীয় দর্শনে বিশ্বাসী ছিলেন।' },
+//    ],
+//    english: [
+//      { id: 'v-eng-1', text: 'Choose the correct passive form of: "The teacher teaches the students."', options: ['The students are taught by the teacher.', 'The students were taught by the teacher.', 'The students have been taught by the teacher.', 'The students is taught by the teacher.'], answer: 0, chapter: 'Grammar', year: '2023', difficulty: 'medium',
+//        explanation: 'The active sentence uses simple present tense ("teaches"). The passive of simple present is: Subject + am/is/are + past participle + by + agent. Since "students" is plural, we use "are taught". Option B uses past tense; C uses present perfect; D incorrectly uses "is" with a plural subject.' },
+//      { id: 'v-eng-2', text: 'What is the synonym of "Eloquent"?', options: ['Silent', 'Fluent', 'Dull', 'Harsh'], answer: 1, chapter: 'Vocabulary', year: '2022', difficulty: 'medium',
+//        explanation: '"Eloquent" means expressing ideas fluently and persuasively in speech or writing. Its synonym is "Fluent" — both describe a smooth, effortless command of language. "Silent" is the antonym; "Dull" means boring or lacking excitement; "Harsh" means rough or unpleasant.' },
+//      { id: 'v-eng-3', text: 'Which of the following is a correct sentence?', options: ['She don\'t know the answer.', 'She doesn\'t knows the answer.', 'She doesn\'t know the answer.', 'She not know the answer.'], answer: 2, chapter: 'Grammar', year: '2023', difficulty: 'easy',
+//        explanation: 'With third person singular subjects (he/she/it) in simple present tense, we use "doesn\'t" (does not) with the base form of the verb. Option A is wrong ("don\'t" is for I/you/we/they). Option B is wrong (double marking: "doesn\'t knows"). Option D is missing the auxiliary verb.' },
+//    ],
+//    math: [
+//      { id: 'v-math-1', text: 'If log₂8 = x, what is the value of x?', options: ['2', '3', '4', '6'], answer: 1, chapter: 'Logarithm', year: '2023', difficulty: 'easy',
+//        explanation: 'log₂8 = x means 2ˣ = 8. Since 2³ = 8, x = 3. Remember: logₐb = c means aᶜ = b. Key logarithm rule: log₂(2ⁿ) = n. Here, 8 = 2³, so log₂8 = 3.' },
+//      { id: 'v-math-2', text: 'The roots of the equation x² − 5x + 6 = 0 are:', options: ['2 and 3', '1 and 6', '−2 and −3', '2 and −3'], answer: 0, chapter: 'Algebra', year: '2022', difficulty: 'easy',
+//        explanation: 'Factorising x² − 5x + 6 = 0: we need two numbers that multiply to +6 and add to −5. Those numbers are −2 and −3: (x − 2)(x − 3) = 0. So x = 2 or x = 3. Verify: 2+3=5 ✓ and 2×3=6 ✓.' },
+//      { id: 'v-math-3', text: 'The value of sin²θ + cos²θ is always equal to:', options: ['0', '2', '1', 'Depends on θ'], answer: 2, chapter: 'Trigonometry', year: '2023', difficulty: 'easy',
+//        explanation: 'sin²θ + cos²θ = 1 is the fundamental Pythagorean trigonometric identity. It holds for all values of θ and can be derived from the Pythagorean theorem applied to a unit circle (radius = 1). Other identities: 1 + tan²θ = sec²θ and 1 + cot²θ = cosec²θ.' },
+//      { id: 'v-math-4', text: 'What is the derivative of f(x) = x³ + 2x² − 5?', options: ['3x² + 4x', '3x² + 4x − 5', 'x² + 4x', '3x + 4'], answer: 0, chapter: 'Calculus', year: '2022', difficulty: 'medium',
+//        explanation: 'Using the power rule d/dx(xⁿ) = nxⁿ⁻¹: d/dx(x³) = 3x², d/dx(2x²) = 4x, d/dx(−5) = 0 (constant). So f\'(x) = 3x² + 4x. Common mistake: carrying the constant −5 into the derivative (option B). Constants always differentiate to zero.' },
+//    ],
+//    ict: [
+//      { id: 'v-ict-1', text: 'Which of the following is NOT a programming language?', options: ['Python', 'HTML', 'Java', 'C++'], answer: 1, chapter: 'Programming', year: '2023', difficulty: 'easy',
+//        explanation: 'HTML (HyperText Markup Language) is a markup language, not a programming language. It defines the structure and content of web pages using tags but has no logic, conditions, or loops. Python, Java, and C++ are full programming languages with variables, control flow, and functions.' },
+//      { id: 'v-ict-2', text: 'The binary equivalent of decimal number 10 is:', options: ['1010', '1100', '1001', '0110'], answer: 0, chapter: 'Number System', year: '2022', difficulty: 'medium',
+//        explanation: 'Convert 10 to binary by successive division by 2: 10÷2=5 R0, 5÷2=2 R1, 2÷2=1 R0, 1÷2=0 R1. Reading remainders bottom to top: 1010. Verify: 1×2³ + 0×2² + 1×2¹ + 0×2⁰ = 8+0+2+0 = 10 ✓.' },
+//    ],
+//    general_knowledge: [
+//      { id: 'v-gk-1', text: 'Bangladesh gained independence in which year?', options: ['1947', '1952', '1971', '1975'], answer: 2, chapter: 'Bangladesh Affairs', year: '2023', difficulty: 'easy',
+//        explanation: 'Bangladesh gained independence on 26 March 1971, when Sheikh Mujibur Rahman declared independence. The Liberation War lasted until 16 December 1971 (Victory Day), when Pakistani forces surrendered. 1947 was the partition of British India; 1952 was the Language Movement; 1975 was the political upheaval after independence.' },
+//      { id: 'v-gk-2', text: 'The capital of Australia is:', options: ['Sydney', 'Melbourne', 'Canberra', 'Brisbane'], answer: 2, chapter: 'World Geography', year: '2022', difficulty: 'medium',
+//        explanation: 'Canberra is the capital of Australia, chosen as a compromise between the rival cities of Sydney and Melbourne. It was purpose-built as the capital and became the seat of government in 1927. Sydney is the largest city and Melbourne is the second largest — a common confusion.' },
+//    ],
+//  }
+//}
 
 // ─── EXAM CONFIGURATIONS ────────────────────────────────────────────────────
 const examConfigs = {

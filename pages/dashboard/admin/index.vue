@@ -379,23 +379,23 @@ async function confirmCrop() {
         // ------------------------------------------
 
         // ----------------------//----------------------
-        const sourceQ   = bulkResults.value[cropperForBulkIdx.value]
-        const groupId   = sourceQ?.stimulusGroupId
+        const idx = cropperForBulkIdx.value
 
-        if (groupId !== null && groupId !== undefined) {
-          // Only fill questions sharing the exact same stimulus group
-          bulkResults.value.forEach(q => {
-            if (q.stimulusGroupId === groupId) {
-              q.stimulusImageUrl     = url
-              q.stimulusImagePreview = preview
-            }
-          })
-          const count = bulkResults.value.filter(q => q.stimulusGroupId === groupId).length
-          showToast(`Stimulus image applied to ${count} linked question${count > 1 ? 's' : ''} ✓`)
+        // Always apply to the source row immediately
+        bulkResults.value[idx].stimulusImageUrl     = url
+        bulkResults.value[idx].stimulusImagePreview = preview
+
+        // Check if any OTHER rows have a stimulus — if so, show picker
+        const otherStimulusRows = bulkResults.value
+          .map((q, i) => ({ q, i }))
+          .filter(({ q, i }) => i !== idx && (q.stimulusBN || q.stimulusEN))
+
+        if (otherStimulusRows.length > 0) {
+          stimulusAutofillUrl.value       = url
+          stimulusAutofillPreview.value   = preview
+          stimulusAutofillSourceIdx.value = idx
+          stimulusAutofillPending.value   = true
         } else {
-          // Question has no stimulus group — apply only to this one question
-          sourceQ.stimulusImageUrl     = url
-          sourceQ.stimulusImagePreview = preview
           showToast('Stimulus image uploaded ✓')
         }
         // --------------//-----------------
@@ -416,6 +416,23 @@ async function confirmCrop() {
   } finally {
     questionImageUploading.value = false
   }
+}
+
+function applyStimulusAutofill(selectedIndices) {
+  selectedIndices.forEach(i => {
+    bulkResults.value[i].stimulusImageUrl     = stimulusAutofillUrl.value
+    bulkResults.value[i].stimulusImagePreview = stimulusAutofillPreview.value
+  })
+  showToast(`Stimulus image applied to ${selectedIndices.length + 1} question${selectedIndices.length ? 's' : ''} ✓`)
+  cancelStimulusAutofill()
+}
+
+function cancelStimulusAutofill() {
+  stimulusAutofillPending.value   = false
+  stimulusAutofillUrl.value       = ''
+  stimulusAutofillPreview.value   = ''
+  stimulusAutofillSourceIdx.value = null
+  showToast('Stimulus image uploaded ✓')
 }
 
 async function cropAndUpload(imageFile, crop, stream, subject, chapter) {
@@ -496,6 +513,35 @@ function onImgFileChange(e) {
   imgFile.value    = f
   imgPreview.value = URL.createObjectURL(f)
   imgError.value   = ''
+}
+
+// Stimulus autofill picker state
+const safSelected = ref([])  // indices chosen in the autofill picker
+const stimulusAutofillPending  = ref(false)   // shows the picker UI
+const stimulusAutofillUrl      = ref('')
+const stimulusAutofillPreview  = ref('')
+const stimulusAutofillSourceIdx = ref(null)   // which row just uploaded
+
+async function removeStorageImage(url, stream) {
+  if (!url) return
+  try {
+    const marker = '/question-images/'
+    const idx = url.indexOf(marker)
+    if (idx === -1) return
+
+    const path = decodeURIComponent(url.slice(idx + marker.length))  // ← fix
+    const supabase = stream?.startsWith('HSC') ? supabaseHSC : supabaseMedical
+
+    const { data, error } = await supabase.storage
+      .from('question-images')
+      .remove([path])
+
+    //console.log('remove result:', { path, data, error })  // keep temporarily to confirm
+
+    if (error) console.error('Storage delete failed:', error.message)
+  } catch (e) {
+    console.error('removeStorageImage error:', e)
+  }
 }
 
 async function extractFromImage() {
@@ -2539,7 +2585,7 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                         Re-upload
                         <input type="file" accept="image/*" style="display:none" @change="onQuestionImageReupload" />
                       </label>
-                      <button class="iso-btn iso-btn--ghost" style="font-size:0.65rem" @click="questionImageUrl = ''; questionImagePreview = ''">Remove</button>
+                      <button class="iso-btn iso-btn--ghost" style="font-size:0.65rem" @click="removeStorageImage(stimulusImageUrl, streamEN); stimulusImageUrl = ''; stimulusImagePreview = ''">Remove</button>
                     </div>
                   </div>
                   <div v-else class="qimg-empty">
@@ -2580,7 +2626,7 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                         Re-upload
                         <input type="file" accept="image/*" style="display:none" @change="onQuestionImageReupload" />
                       </label>
-                      <button class="iso-btn iso-btn--ghost" style="font-size:0.65rem" @click="questionImageUrl = ''; questionImagePreview = ''">Remove</button>
+                      <button class="iso-btn iso-btn--ghost" style="font-size:0.65rem" @click="removeStorageImage(questionImageUrl, streamEN); questionImageUrl = ''; questionImagePreview = ''">Remove</button>
                     </div>
                   </div>
                   <div v-else class="qimg-empty">
@@ -2955,6 +3001,41 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
               <!-- ── Review table ─────────────────────────── -->
               <div v-if="bulkResults.length" class="bulk-review">
 
+                <!-- Stimulus autofill picker -->
+                <div v-if="stimulusAutofillPending" class="stimulus-autofill-panel">
+                  <div class="saf-head">
+                    <div>
+                      <span class="saf-title">APPLY STIMULUS IMAGE TO OTHER QUESTIONS?</span>
+                      <span class="saf-sub">Just uploaded for Q{{ stimulusAutofillSourceIdx + 1 }}. Select which other questions share this stimulus.</span>
+                    </div>
+                    <button class="iso-btn iso-btn--ghost saf-cancel" @click="cancelStimulusAutofill()">✕ Cancel</button>
+                  </div>
+                
+                  <img :src="stimulusAutofillPreview" class="saf-preview-img" />
+                
+                  <div class="saf-list">
+                    <label
+                      v-for="({ q, i }) in bulkResults.map((q,i) => ({q,i})).filter(({q,i}) => i !== stimulusAutofillSourceIdx && (q.stimulusBN || q.stimulusEN))"
+                      :key="i"
+                      class="saf-row"
+                    >
+                      <input type="checkbox" :value="i" v-model="safSelected" class="saf-check" />
+                      <span class="saf-q-num mono">Q{{ i + 1 }}</span>
+                      <span class="saf-q-text">{{ q.stimulusEN || q.stimulusBN }}</span>
+                      <img v-if="q.stimulusImagePreview || q.stimulusImageUrl" :src="q.stimulusImagePreview || q.stimulusImageUrl" class="saf-existing-thumb" title="Already has image" />
+                    </label>
+                  </div>
+                
+                  <div class="saf-footer">
+                    <button
+                      class="iso-btn iso-btn--fill"
+                      :disabled="!safSelected.length"
+                      @click="applyStimulusAutofill(safSelected); safSelected = []"
+                    >Apply to {{ safSelected.length }} selected</button>
+                    <button class="iso-btn iso-btn--ghost" @click="cancelStimulusAutofill()">Skip — keep only for Q{{ stimulusAutofillSourceIdx + 1 }}</button>
+                  </div>
+                </div>
+
                 <div class="bulk-review-header">
                   <span class="bulk-review-title">
                     REVIEW — {{ bulkResults.length }} QUESTION{{ bulkResults.length > 1 ? 'S' : '' }} FOUND
@@ -3099,7 +3180,7 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                           <span class="stimulus-link-badge">🔗 linked</span>
                         </span>
 
-                        <div v-if="q.hasStimulusImage" class="stimulus-img-wrap">
+                        <!--<div v-if="q.hasStimulusImage" class="stimulus-img-wrap">
                           <img
                             v-if="q.stimulusImagePreview || q.stimulusImageUrl"
                             :src="q.stimulusImagePreview || q.stimulusImageUrl"
@@ -3115,6 +3196,29 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                           <span v-if="q.stimulusImageUrl" class="stimulus-auto-filled">
                             ✓ auto-filled on linked questions
                           </span>
+                        </div>-->
+
+                        <div v-if="q.hasStimulusImage" class="stimulus-img-wrap">
+                          <!-- Uploaded image preview -->
+                          <img
+                            v-if="q.stimulusImagePreview || q.stimulusImageUrl"
+                            :src="q.stimulusImagePreview || q.stimulusImageUrl"
+                            class="brd-qimg"
+                          />
+                          <div class="brd-img-actions">
+                            <button
+                              class="iso-btn iso-btn--ghost"
+                              style="font-size:0.68rem; width:fit-content"
+                              @click="openCropper(bulkImgFile, i, true)"
+                            >
+                              {{ q.stimulusImageUrl ? '✎ Re-crop stimulus' : '✂ Crop stimulus image' }}
+                            </button>
+                            <button
+                              v-if="q.stimulusImageUrl || q.stimulusImagePreview"
+                              class="iso-btn iso-btn--ghost brd-remove-btn"
+                              @click="removeStorageImage(q.stimulusImageUrl, streamEN); q.stimulusImageUrl = null; q.stimulusImagePreview = null"
+                            >✕ Remove</button>
+                          </div>
                         </div>
 
                         <textarea class="brd-edit-textarea" v-model="q.stimulusEN" rows="2" placeholder="Stimulus (English)"></textarea>
@@ -3135,7 +3239,7 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                       </div>
 
                       <!-- Question image -->
-                      <div class="brd-section">
+                      <!--<div class="brd-section">
                         <span v-if="q.hasQuestionImage" class="brd-label">QUESTION IMAGE</span>
                         <img v-if="q.questionImagePreview || q.questionImageUrl" :src="q.questionImagePreview || q.questionImageUrl" class="brd-qimg" />
                         <button
@@ -3146,6 +3250,30 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
                         >
                           {{ q.questionImageUrl ? '✎ Re-crop' : '✂ Crop image' }}
                         </button>
+                      </div>-->
+
+                      <div class="brd-section">
+                        <span v-if="q.hasQuestionImage" class="brd-label">QUESTION IMAGE</span>
+                        <img
+                          v-if="q.questionImagePreview || q.questionImageUrl"
+                          :src="q.questionImagePreview || q.questionImageUrl"
+                          class="brd-qimg"
+                        />
+                        <div class="brd-img-actions">
+                          <button
+                            v-if="q.hasQuestionImage"
+                            class="iso-btn iso-btn--ghost"
+                            style="font-size:0.68rem; width:fit-content"
+                            @click="openCropper(bulkImgFile, i)"
+                          >
+                            {{ q.questionImageUrl ? '✎ Re-crop' : '✂ Crop image' }}
+                          </button>
+                          <button
+                            v-if="q.questionImageUrl || q.questionImagePreview"
+                            class="iso-btn iso-btn--ghost brd-remove-btn"
+                            @click="removeStorageImage(q.questionImageUrl, streamEN); q.questionImageUrl = null; q.questionImagePreview = null"
+                          >✕ Remove</button>
+                        </div>
                       </div>
 
                       <!-- Options -->
@@ -4497,5 +4625,107 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
   white-space: pre;
   line-height: 1.6;
   border-radius: 3px;
+}
+
+/* stimulus image */
+.brd-img-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.brd-remove-btn {
+  font-size: 0.65rem !important;
+  color: rgba(255, 100, 100, 0.8) !important;
+  border-color: rgba(255, 100, 100, 0.3) !important;
+}
+.brd-remove-btn:hover {
+  background: rgba(255, 100, 100, 0.08) !important;
+}
+
+/* Stimulus autofill picker */
+.stimulus-autofill-panel {
+  border: 1px solid rgba(255, 200, 80, 0.3);
+  background: rgba(255, 200, 80, 0.04);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.saf-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.saf-title {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  color: rgba(255, 200, 80, 0.9);
+  display: block;
+  margin-bottom: 3px;
+}
+.saf-sub {
+  font-size: 0.72rem;
+  color: var(--gray);
+}
+.saf-cancel {
+  font-size: 0.65rem !important;
+  flex-shrink: 0;
+  border-color: rgba(255,100,100,0.3) !important;
+  color: rgba(255,100,100,0.8) !important;
+}
+.saf-preview-img {
+  max-height: 80px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  align-self: flex-start;
+}
+.saf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.saf-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--white);
+  transition: background 0.12s;
+}
+.saf-row:hover { background: rgba(255,255,255,0.04); }
+.saf-check { flex-shrink: 0; accent-color: rgba(255,200,80,0.8); }
+.saf-q-num { color: var(--gray); font-size: 0.65rem; flex-shrink: 0; }
+.saf-q-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  color: var(--gray);
+}
+.saf-existing-thumb {
+  width: 36px;
+  height: 24px;
+  object-fit: cover;
+  border: 1px solid rgba(120,230,120,0.4);
+  flex-shrink: 0;
+}
+.saf-footer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
 }
 </style>
