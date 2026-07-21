@@ -1,82 +1,272 @@
 <script setup>
 definePageMeta({ middleware: 'auth', layout: 'dashboard' })
 
-const supabase = useSupabaseClient()
-const user     = useSupabaseUser()
+// ─── STUDENT STREAM (from DB) ────────────────────────────────────────────────
+// In production: const user = useSupabaseUser()
+// const studentStream = computed(() => user.value?.user_metadata?.exam_stream || null)
+// For demo, we mock it. Wire this to your profiles table's exam_prefs or stream column.
+const studentStream = ref('hsc') // 'hsc' | 'ssc' | 'engineering' | 'medical' | 'varsity'
 
-// ─── LOADING STATE ────────────────────────────────────────────────────────────
-const catalogueLoading = ref(true)
-const catalogueError   = ref(null)
-
-// ─── STUDENT STREAM (from profiles.primary_stream) ───────────────────────────
-const studentStream = ref('hsc')
-
-async function loadStudentStream() {
-  if (!user.value?.id) return
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('primary_stream')
-      .eq('id', user.value.id)
-      .single()
-    if (error) throw error
-    if (data?.primary_stream) studentStream.value = data.primary_stream
-  } catch (e) {
-    console.warn('Could not load student stream:', e.message)
-  }
-}
-
-// ─── DB ROW → LOCAL SHAPE MAPPER ─────────────────────────────────────────────
-// Normalises preset_exams columns to the shape every computed + template expects.
-function mapExam(row) {
-  return {
-    id:            row.id,
-    title:         row.title,
-    description:   row.description || '',
-    subject:       row.subject      || 'All Subjects',
-    chapter:       row.chapter      || null,
-    stream:        row.stream,
-    group:         row.group_key,
-    type:          row.stream,        // examTypeToRoute uses exam.type
-    source:        row.source         || 'mixed',
-    questionCount: row.question_count,
-    duration:      row.duration_mins,
-    difficulty:    row.difficulty     || 'medium',
-    attendees:     row.attendees      || 0,
-    rating:        parseFloat(row.rating) || 0,
-    tags:          Array.isArray(row.tags) ? row.tags : [],
-    isHot:         row.is_hot         || false,
-    isFeatured:    row.is_featured    || false,
-    negativeMarking: row.negative_marking ?? 0,
-    isDynamic:     row.is_dynamic     ?? true,
-  }
-}
-
-// ─── PRESET EXAM CATALOGUE (Supabase) ────────────────────────────────────────
-const allExams = ref([])
-
-async function loadCatalogue() {
-  catalogueLoading.value = true
-  catalogueError.value   = null
-  try {
-    const { data, error } = await supabase
-      .from('preset_exams')
-      .select('id,title,description,subject,chapter,stream,group_key,source,difficulty,question_count,duration_mins,negative_marking,attendees,rating,tags,is_hot,is_featured,is_dynamic,status')
-      .eq('status', 'published')
-      .order('attendees', { ascending: false })
-    if (error) throw error
-    allExams.value = (data || []).map(mapExam)
-  } catch (e) {
-    catalogueError.value = e.message || 'Failed to load exams'
-  } finally {
-    catalogueLoading.value = false
-  }
-}
-
-onMounted(async () => {
-  await Promise.all([loadStudentStream(), loadCatalogue()])
-})
-
+// ─── PRESET EXAM CATALOGUE ───────────────────────────────────────────────────
+// Each exam has: id, title, subject, chapter (optional), stream, group (sub-stream),
+// type (hsc/ssc/engineering/medical/varsity), source (ai/teacher/mixed),
+// questionCount, duration (mins), difficulty, attendees, rating, tags[], isHot, isFeatured
+const allExams = [
+  // ── HOT / FEATURED ─────────────────────────────────────────────────────────
+  {
+    id: 'ex-hsc-sci-full-2024',
+    title: 'HSC Science Full Model Test 2024',
+    subject: 'All Subjects',
+    chapter: null,
+    stream: 'hsc', group: 'hsc_science',
+    type: 'hsc',
+    source: 'mixed',
+    questionCount: 25,
+    duration: 25,
+    difficulty: 'medium',
+    attendees: 8420,
+    rating: 4.8,
+    tags: ['Physics', 'Chemistry', 'Biology', 'Math'],
+    isHot: true,
+    isFeatured: true,
+    description: 'Full HSC Science MCQ mock following the official board pattern. All core subjects covered.',
+  },
+  {
+    id: 'ex-hsc-phy-ch1',
+    title: 'HSC Physics — Kinematics & Dynamics',
+    subject: 'Physics',
+    chapter: 'Kinematics, Dynamics',
+    stream: 'hsc', group: 'hsc_science',
+    type: 'hsc',
+    source: 'teacher',
+    questionCount: 15,
+    duration: 15,
+    difficulty: 'easy',
+    attendees: 5130,
+    rating: 4.6,
+    tags: ['Physics', 'Kinematics', 'Dynamics'],
+    isHot: true,
+    isFeatured: false,
+    description: "Chapter-focused test on motion, forces, and Newton's laws for HSC Physics.",
+  },
+  {
+    id: 'ex-ssc-sci-full',
+    title: 'SSC Science Full Practice Test',
+    subject: 'All Subjects',
+    chapter: null,
+    stream: 'ssc', group: 'ssc_science',
+    type: 'ssc',
+    source: 'ai',
+    questionCount: 20,
+    duration: 20,
+    difficulty: 'medium',
+    attendees: 6870,
+    rating: 4.7,
+    tags: ['Physics', 'Chemistry', 'Biology', 'Math'],
+    isHot: true,
+    isFeatured: true,
+    description: 'Complete SSC Science MCQ test following official board structure.',
+  },
+  {
+    id: 'ex-buet-full-2024',
+    title: 'BUET Admission Full Mock 2024',
+    subject: 'All Subjects',
+    chapter: null,
+    stream: 'engineering', group: 'buet',
+    type: 'engineering',
+    source: 'mixed',
+    questionCount: 100,
+    duration: 60,
+    difficulty: 'hard',
+    attendees: 12340,
+    rating: 4.9,
+    tags: ['Physics', 'Chemistry', 'Math', 'English'],
+    isHot: true,
+    isFeatured: true,
+    description: 'The most attempted BUET preparation test. Full 100-question mock based on previous year patterns.',
+  },
+  {
+    id: 'ex-medical-full-2024',
+    title: 'Medical Admission Full Mock 2024',
+    subject: 'All Subjects',
+    chapter: null,
+    stream: 'medical', group: 'mbbs',
+    type: 'medical',
+    source: 'mixed',
+    questionCount: 100,
+    duration: 60,
+    difficulty: 'hard',
+    attendees: 9450,
+    rating: 4.8,
+    tags: ['Biology', 'Chemistry', 'Physics', 'English'],
+    isHot: true,
+    isFeatured: false,
+    description: 'Complete medical admission preparation mock with 100 MCQs following MBBS entrance pattern.',
+  },
+  {
+    id: 'ex-du-varsity-full',
+    title: 'DU / JU Varsity Admission Full Test',
+    subject: 'All Subjects',
+    chapter: null,
+    stream: 'varsity', group: 'cu',
+    type: 'varsity',
+    source: 'ai',
+    questionCount: 60,
+    duration: 45,
+    difficulty: 'hard',
+    attendees: 7620,
+    rating: 4.7,
+    tags: ['Bangla', 'English', 'General Knowledge', 'Math'],
+    isHot: true,
+    isFeatured: false,
+    description: 'Covers all subjects tested in major university admission exams (DU, JU, CU and others).',
+  },
+  // ── MORE EXAMS ──────────────────────────────────────────────────────────────
+  {
+    id: 'ex-hsc-chem-org',
+    title: 'HSC Chemistry — Organic Chemistry',
+    subject: 'Chemistry',
+    chapter: 'Organic Chemistry',
+    stream: 'hsc', group: 'hsc_science',
+    type: 'hsc',
+    source: 'teacher',
+    questionCount: 10,
+    duration: 12,
+    difficulty: 'medium',
+    attendees: 3210,
+    rating: 4.5,
+    tags: ['Chemistry', 'Organic'],
+    isHot: false,
+    isFeatured: false,
+    description: 'Deep-dive into organic chemistry reactions, hybridisation, and functional groups.',
+  },
+  {
+    id: 'ex-hsc-math-calc',
+    title: 'HSC Math — Calculus & Trigonometry',
+    subject: 'Math',
+    chapter: 'Calculus, Trigonometry',
+    stream: 'hsc', group: 'hsc_science',
+    type: 'hsc',
+    source: 'ai',
+    questionCount: 12,
+    duration: 15,
+    difficulty: 'hard',
+    attendees: 2890,
+    rating: 4.4,
+    tags: ['Math', 'Calculus', 'Trigonometry'],
+    isHot: false,
+    isFeatured: false,
+    description: 'Targeted practice on derivatives, integration, and trigonometric identities.',
+  },
+  {
+    id: 'ex-hsc-arts-bangla',
+    title: 'HSC Arts — Bangla Literature & Grammar',
+    subject: 'Bangla',
+    chapter: null,
+    stream: 'hsc', group: 'hsc_arts',
+    type: 'hsc',
+    source: 'teacher',
+    questionCount: 15,
+    duration: 15,
+    difficulty: 'medium',
+    attendees: 4120,
+    rating: 4.6,
+    tags: ['Bangla', 'Literature', 'Grammar'],
+    isHot: false,
+    isFeatured: false,
+    description: 'Covers Bangla poetry, prose, grammar rules, and literary analysis for HSC Arts.',
+  },
+  {
+    id: 'ex-hsc-commerce-acc',
+    title: 'HSC Commerce — Accounting Full Test',
+    subject: 'Accounting',
+    chapter: null,
+    stream: 'hsc', group: 'hsc_commerce',
+    type: 'hsc',
+    source: 'mixed',
+    questionCount: 12,
+    duration: 15,
+    difficulty: 'medium',
+    attendees: 2340,
+    rating: 4.3,
+    tags: ['Accounting', 'Finance', 'Commerce'],
+    isHot: false,
+    isFeatured: false,
+    description: 'Double entry, trial balance, balance sheets, and depreciation concepts.',
+  },
+  {
+    id: 'ex-ssc-arts-full',
+    title: 'SSC Arts — Full Model Test',
+    subject: 'All Subjects',
+    chapter: null,
+    stream: 'ssc', group: 'ssc_arts',
+    type: 'ssc',
+    source: 'ai',
+    questionCount: 20,
+    duration: 20,
+    difficulty: 'easy',
+    attendees: 4560,
+    rating: 4.5,
+    tags: ['Bangla', 'English', 'History', 'Civics'],
+    isHot: false,
+    isFeatured: false,
+    description: 'Full SSC Arts practice test covering all humanities subjects.',
+  },
+  {
+    id: 'ex-ruet-physics',
+    title: 'RUET/CUET — Physics Crash Test',
+    subject: 'Physics',
+    chapter: null,
+    stream: 'engineering', group: 'ruet',
+    type: 'engineering',
+    source: 'teacher',
+    questionCount: 30,
+    duration: 20,
+    difficulty: 'hard',
+    attendees: 3870,
+    rating: 4.6,
+    tags: ['Physics', 'Engineering', 'RUET', 'CUET'],
+    isHot: false,
+    isFeatured: false,
+    description: 'Physics-only focused test for RUET/CUET aspirants. High-difficulty conceptual questions.',
+  },
+  {
+    id: 'ex-medical-bio',
+    title: 'Medical — Biology Deep Dive',
+    subject: 'Biology',
+    chapter: null,
+    stream: 'medical', group: 'mbbs',
+    type: 'medical',
+    source: 'teacher',
+    questionCount: 40,
+    duration: 30,
+    difficulty: 'hard',
+    attendees: 5210,
+    rating: 4.7,
+    tags: ['Biology', 'Medical', 'Anatomy', 'Physiology'],
+    isHot: false,
+    isFeatured: false,
+    description: 'Biology-heavy test for MBBS admission aspirants. Covers human anatomy, physiology, and cell biology.',
+  },
+  {
+    id: 'ex-varsity-english',
+    title: 'Varsity — English Language Test',
+    subject: 'English',
+    chapter: null,
+    stream: 'varsity', group: 'cu',
+    type: 'varsity',
+    source: 'ai',
+    questionCount: 25,
+    duration: 20,
+    difficulty: 'medium',
+    attendees: 3140,
+    rating: 4.4,
+    tags: ['English', 'Grammar', 'Vocabulary'],
+    isHot: false,
+    isFeatured: false,
+    description: 'English grammar, vocabulary, and comprehension preparation for university admissions.',
+  },
+]
 
 // ─── STREAM MAP: which exam page to launch ───────────────────────────────────
 const examTypeToRoute = {
@@ -134,7 +324,7 @@ const availableChapters = computed(() =>
 
 // ─── COMPUTED: HOT EXAMS (top attended, filtered to student stream) ───────────
 const hotExams = computed(() => {
-  let pool = allExams.value.filter(e => e.isHot)
+  let pool = allExams.filter(e => e.isHot)
   // Prioritise student's own stream at top, but include all hot exams
   return pool.sort((a, b) => {
     const aMatch = a.stream === studentStream.value ? 1 : 0
@@ -146,7 +336,7 @@ const hotExams = computed(() => {
 
 // ─── COMPUTED: FILTERED EXAMS ─────────────────────────────────────────────────
 const filteredExams = computed(() => {
-  let pool = [...allExams.value]
+  let pool = [...allExams]
   if (filterStream.value !== 'all') pool = pool.filter(e => e.stream === filterStream.value)
   if (filterSubject.value !== 'All') pool = pool.filter(e =>
     e.subject === filterSubject.value || e.subject === 'All Subjects' ||
@@ -365,21 +555,6 @@ function fmtAttendees(n) {
       </div>
     </div>
 
-
-    <!-- ══ LOADING STATE ══════════════════════════════════════════════════════ -->
-    <div v-if="catalogueLoading" class="catalogue-loading">
-      <div class="catalogue-spinner" />
-      <span>Loading exams…</span>
-    </div>
-
-    <!-- ══ ERROR STATE ════════════════════════════════════════════════════════ -->
-    <div v-else-if="catalogueError" class="catalogue-error">
-      <span class="catalogue-error-icon">⚠</span>
-      <p class="catalogue-error-msg">{{ catalogueError }}</p>
-      <button class="iso-btn iso-btn--ghost" style="font-size:0.65rem" @click="loadCatalogue">Retry</button>
-    </div>
-
-    <template v-else>
     <!-- ══ HOT EXAMS ════════════════════════════════════════════════════════ -->
     <section class="hot-section">
       <div class="section-head">
@@ -732,8 +907,6 @@ function fmtAttendees(n) {
       </div>
     </Teleport>
 
-    </template>
-
   </div>
 </template>
 
@@ -1083,30 +1256,6 @@ function fmtAttendees(n) {
 .meta-pill.diff-hard   { background: rgba(255,100,100,0.07); border-color: rgba(255,100,100,0.25); color: rgba(255,100,100,0.8); }
 .meta-pill.src-ai      { color: rgba(140,180,255,0.8); border-color: rgba(140,180,255,0.2); background: rgba(140,180,255,0.06); }
 .meta-pill.src-teacher { color: rgba(200,160,255,0.8); border-color: rgba(200,160,255,0.2); background: rgba(200,160,255,0.06); }
-
-/* ─── CATALOGUE LOADING / ERROR ──────────────────────────────────────────── */
-.catalogue-loading {
-  display: flex; align-items: center; justify-content: center;
-  gap: 12px; padding: 80px 20px;
-  font-family: var(--font-mono); font-size: 0.65rem;
-  letter-spacing: 0.1em; color: var(--gray);
-}
-.catalogue-spinner {
-  width: 18px; height: 18px; border: 2px solid var(--border);
-  border-top-color: var(--white); border-radius: 50%;
-  animation: catalogue-spin 0.8s linear infinite; flex-shrink: 0;
-}
-@keyframes catalogue-spin { to { transform: rotate(360deg); } }
-
-.catalogue-error {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 10px; padding: 80px 20px; text-align: center;
-}
-.catalogue-error-icon { font-size: 2rem; color: rgba(255,200,80,0.7); }
-.catalogue-error-msg {
-  font-family: var(--font-sans); font-size: 0.78rem;
-  color: var(--gray); margin: 0;
-}
 
 /* ─── HOT CARD CTA ROW (two buttons) ──────────────────────────────────────── */
 .hot-card-cta { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }

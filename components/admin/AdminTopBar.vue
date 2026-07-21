@@ -57,7 +57,8 @@ const tabLabels: Record<string, string> = {
   overview:  'Overview',
   users:     'Users',
   questions: 'Questions',
-  exams:     'Exam Results',
+  exams:     'Exam Library',
+  examBuilder: 'Create Exam',
   content:   'Content',
   system:    'System',
 }

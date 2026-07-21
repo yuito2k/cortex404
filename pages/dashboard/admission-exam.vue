@@ -222,8 +222,110 @@ const showNegativeWarning = ref(false)
 const filterTab = ref('all')         // results filter: all | correct | wrong | skipped
 const subjectFilter = ref('all')     // results subject filter: 'all' | subject key
 
+const route = useRoute()
+
+const configOverrides  = ref(null)  // top-level overrides: { duration, negativeMarking }
+const subjectOverrides = ref(null)  // subject->count map override
+
+const _groupToExamKey = {
+  medical: 'mbbs', varsity: 'du',
+  mbbs: 'mbbs', bds: 'bds', afmc: 'afmc',
+  du: 'du', cu: 'cu', ju: 'ju', ru: 'ru', ku: 'ku', sust: 'sust',
+}
+
+onMounted(() => {
+  const q = route.query
+  if (q.autostart !== '1') return
+
+  const examKey = _groupToExamKey[q.group] || _groupToExamKey[q.stream]
+  if (!examKey || !examConfigs[examKey]) return
+
+  selectedExam.value = examKey
+  selectedUnit.value = ''
+  kaOptionalSubjects.value = []
+
+  const cfg = examConfigs[examKey]
+
+  // ── Duration override ────────────────────────────────────────────────────
+  if (q.duration) {
+    const dur = parseInt(q.duration)
+    if (!isNaN(dur) && dur > 0) {
+      configOverrides.value = { ...configOverrides.value, duration: dur }
+    }
+  }
+
+  // ── Negative marking override ────────────────────────────────────────────
+  // exams.vue can pass `negMark` as a decimal string, e.g. "0.25" or "0"
+  if (q.negMark !== undefined) {
+    const nm = parseFloat(q.negMark)
+    if (!isNaN(nm) && nm >= 0) {
+      configOverrides.value = { ...configOverrides.value, negativeMarking: nm }
+    }
+  }
+
+  // ── Question count override (non-DU exams only — DU needs unit first) ────
+  if (q.count && !cfg.requiresUnit) {
+    const targetTotal = parseInt(q.count)
+    if (!isNaN(targetTotal) && targetTotal > 0) {
+      const baseSubjects = cfg.subjects
+      const baseTotal = Object.values(baseSubjects).reduce((a, b) => a + b, 0)
+      const scale = targetTotal / baseTotal
+      const scaled = {}
+      let runningTotal = 0
+      const keys = Object.keys(baseSubjects)
+      keys.forEach((subj, i) => {
+        if (i === keys.length - 1) {
+          scaled[subj] = Math.max(1, targetTotal - runningTotal)
+        } else {
+          const val = Math.max(1, Math.round(baseSubjects[subj] * scale))
+          scaled[subj] = val
+          runningTotal += val
+        }
+      })
+      subjectOverrides.value = scaled
+    }
+  }
+
+  // ── Single subject filter (non-DU exams only) ────────────────────────────
+  if (q.subject && q.subject !== 'All' && !cfg.requiresUnit) {
+    const subjKey = Object.keys(cfg.subjectLabels || {}).find(
+      k => (cfg.subjectLabels[k] || '').toLowerCase() === String(q.subject).toLowerCase()
+    )
+    if (subjKey && cfg.subjects[subjKey] !== undefined) {
+      const total = subjectOverrides.value
+        ? Object.values(subjectOverrides.value).reduce((a, b) => a + b, 0)
+        : (q.count ? parseInt(q.count) : cfg.subjects[subjKey])
+      subjectOverrides.value = { [subjKey]: total }
+    }
+  }
+
+  // ── Show appropriate modal after reactivity flushes ──────────────────────
+  nextTick(() => {
+    if (cfg.requiresUnit) {
+      // DU requires a unit — student must pick manually.
+      // Duration/negMark overrides still apply once they start.
+      setTimeout(() => {
+        const unitEl = document.querySelector('.unit-selector')
+        if (unitEl) unitEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 400)
+    } else {
+      nextTick(() => {
+        showNegativeWarning.value = true
+      })
+    }
+  })
+})
+
+const presetExamTitle = computed(() => route.query.title || null)
+
 // ─── COMPUTED ────────────────────────────────────────────────────────────────
-const config = computed(() => selectedExam.value ? examConfigs[selectedExam.value] : null)
+//const config = computed(() => selectedExam.value ? examConfigs[selectedExam.value] : null)
+const config = computed(() => {
+  if (!selectedExam.value) return null
+  const base = examConfigs[selectedExam.value]
+  if (!configOverrides.value) return base
+  return { ...base, ...configOverrides.value }
+})
 
 // For DU: the currently selected unit object (or null)
 const activeUnitConfig = computed(() => {
@@ -232,11 +334,26 @@ const activeUnitConfig = computed(() => {
 })
 
 // Subjects/labels/total to actually use — reactive to unit + optional selection
+//const activeSubjects = computed(() => {
+//  if (!activeUnitConfig.value) return config.value?.subjects || {}
+//  const u = activeUnitConfig.value
+//  if (u.requiresOptionals) {
+//    // Build from compulsory + chosen optionals
+//    const result = { ...u.compulsory }
+//    kaOptionalSubjects.value.forEach(key => {
+//      const opt = u.optionalSubjects.find(o => o.key === key)
+//      if (opt) result[key] = opt.questions
+//    })
+//    return result
+//  }
+//  return u.subjects
+//})
 const activeSubjects = computed(() => {
+  // Subject override takes priority over everything (DU units included)
+  if (subjectOverrides.value) return subjectOverrides.value
   if (!activeUnitConfig.value) return config.value?.subjects || {}
   const u = activeUnitConfig.value
   if (u.requiresOptionals) {
-    // Build from compulsory + chosen optionals
     const result = { ...u.compulsory }
     kaOptionalSubjects.value.forEach(key => {
       const opt = u.optionalSubjects.find(o => o.key === key)
@@ -246,11 +363,30 @@ const activeSubjects = computed(() => {
   }
   return u.subjects
 })
+
 const activeSubjectLabels = computed(() => {
   if (activeUnitConfig.value) return activeUnitConfig.value.subjectLabels
   return config.value?.subjectLabels || {}
 })
+
+//const activeTotalQuestions = computed(() => {
+//  if (!activeUnitConfig.value) return config.value?.totalQuestions || 0
+//  const u = activeUnitConfig.value
+//  if (u.requiresOptionals) {
+//    const compTotal = Object.values(u.compulsory).reduce((a, b) => a + b, 0)
+//    const optTotal = kaOptionalSubjects.value.reduce((sum, key) => {
+//      const opt = u.optionalSubjects.find(o => o.key === key)
+//      return sum + (opt ? opt.questions : 0)
+//    }, 0)
+//    return compTotal + optTotal
+//  }
+//  return u.totalQuestions
+//})
+
 const activeTotalQuestions = computed(() => {
+  if (subjectOverrides.value) {
+    return Object.values(subjectOverrides.value).reduce((a, b) => a + b, 0)
+  }
   if (!activeUnitConfig.value) return config.value?.totalQuestions || 0
   const u = activeUnitConfig.value
   if (u.requiresOptionals) {
@@ -495,92 +631,6 @@ function reviewOptClass(q, idx) {
 }
 
 const pct = (v) => `${v}%`
-
-// ════════════════════════════════════════════════════════════════════════════
-// PATCH for: pages/dashboard/admission-exam.vue  (FIXED)
-// PURPOSE:   Auto-start from query params when launched by exams.vue
-//
-// WHERE TO ADD:
-//   Inside script setup, paste this block AFTER the existing helper
-//   functions section (after `const pct = (v) => ...` near line 493),
-//   but BEFORE the closing /script tag.
-//
-// NOTE: Do NOT paste inside an existing function — this is top-level code.
-// ════════════════════════════════════════════════════════════════════════════
- 
-// ─── QUERY PARAM AUTO-START ──────────────────────────────────────────────────
-//
-// exams.vue passes these query params via navigateTo():
-//   stream    — 'medical' | 'varsity'
-//   group     — 'medical' | 'varsity' (generic) or a specific key like 'mbbs', 'du'
-//   autostart — '1'
-//   examId    — preset exam id (optional, for analytics)
-//   title     — preset exam title (optional, display only)
-//
-// Mapping from exams.vue `group` values → actual examConfigs keys:
-//   'medical'  → 'mbbs'   (default medical exam)
-//   'varsity'  → 'du'     (default varsity exam — most attended)
-//   any specific key ('mbbs', 'bds', 'afmc', 'du', 'cu', 'ju' etc.) → use directly
-//
-// ─────────────────────────────────────────────────────────────────────────────
- 
-const _route = useRoute()
- 
-const _groupToExamKey = {
-  // Generic values from exams.vue catalogue
-  medical:  'mbbs',
-  varsity:  'du',
-  // Specific keys passed directly (future-proof)
-  mbbs:     'mbbs',
-  bds:      'bds',
-  afmc:     'afmc',
-  du:       'du',
-  cu:       'cu',
-  ju:       'ju',
-  ru:       'ru',
-  ku:       'ku',
-  sust:     'sust',
-}
- 
-onMounted(() => {
-  const q = _route.query
-  if (q.autostart !== '1') return
- 
-  // Resolve which examConfigs key to use
-  const examKey = _groupToExamKey[q.group] || _groupToExamKey[q.stream]
-  if (!examKey || !examConfigs[examKey]) return
- 
-  // Step 1: set selectedExam (mirrors selectExam())
-  selectedExam.value = examKey
-  selectedUnit.value = ''
-  kaOptionalSubjects.value = []
- 
-  const cfg = examConfigs[examKey]
- 
-  // Step 2: wait for Vue to flush reactivity so `canStart` and `config`
-  // computed values are updated before we try to show anything
-  nextTick(() => {
-    if (cfg.requiresUnit) {
-      // DU requires a unit — we can't fully auto-start.
-      // Pre-select the exam and scroll the unit picker into view.
-      // The student picks a unit, then hits "Start Exam →" themselves.
-      setTimeout(() => {
-        const unitEl = document.querySelector('.unit-selector')
-        if (unitEl) unitEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 400)
-    } else {
-      // Non-DU exams: canStart is now true, show the negative marking modal.
-      // Another nextTick ensures the DOM has fully rendered with the new state.
-      nextTick(() => {
-        showNegativeWarning.value = true
-      })
-    }
-  })
-})
- 
-// Optional: expose preset title for display in template
-// Usage in template: {{ _presetTitle || 'Admission Mock Tests' }}
-const _presetTitle = computed(() => _route.query.title || null)
 </script>
 
 <template>

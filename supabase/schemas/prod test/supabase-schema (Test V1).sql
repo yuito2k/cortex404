@@ -207,6 +207,459 @@ create table if not exists public.bookmarks (
 
 create index if not exists idx_bookmarks_user on public.bookmarks(user_id);
 
+-- ============================================================
+-- CORTEX404 — Schema Addition: Preset Exams
+-- Run this after the existing schema (supabase-schema__Test_V1_.sql)
+-- ============================================================
+
+
+-- ============================================================
+-- PRESET EXAMS
+-- ============================================================
+-- Stores admin/teacher-created preset exam configurations
+-- that appear in exams.vue (hot exams + filterable library).
+--
+-- Two modes:
+--   is_dynamic = true  → questions pulled randomly from the
+--                        questions table each time a student
+--                        starts, filtered by stream/subject/
+--                        chapter/difficulty_distribution.
+--   is_dynamic = false → question_ids[] is the fixed curated
+--                        set. Always the same questions.
+--
+-- source:
+--   'ai'      = generated entirely by Gemini
+--   'teacher' = manually built by admin/teacher
+--   'mixed'   = AI-generated then human-edited, or a mix
+-- ============================================================
+
+create table if not exists public.ai_generated_questions (
+  id                bigserial primary key,
+
+  -- Stream / exam classifier
+  -- Values seen across all files: HSC, SSC, BUET, Medical, BCS, Bank,
+  -- DU (Dhaka Univ), RU (Rajshahi Univ), CU, JU, IU, SUST, KUET, etc.
+  exam              text not null,
+  text_book         text,
+
+  -- Bilingual text fields (JSONB with { "english": "...", "bangla": "..." })
+  -- Null bangla is allowed for purely English content (e.g. English grammar Qs)
+  question          jsonb,            -- { english, bangla }
+  question_hash     text,             -- hash of the question text
+  question_image    text,             -- image for the question if any
+  stimulus          jsonb,            -- { english, bangla }
+  stimulus_hash     text,             -- hash of the stimuli text
+  stimulus_image    text,             -- image for the stimuli if any
+  options           jsonb not null,   -- { english: [...], bangla: [...] }
+  explanation       jsonb,            -- { english, bangla }
+  subject           jsonb not null,   -- { english, bangla }
+  chapter           jsonb not null,   -- { english, bangla }
+  difficulty        jsonb not null,   -- { english: "hard", bangla: "কঠিন" }
+  years             jsonb,            -- { english: ["2023", "2024"], bangla: ["২০২৩", "২০২৪"] }
+
+  -- Scalar fields
+  correct_index     smallint not null check (correct_index between 0 and 4),
+  difficulty_level  text not null default 'medium' check (difficulty_level in ('easy','medium','hard')),
+
+  -- Optional metadata
+  source            jsonb,             -- e.g. "BUET 2023 Question Paper"
+  --has_image         boolean not null default false,
+  --image_url         text,             -- image for the question if any
+  --tags              text[],           -- freeform tags for cross-topic search
+  is_verified       boolean not null default false,
+
+  -- Admin panel status (index.vue Questions tab)
+  -- 'published' = live for all users
+  -- 'draft'     = saved but not visible to students
+  -- 'flagged'   = reported/under review (maps to question_reports)
+  status            text not null default 'published'
+                      check (status in ('published','draft','flagged')),
+
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+
+-- Indexes for the filter patterns used in question-bank.vue and mock-exam.vue
+create index if not exists idx_questions_exam             on public.ai_generated_questions(exam);
+create index if not exists idx_questions_difficulty_level on public.ai_generated_questions(difficulty_level);
+create index if not exists idx_questions_status           on public.ai_generated_questions(status);
+create index if not exists idx_questions_published        on public.ai_generated_questions(status) where status = 'published';  -- TODO: is this even necessary
+-- GIN indexes for JSONB subject/chapter text search
+create index if not exists idx_questions_subject_gin      on public.ai_generated_questions using gin(subject);
+create index if not exists idx_questions_chapter_gin      on public.ai_generated_questions using gin(chapter);
+--create index if not exists idx_questions_tags             on public.questions using gin(tags);
+
+
+CREATE OR REPLACE FUNCTION get_random_ai_generated_questions(
+  p_exam text,
+  p_subject text DEFAULT NULL,
+  p_chapter text DEFAULT NULL,
+  p_text_book text DEFAULT NULL,
+  p_difficulty text DEFAULT NULL,
+  p_limit int DEFAULT 100
+)
+RETURNS SETOF ai_generated_questions AS $$
+BEGIN
+  RETURN QUERY
+  SELECT * FROM ai_generated_questions
+  WHERE status = 'published'
+    AND exam = p_exam
+    AND (p_subject IS NULL OR subject->>'english' = p_subject)
+    AND (p_chapter IS NULL OR chapter->>'english' = p_chapter)
+    AND (p_text_book IS NULL OR text_book = p_text_book)
+    -- AND (p_difficulty IS NULL OR difficulty_level = p_difficulty)
+  ORDER BY random()
+  LIMIT p_limit;
+END;
+$$ LANGUAGE plpgsql;
+
+
+
+create table if not exists public.preset_exams (
+  id                uuid primary key default uuid_generate_v4(),
+
+  -- Identity
+  title             text not null,
+  description       text,
+
+  -- Classification (mirrors exams.vue catalogue shape)
+  stream            text not null,
+    -- hsc | ssc | engineering | medical | varsity
+  group_key         text not null,
+    -- hsc_science | hsc_arts | hsc_commerce |
+    -- ssc_science | ssc_arts | ssc_commerce |
+    -- buet | ruet | kuet | cuet |
+    -- mbbs | bds | afmc |
+    -- du | cu | ju | ru | ku | sust
+  subject           text not null default 'All',
+    -- 'All' or a specific subject name (English)
+  chapter           text not null default 'All',
+    -- 'All' or a specific chapter name (English)
+  tags              text[] not null default '{}',
+
+  -- Source & difficulty
+  source            text not null default 'mixed'
+                      check (source in ('ai','teacher','mixed')),
+  difficulty        text not null default 'medium'
+                      check (difficulty in ('easy','medium','hard','mixed')),
+
+  -- Difficulty distribution (used when is_dynamic = true)
+  -- Shape: { "easy": 40, "medium": 40, "hard": 20 }
+  -- Percentages must sum to 100. null = pure random.
+  difficulty_distribution jsonb,
+  question_distribution jsonb,
+
+  -- Exam config
+  question_count    int  not null default 20,
+  duration_mins     int  not null default 20,
+  negative_marking  numeric(4,2) not null default 0,
+    -- 0 = no negative marking
+    -- 0.25 = standard Bangladesh admission deduction
+
+  -- Dynamic vs curated
+  is_dynamic        boolean not null default true,
+  question_ids      bigint[],
+    -- null when is_dynamic = true
+    -- array of questions.id when is_dynamic = false
+
+  -- Publishing lifecycle: draft → review → published → archived
+  status            text not null default 'draft'
+                      check (status in ('draft','review','published','archived')),
+
+  -- Discoverability
+  is_hot            boolean not null default false,
+  is_featured       boolean not null default false,
+
+  -- Stats (attendees auto-incremented by trigger below)
+  attendees         int not null default 0,
+  rating            numeric(3,1) not null default 0.0,
+
+  -- Audit
+  created_by        uuid references auth.users(id) on delete set null,
+  reviewed_by       uuid references auth.users(id) on delete set null,
+  reviewed_at       timestamptz,
+  published_at      timestamptz,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+
+-- Indexes
+create index if not exists idx_preset_exams_status
+  on public.preset_exams(status);
+
+create index if not exists idx_preset_exams_stream
+  on public.preset_exams(stream);
+
+create index if not exists idx_preset_exams_hot
+  on public.preset_exams(is_hot) where is_hot = true;
+
+create index if not exists idx_preset_exams_published
+  on public.preset_exams(status, attendees desc)
+  where status = 'published';
+
+
+-- ── updated_at trigger ────────────────────────────────────────
+create or replace function public.set_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists preset_exams_updated_at on public.preset_exams;
+create trigger preset_exams_updated_at
+  before update on public.preset_exams
+  for each row execute procedure public.set_updated_at();
+
+-- ── published_at / reviewed_at auto-set triggers ──────────────
+create or replace function public.preset_exams_lifecycle()
+returns trigger as $$
+begin
+  -- Auto-set published_at when status flips to 'published'
+  if new.status = 'published' and old.status <> 'published' then
+    new.published_at = now();
+  end if;
+  -- Auto-set reviewed_at when status flips to 'review' → 'published'/'archived'
+  if new.status in ('published','archived') and old.status = 'review'
+     and new.reviewed_at is null then
+    new.reviewed_at = now();
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists preset_exams_lifecycle on public.preset_exams;
+create trigger preset_exams_lifecycle
+  before update on public.preset_exams
+  for each row execute procedure public.preset_exams_lifecycle();
+
+
+-- ============================================================
+-- ATTENDEES AUTO-INCREMENT
+-- Fired when a student starts an exam that has a preset_exam_id.
+-- We add preset_exam_id to exam_sessions so the trigger knows
+-- which preset exam to increment.
+-- ============================================================
+
+-- First: add preset_exam_id column to exam_sessions
+alter table public.exam_sessions
+  add column if not exists preset_exam_id uuid
+    references public.preset_exams(id) on delete set null;
+
+create index if not exists idx_sessions_preset_exam
+  on public.exam_sessions(preset_exam_id)
+  where preset_exam_id is not null;
+
+-- Trigger function: increment attendees on exam_sessions INSERT
+-- only when preset_exam_id is set
+create or replace function public.increment_preset_exam_attendees()
+returns trigger as $$
+begin
+  if new.preset_exam_id is not null then
+    update public.preset_exams
+      set attendees = attendees + 1
+      where id = new.preset_exam_id;
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_exam_session_start on public.exam_sessions;
+create trigger on_exam_session_start
+  after insert on public.exam_sessions
+  for each row execute procedure public.increment_preset_exam_attendees();
+
+
+-- ============================================================
+-- RLS POLICIES FOR PRESET EXAMS
+-- ============================================================
+
+alter table public.preset_exams enable row level security;
+
+-- Students: read published exams only
+--create policy "preset_exams_select_published"
+--  on public.preset_exams for select
+--  using (status = 'published');
+
+-- Admins: full access via service role key (used in admin panel)
+-- No anon/user-key insert/update/delete policies needed —
+-- all admin writes go through the service role client.
+
+
+-- ============================================================
+-- AI QUESTION GENERATION LOG
+-- ============================================================
+-- Tracks every AI generation run so admins can audit, retry,
+-- or revert. Each run produces N questions linked to a preset exam.
+-- ============================================================
+
+create table if not exists public.ai_generation_log (
+  id              uuid primary key default uuid_generate_v4(),
+  preset_exam_id  uuid references public.preset_exams(id) on delete cascade,
+
+  -- What was sent to Gemini
+  prompt_stream   text not null,
+  prompt_subject  text,
+  prompt_chapter  text,
+  prompt_count    int not null default 20,
+  prompt_difficulty text,
+  prompt_seed     text,  -- optional topic seed / extra instructions
+
+  -- Gemini model used
+  model           text not null default 'gemini-3.1-flash-lite',
+
+  -- Result
+  questions_generated int not null default 0,
+  questions_accepted  int not null default 0,  -- after admin review
+  question_ids    bigint[],  -- IDs of accepted questions saved to questions table
+
+  -- Status
+  status          text not null default 'pending'
+                    check (status in ('pending','success','error')),
+  error_message   text,
+
+  created_by      uuid references auth.users(id) on delete set null,
+  created_at      timestamptz not null default now()
+);
+
+alter table public.ai_generation_log enable row level security;
+-- Admin-only via service role — no user-facing policies needed.
+
+
+-- ============================================================
+-- HELPER FUNCTION: get_preset_exam_questions
+-- ============================================================
+-- Called by exam pages when a student starts a preset exam.
+-- For dynamic exams: pulls random questions matching the config.
+-- For curated exams: returns the fixed question_ids set.
+-- ============================================================
+
+create or replace function public.get_preset_exam_questions(
+  p_exam_id        uuid,
+  p_stream_table   text default 'questions'  -- unused, kept for clarity
+)
+returns table (
+  question_id      bigint,
+  exam             text,
+  question         jsonb,
+  question_hash    text,
+  question_image   text,
+  stimulus         jsonb,
+  stimulus_image   text,
+  options          jsonb,
+  explanation      jsonb,
+  subject          jsonb,
+  chapter          jsonb,
+  difficulty       jsonb,
+  years            jsonb,
+  correct_index    smallint,
+  difficulty_level text,
+  source           jsonb,
+  status           text
+) as $$
+declare
+  v_exam        preset_exams%rowtype;
+  v_easy_count  int;
+  v_med_count   int;
+  v_hard_count  int;
+  v_total       int;
+begin
+  select * into v_exam from public.preset_exams where id = p_exam_id;
+  if not found then return; end if;
+
+  -- ── Curated exam: return fixed question set ─────────────────
+  if not v_exam.is_dynamic and v_exam.question_ids is not null then
+    return query
+      select
+        q.id,
+        q.exam, q.question, q.question_hash, q.question_image,
+        q.stimulus, q.stimulus_image, q.options, q.explanation,
+        q.subject, q.chapter, q.difficulty, q.years,
+        q.correct_index, q.difficulty_level, q.source, q.status
+      from public.questions q
+      where q.id = any(v_exam.question_ids)
+        and q.status = 'published'
+      -- preserve the curated order
+      order by array_position(v_exam.question_ids, q.id);
+    return;
+  end if;
+
+  -- ── Dynamic exam: pull random questions ─────────────────────
+  v_total := coalesce(v_exam.question_count, 20);
+
+  -- Check if difficulty distribution is configured
+  if v_exam.difficulty_distribution is not null then
+    v_easy_count := round(v_total * coalesce((v_exam.difficulty_distribution->>'easy')::numeric, 0) / 100);
+    v_med_count  := round(v_total * coalesce((v_exam.difficulty_distribution->>'medium')::numeric, 0) / 100);
+    v_hard_count := v_total - v_easy_count - v_med_count;
+
+    return query
+      (
+        select
+          q.id, q.exam, q.question, q.question_hash, q.question_image,
+          q.stimulus, q.stimulus_image, q.options, q.explanation,
+          q.subject, q.chapter, q.difficulty, q.years,
+          q.correct_index, q.difficulty_level, q.source, q.status
+        from public.questions q
+        where q.status = 'published'
+          and q.exam = v_exam.stream
+          and (v_exam.subject = 'All' or q.subject->>'english' = v_exam.subject)
+          and (v_exam.chapter = 'All' or q.chapter->>'english' = v_exam.chapter)
+          and q.difficulty_level = 'easy'
+        order by random() limit v_easy_count
+      )
+      union all
+      (
+        select
+          q.id, q.exam, q.question, q.question_hash, q.question_image,
+          q.stimulus, q.stimulus_image, q.options, q.explanation,
+          q.subject, q.chapter, q.difficulty, q.years,
+          q.correct_index, q.difficulty_level, q.source, q.status
+        from public.questions q
+        where q.status = 'published'
+          and q.exam = v_exam.stream
+          and (v_exam.subject = 'All' or q.subject->>'english' = v_exam.subject)
+          and (v_exam.chapter = 'All' or q.chapter->>'english' = v_exam.chapter)
+          and q.difficulty_level = 'medium'
+        order by random() limit v_med_count
+      )
+      union all
+      (
+        select
+          q.id, q.exam, q.question, q.question_hash, q.question_image,
+          q.stimulus, q.stimulus_image, q.options, q.explanation,
+          q.subject, q.chapter, q.difficulty, q.years,
+          q.correct_index, q.difficulty_level, q.source, q.status
+        from public.questions q
+        where q.status = 'published'
+          and q.exam = v_exam.stream
+          and (v_exam.subject = 'All' or q.subject->>'english' = v_exam.subject)
+          and (v_exam.chapter = 'All' or q.chapter->>'english' = v_exam.chapter)
+          and q.difficulty_level = 'hard'
+        order by random() limit v_hard_count
+      );
+
+  else
+    -- No distribution config: pure random across all difficulties
+    return query
+      select
+        q.id, q.exam, q.question, q.question_hash, q.question_image,
+        q.stimulus, q.stimulus_image, q.options, q.explanation,
+        q.subject, q.chapter, q.difficulty, q.years,
+        q.correct_index, q.difficulty_level, q.source, q.status
+      from public.questions q
+      where q.status = 'published'
+        and q.exam = v_exam.stream
+        and (v_exam.subject = 'All' or q.subject->>'english' = v_exam.subject)
+        and (v_exam.chapter = 'All' or q.chapter->>'english' = v_exam.chapter)
+      order by random()
+      limit v_total;
+  end if;
+
+end;
+$$ language plpgsql security definer;
+
 -- ── Exam Sessions ────────────────────────────────────────────
 -- A single completed exam run (mock-exam.vue, admission-exam.vue,
 -- engineering-exam.vue, hsc-ssc-exam.vue). One row per attempt.

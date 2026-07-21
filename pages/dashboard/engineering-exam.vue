@@ -215,6 +215,89 @@ const subjectLabels = {
 const phase = ref('setup')          // 'setup' | 'mcq' | 'written_intro' | 'written' | 'results'
 const selectedExamType = ref(null)  // 'buet' | 'ruet' | 'kuet' | 'cuet'
 const selectedGroupKey = ref(null)
+
+const route = useRoute()
+
+const configOverrides  = ref(null)  // top-level overrides: { mcqDuration, totalMcq }
+const subjectOverrides = ref(null)  // subject->count map override
+
+onMounted(() => {
+  const q = route.query
+  if (q.autostart !== '1') return
+
+  // For engineering, `group` maps directly to examTypes key (buet/ruet/kuet/cuet)
+  const examTypeKey = q.group
+  if (!examTypeKey || !examTypes[examTypeKey]) return
+
+  const typeConfig = examTypes[examTypeKey]
+  const groupKey    = typeConfig.groups[0]?.key
+  if (!groupKey) return
+  const groupExists = typeConfig.groups[0]
+
+  selectedExamType.value = examTypeKey
+  selectedGroupKey.value = groupKey
+
+  // ── Duration override ────────────────────────────────────────────────────
+  if (q.duration) {
+    const dur = parseInt(q.duration)
+    if (!isNaN(dur) && dur > 0) {
+      configOverrides.value = { ...configOverrides.value, mcqDuration: dur }
+    }
+  }
+
+  // ── Question count override (proportionally scaled across subjects) ──────
+  if (q.count) {
+    const targetTotal = parseInt(q.count)
+    if (!isNaN(targetTotal) && targetTotal > 0) {
+      const baseSubjects = groupExists.subjects
+      const baseTotal = Object.values(baseSubjects).reduce((a, b) => a + b, 0)
+      const scale = targetTotal / baseTotal
+      const scaled = {}
+      let runningTotal = 0
+      const keys = Object.keys(baseSubjects)
+      keys.forEach((subj, i) => {
+        if (i === keys.length - 1) {
+          scaled[subj] = Math.max(1, targetTotal - runningTotal)
+        } else {
+          const val = Math.max(1, Math.round(baseSubjects[subj] * scale))
+          scaled[subj] = val
+          runningTotal += val
+        }
+      })
+      subjectOverrides.value = scaled
+      configOverrides.value = { ...configOverrides.value, totalMcq: targetTotal }
+    }
+  }
+
+  // ── Single subject filter ────────────────────────────────────────────────
+  if (q.subject && q.subject !== 'All') {
+    const subjKey = String(q.subject).toLowerCase()
+    if (groupExists.subjects[subjKey] !== undefined) {
+      const total = subjectOverrides.value
+        ? Object.values(subjectOverrides.value).reduce((a, b) => a + b, 0)
+        : (q.count ? parseInt(q.count) : groupExists.subjects[subjKey])
+      subjectOverrides.value = { [subjKey]: total }
+      configOverrides.value = { ...configOverrides.value, totalMcq: total }
+    }
+  }
+
+  nextTick(() => {
+    nextTick(() => {
+      showStartModal.value = true
+    })
+  })
+})
+
+const presetExamTitle = computed(() => route.query.title || null)
+
+// ════════════════════════════════════════════════════════════════════════════
+// NOTE: Engineering exams (BUET/RUET/KUET/CUET) have NO negative marking —
+// confirmed in the original file ("No negative marking — every attempt is
+// risk-free"). exams.vue should never pass a `negativeMarking` param for
+// type: 'engineering' exams. If this ever changes, add negativeMarking to
+// examTypes[key] and use it in the score calculation.
+// ════════════════════════════════════════════════════════════════════════════
+
 const questions = ref([])
 const answers = ref({})
 const flagged = ref(new Set())
@@ -233,10 +316,28 @@ const writtenTimerInterval = ref(null)
 const writtenQuestionsList = ref([])
 
 // ─── COMPUTED ─────────────────────────────────────────────────────────────────
-const examConfig = computed(() => selectedExamType.value ? examTypes[selectedExamType.value] : null)
+//const examConfig = computed(() => selectedExamType.value ? examTypes[selectedExamType.value] : null)
+
+const examConfig = computed(() => {
+  if (!selectedExamType.value) return null
+  const base = examTypes[selectedExamType.value]
+  if (!configOverrides.value) return base
+  return { ...base, ...configOverrides.value }
+})
+
+//const selectedGroup = computed(() => {
+//  if (!examConfig.value || !selectedGroupKey.value) return null
+//  return examConfig.value.groups.find(g => g.key === selectedGroupKey.value)
+//})
+
 const selectedGroup = computed(() => {
   if (!examConfig.value || !selectedGroupKey.value) return null
-  return examConfig.value.groups.find(g => g.key === selectedGroupKey.value)
+  const base = examConfig.value.groups.find(g => g.key === selectedGroupKey.value)
+  if (!base) return null
+  if (subjectOverrides.value) {
+    return { ...base, subjects: subjectOverrides.value }
+  }
+  return base
 })
 
 const canStart = computed(() => selectedExamType.value && selectedGroupKey.value)
@@ -480,61 +581,6 @@ function reviewOptClass(q, idx) {
   if (answers.value[q.id] === idx && idx !== q.answer) return 'rc-wrong'
   return ''
 }
-
-// ════════════════════════════════════════════════════════════════════════════
-// PATCH for: pages/dashboard/engineering-exam.vue
-// PURPOSE:   Auto-start from query params when launched by exams.vue
-//
-// WHERE TO ADD:  Inside <script setup>, AFTER all the existing refs/state
-//               declarations (after line ~229, before the computed section).
-//               Add this entire block.
-// ════════════════════════════════════════════════════════════════════════════
- 
-// ─── QUERY PARAM AUTO-START ──────────────────────────────────────────────────
-// Reads query params set by exams.vue → navigateTo({ path, query: { ... } })
-// Supported params:
-//   group     — 'buet' | 'ruet' | 'kuet' | 'cuet'
-//               Note: for engineering exams, `group` IS the exam type key.
-//               The exams.vue catalogue uses group = 'buet', 'ruet', etc.
-//   autostart — '1' to skip setup and show start modal
-//   examId    — (optional) preset exam id for analytics
-//   title     — (optional) preset exam title
-const route = useRoute()
- 
-onMounted(() => {
-  const q = route.query
- 
-  if (q.autostart !== '1') return
- 
-  // For engineering, the `group` query param maps directly to the examTypes key
-  // e.g. group='buet' → examTypes['buet']
-  // exams.vue sets group = 'buet' | 'ruet' | 'kuet' | 'cuet'
-  const examTypeKey = q.group  // 'buet' | 'ruet' | 'kuet' | 'cuet'
- 
-  if (!examTypeKey || !examTypes[examTypeKey]) return
- 
-  // Engineering exams have exactly one group per exam type
-  // (e.g. examTypes.buet.groups[0].key === 'buet')
-  const typeConfig  = examTypes[examTypeKey]
-  const groupKey    = typeConfig.groups[0]?.key
- 
-  if (!groupKey) return
- 
-  selectedExamType.value  = examTypeKey
-  selectedGroupKey.value  = groupKey
- 
-  nextTick(() => {
-    setTimeout(() => {
-      showStartModal.value = true
-    }, 300)
-  })
-})
- 
-// ════════════════════════════════════════════════════════════════════════════
-// OPTIONAL preset title display
-// ════════════════════════════════════════════════════════════════════════════
- 
-const presetExamTitle = computed(() => route.query.title || null)
 </script>
 
 <template>

@@ -849,7 +849,7 @@ const sidebarCollapsed = ref(
   typeof window !== 'undefined' && window.innerWidth <= 1024
 )
 const mobileDrawerOpen  = ref(false)
-const activeTab = ref('overview')
+const activeTab = ref('queue')
 
 const route = useRoute()
 
@@ -953,16 +953,16 @@ function closeModal() { modal.show = false; modal.type = null; modal.data = null
 function handleAction(type) {
   if (type === 'addQuestion') {
     if (activeTab.value === 'questions') openModal('addQuestion')
-    else navigateTo('/dashboard/admin/questions?open=addQuestion')
+    else navigateTo('/admin/questions?open=addQuestion')
   }
   else if (type === 'announcement') {
     if (activeTab.value === 'content') openModal('announcement')
-    else navigateTo('/dashboard/admin/content?open=announcement')
+    else navigateTo('/admin/content?open=announcement')
   }
   else if (type === 'purgecache')   { logAction('system', 'CDN cache purge triggered', 'Admin'); showToast('Cache purge initiated.') }
   else if (type === 'recalcleaderboard') { logAction('system', 'Leaderboard recalc triggered', 'Admin'); showToast('Leaderboard recalculation started.') }
-  else if (type === 'viewusers')    { if (activeTab.value !== 'users')  navigateTo('/dashboard/admin/users') }
-  else if (type === 'viewsystem')   { if (activeTab.value !== 'system') navigateTo('/dashboard/admin/system') }
+  else if (type === 'viewusers')    { if (activeTab.value !== 'users')  navigateTo('/admin/users') }
+  else if (type === 'viewsystem')   { if (activeTab.value !== 'system') navigateTo('/admin/system') }
 }
 
 // Auto-open a modal when navigated here via a quick action from another admin page
@@ -1663,74 +1663,197 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
       <!-- ═══════════════════════════════════════════════════
            OVERVIEW TAB
       ══════════════════════════════════════════════════════ -->
-      <div v-if="activeTab === 'overview'" class="tab-body">
+      <div v-if="activeTab === 'queue'" class="tab-body">
 
-        <!-- Page Header -->
         <div class="page-header">
           <div class="header-left">
-            <div class="page-chip"><span class="chip-dot" /> Admin Panel</div>
-            <h1 class="page-title">Platform Overview.<br><span class="text-outline">Everything at a Glance.</span></h1>
-            <p class="page-sub">Live metrics, activity trends, and system health for Cortex404.</p>
+            <div class="page-chip"><span class="chip-dot" /> Review Queue</div>
+            <h1 class="page-title">Moderator Submissions.<br><span class="text-outline">Approve or Reject.</span></h1>
+            <p class="page-sub">Review questions submitted by moderators — including mod-fixed reported questions — then publish or reject them.</p>
           </div>
           <div class="header-right">
             <div class="header-stat-card">
-              <span class="hsc-label">Platform Status</span>
-              <span class="hsc-value">Operational</span>
-              <div class="hsc-row">
-                <span class="h-dot-inline healthy" /><span class="hsc-meta">All 5 services healthy</span>
-              </div>
-              <div class="hsc-bar-wrap"><div class="hsc-bar-fill" style="width:100%" /></div>
+              <span class="hsc-label">Pending Review</span>
+              <span class="hsc-value">{{ reviewQueue.filter(q=>q.status==='pending'||q.status==='fixed').length }}</span>
+              <div class="hsc-row"><span class="hsc-meta">{{ reviewQueue.filter(q=>q.status==='approved').length }} approved · {{ reviewQueue.filter(q=>q.status==='rejected').length }} rejected</span></div>
+              <div class="hsc-bar-wrap"><div class="hsc-bar-fill" :style="{width:(reviewQueue.filter(q=>q.status==='pending'||q.status==='fixed').length/reviewQueue.length*100)+'%'}" /></div>
             </div>
           </div>
         </div>
 
-        <AdminStats :stats="overviewStats" />
+        <div class="filter-bar">
+          <div class="fb-search">
+            <span class="fb-icon">⌕</span>
+            <input v-model="queueSearch" class="fb-input" placeholder="Search questions…" />
+            <button v-if="queueSearch" class="fb-clear" @click="queueSearch=''">×</button>
+          </div>
+          <div class="fb-pills">
+            <button v-for="f in ['all','pending','fixed','approved','rejected']" :key="f"
+              class="pill" :class="{active:queueFilter===f}" @click="queueFilter=f">
+              {{ f === 'fixed' ? 'Mod-Fixed' : f.charAt(0).toUpperCase()+f.slice(1) }}
+            </button>
+          </div>
+          <div class="fb-pills">
+            <button v-for="s in ['All','SSC','HSC','BUET','Medical','DU','BCS','Bank']" :key="s"
+              class="pill" :class="{active:queueStream===s}" @click="queueStream=s">{{ s }}</button>
+          </div>
+          <div class="fb-meta">{{ filteredReviewQueue.length }} questions</div>
+        </div>
 
-        <div class="ov-row">
-          <!-- Activity chart -->
-          <div class="panel ov-chart-panel">
-            <div class="panel-head">
-              <span class="panel-title">EXAM ACTIVITY — LAST 14 DAYS</span>
+        <div v-if="queueLoading" class="empty-panel">Loading submissions…</div>
+        <!--<div v-else-if="filteredReviewQueue.length === 0" class="empty-panel">
+          <span class="empty-icon">✓</span>
+          <h3>No pending questions</h3>
+          <p>Everything is clean. Take a break.</p>
+        </div>-->
+
+        <!-- <div class="queue-cards">
+          <div class="queue-card" v-for="q in filteredReviewQueue" :key="q.id" :class="'qcard-'+q.status">
+            <div class="qcard-top">
+              <div class="qcard-meta">
+                <span class="stream-tag">{{ q.stream }}</span>
+                <span class="mono dim">{{ q.subj }}</span>
+                <span class="diff-badge" :class="diffClass(q.diff)">{{ q.diff }}</span>
+                <span v-if="q.status==='fixed'" class="fixed-tag">✎ Mod-Fixed</span>
+              </div>
+              <span class="status-badge" :class="q.status==='fixed'?'pending':q.status">
+                {{ q.status === 'fixed' ? 'pending (fixed)' : q.status }}
+              </span>
             </div>
-            <div class="activity-chart">
-              <div class="ac-bars">
-                <div v-for="(val, i) in weeklyActivity" :key="i" class="ac-bar" :style="{ height: val + '%' }" :title="val + ' exams'">
-                  <div class="ac-bar-inner" />
+            <p class="qcard-text">{{ q.text }}</p>
+            <div class="qcard-footer">
+              <span class="qcard-by mono dim">Submitted by {{ q.submittedBy }} · {{ q.date }}</span>
+              <span v-if="q.note" class="qcard-note">Note: {{ q.note }}</span>
+              <div class="qcard-actions" v-if="q.status==='pending'||q.status==='fixed'">
+                <button class="iso-btn iso-btn--ghost qact-btn approve-btn" @click="adminApproveQ(q)">✓ Approve & Publish</button>
+                <button class="iso-btn iso-btn--ghost qact-btn reject-btn"  @click="openModal('adminRejectQ', q)">✕ Reject</button>
+              </div>
+              <div v-else class="qcard-done">
+                <span class="status-badge" :class="q.status">{{ q.status }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-if="!filteredReviewQueue.length" class="empty-panel">No questions match this filter.</div>
+        </div> -->
+
+        <div class="queue-cards">
+          <div class="queue-card" v-for="q in filteredReviewQueue" :key="q.id" :class="'qcard-'+q.status">
+          
+            <!-- TOP ROW: tags + status badge -->
+            <div class="qcard-top">
+              <div class="qcard-meta">
+                <span class="stream-tag">{{ q.stream }}</span>
+                <span class="mono dim">{{ q.subj }}</span>
+                <span class="diff-badge" :class="diffClass(q.diff)">{{ q.diff }}</span>
+                <span v-if="q.status==='fixed'" class="fixed-tag">✎ Mod-Fixed</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <!-- <span class="status-badge" :class="q.status==='fixed'?'pending':q.status">
+                  {{ q.status === 'fixed' ? 'pending (fixed)' : q.status }}
+                </span>  -->
+                <span class="iso-btn iso-btn--ghost" style="font-size:0.65rem;padding:3px 8px" >
+                  {{ q.status === 'fixed' ? 'pending (fixed)' : q.status }}
+                </span>
+                <!-- Expand toggle -->
+                <button class="iso-btn iso-btn--ghost" style="font-size:0.65rem;padding:3px 8px" @click="toggleQueueExpand(q)">
+                  {{ q.expanded ? '▲ Collapse' : '▼ Details' }}
+                </button>
+              </div>
+            </div>
+          
+            <!-- QUESTION TEXT -->
+            <p class="qcard-text"><span v-if="q.expanded">EN:</span> {{ q.text }}</p>
+            <p v-if="q.expanded" class="qcard-text">BN: {{ q.text_bn }}</p>
+          
+            <!-- EXPANDED DETAILS -->
+            <div v-if="q.expanded" class="qcard-details">
+              <!-- Stimulus -->
+              <div v-if="q.stimulus?.bangla || q.stimulus?.english" class="qd-section">
+                <span class="qd-label">STIMULUS</span>
+                <p class="qd-text">EN: {{ q.stimulus?.english }}</p>
+                <p class="qd-text">BN: {{ q.stimulus?.bangla }}</p>
+                <img v-if="q.stimulus_image" :src="q.stimulus_image" class="qd-img" />
+              </div>
+            
+              <!-- Options -->
+              <div class="qd-section">
+                <span class="qd-label">OPTIONS</span>
+                <div class="qd-options">
+                  <div
+                    v-for="(opt, i) in (q.options?.english || q.options?.bangla || [])"
+                    :key="i"
+                    class="qd-option"
+                    :class="{ 'qd-option--correct': i === q.correct_index }"
+                  >
+                    <span class="qd-opt-letter">{{ ['A','B','C','D'][i] }}.</span>
+                    {{ opt }} / {{ q.options?.bangla[i] }}
+                    <span v-if="i === q.correct_index" style="margin-left:6px;color:rgba(120,230,120,0.9)">✓</span>
+                  </div>
                 </div>
               </div>
-              <div class="ac-labels">
-                <span v-for="(_, i) in weeklyActivity" :key="i">D{{ i + 1 }}</span>
+            
+              <!-- Explanation -->
+              <div v-if="q.explanation?.bangla || q.explanation?.english" class="qd-section">
+                <span class="qd-label">EXPLANATION</span>
+                <p class="qd-text">EN: {{ q.explanation?.english }}</p>
+                <p class="qd-text">BN: {{ q.explanation?.bangla }}</p>
+              </div>
+            
+              <!-- Question image -->
+              <div v-if="q.question_image" class="qd-section">
+                <span class="qd-label">QUESTION IMAGE</span>
+                <img :src="q.question_image" class="qd-img" />
+              </div>
+            
+              <!-- Metadata row -->
+              <div class="qd-meta-row">
+                <span v-if="q.chapter?.english">
+                  Chapter: {{ q.chapter?.english }}
+                </span>
+                <span v-if="q.years">Year: {{ Array.isArray(q.years) ? q.years.map(y=>y.english||y).join(', ') : q.years }}</span>
+                <span v-if="q.source?.english">Source: {{ q.source.english.join(', ') }}</span>
+                <!-- <span>Correct index: {{ q.correct_index }}</span> -->
+              </div>
+              <div class="qd-meta-row">
+                <span v-if="q.chapter?.bangla">
+                  Chapter: {{ q.chapter?.bangla }}
+                </span>
+                <span v-if="q.years">Year: {{ Array.isArray(q.years) ? q.years.map(y=>y.bangla||y).join(', ') : q.years }}</span>
+                <span v-if="q.source?.bangla">Source: {{ q.source.bangla.join(', ') }}</span>
+                <!-- <span>Correct index: {{ q.correct_index }}</span> -->
+              </div>
+              <br>
+            </div>
+          
+            <!-- FOOTER: submitter + actions -->
+            <div class="qcard-footer">
+              <!-- ↓ CHANGED: avatar + full name instead of bare UUID -->
+              <div class="qcard-submitter">
+                <span class="qcard-by mono dim">Submitted by:</span>
+                <img
+                  v-if="q.submitterAvatar"
+                  :src="q.submitterAvatar"
+                  class="qcard-avatar"
+                  :alt="q.submittedBy"
+                />
+                <span v-else class="qcard-avatar qcard-avatar--fallback">
+                  {{ q.submittedBy?.charAt(0)?.toUpperCase() ?? '?' }}
+                </span>
+                <span class="qcard-by mono dim">{{ q.submittedBy }} · {{ q.date }}</span>
+              </div>
+            
+              <span v-if="q.note" class="qcard-note">Note: {{ q.note }}</span>
+              <div class="qcard-actions" v-if="q.status==='pending'||q.status==='fixed'">
+                <button class="iso-btn iso-btn--ghost qact-btn approve-btn" @click="adminApproveQ(q)">✓ Approve & Publish</button>
+                <button class="iso-btn iso-btn--ghost qact-btn reject-btn"  @click="openModal('adminRejectQ', q)">✕ Reject</button>
+              </div>
+              <div v-else class="qcard-done">
+                <span class="status-badge" :class="q.status">{{ q.status }}</span>
               </div>
             </div>
+          
           </div>
-
-          <!-- Stream breakdown -->
-          <div class="panel ov-breakdown-panel">
-            <div class="panel-head"><span class="panel-title">USER STREAMS</span></div>
-            <div class="stream-bars">
-              <div class="sbar-row" v-for="item in [{name:'HSC',pct:28},{name:'Medical',pct:22},{name:'BUET',pct:18},{name:'BCS',pct:15},{name:'SSC',pct:10},{name:'DU',pct:5},{name:'Bank',pct:2}]" :key="item.name">
-                <span class="sbar-name">{{ item.name }}</span>
-                <div class="sbar-track"><div class="sbar-fill" :style="{ width: item.pct + '%' }" /></div>
-                <span class="sbar-pct">{{ item.pct }}%</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="ov-bottom-row">
-          <!-- Recent admin actions component -->
-          <AdminRecentActions :actions="auditLog.slice(0, 6)" />
-
-          <!-- Quick actions component -->
-          <AdminQuickActions @action="handleAction" />
-
-          <!-- System health component -->
-          <AdminSystemHealth
-            :services="systemServices"
-            :logs="systemLogs.slice(0, 4)"
-            :dbUsed="2.3"
-            :dbTotal="8"
-          />
+          <div v-if="!filteredReviewQueue.length" class="empty-panel">No questions match this filter.</div>
         </div>
       </div>
 

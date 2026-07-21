@@ -849,7 +849,7 @@ const sidebarCollapsed = ref(
   typeof window !== 'undefined' && window.innerWidth <= 1024
 )
 const mobileDrawerOpen  = ref(false)
-const activeTab = ref('overview')
+const activeTab = ref('exams')
 
 const route = useRoute()
 
@@ -953,16 +953,16 @@ function closeModal() { modal.show = false; modal.type = null; modal.data = null
 function handleAction(type) {
   if (type === 'addQuestion') {
     if (activeTab.value === 'questions') openModal('addQuestion')
-    else navigateTo('/dashboard/admin/questions?open=addQuestion')
+    else navigateTo('/admin/questions?open=addQuestion')
   }
   else if (type === 'announcement') {
     if (activeTab.value === 'content') openModal('announcement')
-    else navigateTo('/dashboard/admin/content?open=announcement')
+    else navigateTo('/admin/content?open=announcement')
   }
   else if (type === 'purgecache')   { logAction('system', 'CDN cache purge triggered', 'Admin'); showToast('Cache purge initiated.') }
   else if (type === 'recalcleaderboard') { logAction('system', 'Leaderboard recalc triggered', 'Admin'); showToast('Leaderboard recalculation started.') }
-  else if (type === 'viewusers')    { if (activeTab.value !== 'users')  navigateTo('/dashboard/admin/users') }
-  else if (type === 'viewsystem')   { if (activeTab.value !== 'system') navigateTo('/dashboard/admin/system') }
+  else if (type === 'viewusers')    { if (activeTab.value !== 'users')  navigateTo('/admin/users') }
+  else if (type === 'viewsystem')   { if (activeTab.value !== 'system') navigateTo('/admin/system') }
 }
 
 // Auto-open a modal when navigated here via a quick action from another admin page
@@ -1663,74 +1663,54 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
       <!-- ═══════════════════════════════════════════════════
            OVERVIEW TAB
       ══════════════════════════════════════════════════════ -->
-      <div v-if="activeTab === 'overview'" class="tab-body">
+      <div v-if="activeTab === 'exams'" class="tab-body">
 
         <!-- Page Header -->
         <div class="page-header">
           <div class="header-left">
-            <div class="page-chip"><span class="chip-dot" /> Admin Panel</div>
-            <h1 class="page-title">Platform Overview.<br><span class="text-outline">Everything at a Glance.</span></h1>
-            <p class="page-sub">Live metrics, activity trends, and system health for Cortex404.</p>
+            <div class="page-chip"><span class="chip-dot" /> Exam Results</div>
+            <h1 class="page-title">All Attempts.<br><span class="text-outline">Pass Rates & Scores.</span></h1>
+            <p class="page-sub">Browse every exam result submitted by students across the platform.</p>
           </div>
           <div class="header-right">
             <div class="header-stat-card">
-              <span class="hsc-label">Platform Status</span>
-              <span class="hsc-value">Operational</span>
+              <span class="hsc-label">Today's Exams</span>
+              <span class="hsc-value">1,203</span>
               <div class="hsc-row">
-                <span class="h-dot-inline healthy" /><span class="hsc-meta">All 5 services healthy</span>
+                <span class="hsc-meta">+18% vs yesterday · avg score 74%</span>
               </div>
-              <div class="hsc-bar-wrap"><div class="hsc-bar-fill" style="width:100%" /></div>
+              <div class="hsc-bar-wrap"><div class="hsc-bar-fill" style="width:74%" /></div>
             </div>
           </div>
         </div>
 
-        <AdminStats :stats="overviewStats" />
-
-        <div class="ov-row">
-          <!-- Activity chart -->
-          <div class="panel ov-chart-panel">
-            <div class="panel-head">
-              <span class="panel-title">EXAM ACTIVITY — LAST 14 DAYS</span>
-            </div>
-            <div class="activity-chart">
-              <div class="ac-bars">
-                <div v-for="(val, i) in weeklyActivity" :key="i" class="ac-bar" :style="{ height: val + '%' }" :title="val + ' exams'">
-                  <div class="ac-bar-inner" />
-                </div>
-              </div>
-              <div class="ac-labels">
-                <span v-for="(_, i) in weeklyActivity" :key="i">D{{ i + 1 }}</span>
-              </div>
-            </div>
+        <div class="filter-bar">
+          <div class="fb-pills">
+            <button v-for="f in ['all','high','low']" :key="f" class="pill" :class="{active:examFilter===f}" @click="examFilter=f">
+              {{ f === 'all' ? 'All' : f === 'high' ? '≥ 80%' : '< 50%' }}
+            </button>
           </div>
-
-          <!-- Stream breakdown -->
-          <div class="panel ov-breakdown-panel">
-            <div class="panel-head"><span class="panel-title">USER STREAMS</span></div>
-            <div class="stream-bars">
-              <div class="sbar-row" v-for="item in [{name:'HSC',pct:28},{name:'Medical',pct:22},{name:'BUET',pct:18},{name:'BCS',pct:15},{name:'SSC',pct:10},{name:'DU',pct:5},{name:'Bank',pct:2}]" :key="item.name">
-                <span class="sbar-name">{{ item.name }}</span>
-                <div class="sbar-track"><div class="sbar-fill" :style="{ width: item.pct + '%' }" /></div>
-                <span class="sbar-pct">{{ item.pct }}%</span>
-              </div>
-            </div>
-          </div>
+          <div class="fb-meta">{{ filteredResults.length }} results</div>
         </div>
-
-        <div class="ov-bottom-row">
-          <!-- Recent admin actions component -->
-          <AdminRecentActions :actions="auditLog.slice(0, 6)" />
-
-          <!-- Quick actions component -->
-          <AdminQuickActions @action="handleAction" />
-
-          <!-- System health component -->
-          <AdminSystemHealth
-            :services="systemServices"
-            :logs="systemLogs.slice(0, 4)"
-            :dbUsed="2.3"
-            :dbTotal="8"
-          />
+        <div class="panel table-panel">
+          <div class="table-scroll"><div class="data-table results-table">
+            <div class="dt-head">
+              <span>User</span><span>Stream</span><span>Subject</span>
+              <span>Score</span><span>Questions</span><span>Date</span><span>Status</span>
+            </div>
+            <div class="dt-row" v-for="r in filteredResults" :key="r.id">
+              <span class="dt-name">{{ r.user }}</span>
+              <span class="stream-tag">{{ r.stream }}</span>
+              <span class="mono dim">{{ r.subject }}</span>
+              <div class="score-cell">
+                <span class="score-val" :class="scoreClass(r.score)">{{ r.score }}%</span>
+                <div class="score-bar-mini"><div class="sbm-fill" :class="scoreClass(r.score)" :style="{width: r.score+'%'}"/></div>
+              </div>
+              <span class="mono">{{ r.qs }}</span>
+              <span class="mono dim">{{ r.date }}</span>
+              <span class="status-badge" :class="r.status">{{ r.status }}</span>
+            </div>
+        </div></div><!-- /table-scroll -->
         </div>
       </div>
 

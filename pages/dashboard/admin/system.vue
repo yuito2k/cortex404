@@ -849,7 +849,7 @@ const sidebarCollapsed = ref(
   typeof window !== 'undefined' && window.innerWidth <= 1024
 )
 const mobileDrawerOpen  = ref(false)
-const activeTab = ref('overview')
+const activeTab = ref('system')
 
 const route = useRoute()
 
@@ -953,16 +953,16 @@ function closeModal() { modal.show = false; modal.type = null; modal.data = null
 function handleAction(type) {
   if (type === 'addQuestion') {
     if (activeTab.value === 'questions') openModal('addQuestion')
-    else navigateTo('/dashboard/admin/questions?open=addQuestion')
+    else navigateTo('/admin/questions?open=addQuestion')
   }
   else if (type === 'announcement') {
     if (activeTab.value === 'content') openModal('announcement')
-    else navigateTo('/dashboard/admin/content?open=announcement')
+    else navigateTo('/admin/content?open=announcement')
   }
   else if (type === 'purgecache')   { logAction('system', 'CDN cache purge triggered', 'Admin'); showToast('Cache purge initiated.') }
   else if (type === 'recalcleaderboard') { logAction('system', 'Leaderboard recalc triggered', 'Admin'); showToast('Leaderboard recalculation started.') }
-  else if (type === 'viewusers')    { if (activeTab.value !== 'users')  navigateTo('/dashboard/admin/users') }
-  else if (type === 'viewsystem')   { if (activeTab.value !== 'system') navigateTo('/dashboard/admin/system') }
+  else if (type === 'viewusers')    { if (activeTab.value !== 'users')  navigateTo('/admin/users') }
+  else if (type === 'viewsystem')   { if (activeTab.value !== 'system') navigateTo('/admin/system') }
 }
 
 // Auto-open a modal when navigated here via a quick action from another admin page
@@ -1663,74 +1663,71 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
       <!-- ═══════════════════════════════════════════════════
            OVERVIEW TAB
       ══════════════════════════════════════════════════════ -->
-      <div v-if="activeTab === 'overview'" class="tab-body">
+      <div v-if="activeTab === 'system'" class="tab-body">
 
         <!-- Page Header -->
         <div class="page-header">
           <div class="header-left">
-            <div class="page-chip"><span class="chip-dot" /> Admin Panel</div>
-            <h1 class="page-title">Platform Overview.<br><span class="text-outline">Everything at a Glance.</span></h1>
-            <p class="page-sub">Live metrics, activity trends, and system health for Cortex404.</p>
+            <div class="page-chip"><span class="chip-dot" /> System</div>
+            <h1 class="page-title">Infrastructure.<br><span class="text-outline">Logs, Health & Actions.</span></h1>
+            <p class="page-sub">Monitor service health, run admin operations, and review system logs.</p>
           </div>
           <div class="header-right">
             <div class="header-stat-card">
-              <span class="hsc-label">Platform Status</span>
-              <span class="hsc-value">Operational</span>
+              <span class="hsc-label">Services</span>
+              <span class="hsc-value" :class="systemServices.some(s=>s.status==='error') ? 'hsc-value--error' : systemServices.some(s=>s.status==='warn') ? 'hsc-value--warn' : ''">
+                {{ systemServices.filter(s=>s.status==='healthy').length }} / {{ systemServices.length }} OK
+              </span>
               <div class="hsc-row">
-                <span class="h-dot-inline healthy" /><span class="hsc-meta">All 5 services healthy</span>
+                <span class="h-dot-inline" :class="systemStatus === 'ok' ? 'healthy' : systemStatus" />
+                <span class="hsc-meta">{{ systemStatus === 'ok' ? 'All systems operational' : 'Degraded performance' }}</span>
               </div>
-              <div class="hsc-bar-wrap"><div class="hsc-bar-fill" style="width:100%" /></div>
+              <div class="hsc-bar-wrap"><div class="hsc-bar-fill" :style="{width: (systemServices.filter(s=>s.status==='healthy').length / systemServices.length * 100) + '%'}" /></div>
             </div>
           </div>
         </div>
 
-        <AdminStats :stats="overviewStats" />
-
-        <div class="ov-row">
-          <!-- Activity chart -->
-          <div class="panel ov-chart-panel">
-            <div class="panel-head">
-              <span class="panel-title">EXAM ACTIVITY — LAST 14 DAYS</span>
-            </div>
-            <div class="activity-chart">
-              <div class="ac-bars">
-                <div v-for="(val, i) in weeklyActivity" :key="i" class="ac-bar" :style="{ height: val + '%' }" :title="val + ' exams'">
-                  <div class="ac-bar-inner" />
+        <div class="system-layout">
+          <div class="sys-main">
+            <!-- Full system health panel as component -->
+            <AdminSystemHealth
+              :services="systemServices"
+              :logs="systemLogs"
+              :dbUsed="2.3"
+              :dbTotal="8"
+            />
+            <!-- Full log panel -->
+            <div class="panel logs-panel">
+              <div class="panel-head">
+                <span class="panel-title">FULL SYSTEM LOG</span>
+                <span class="mono dim">{{ systemLogs.length }} entries</span>
+              </div>
+              <div class="log-list-full">
+                <div class="log-row-full" v-for="(log, i) in systemLogs" :key="i" :class="'log-'+log.level.toLowerCase()">
+                  <span class="log-time mono">{{ log.time }}</span>
+                  <span class="log-level mono">{{ log.level }}</span>
+                  <span class="log-msg-text">{{ log.msg }}</span>
                 </div>
               </div>
-              <div class="ac-labels">
-                <span v-for="(_, i) in weeklyActivity" :key="i">D{{ i + 1 }}</span>
-              </div>
             </div>
           </div>
 
-          <!-- Stream breakdown -->
-          <div class="panel ov-breakdown-panel">
-            <div class="panel-head"><span class="panel-title">USER STREAMS</span></div>
-            <div class="stream-bars">
-              <div class="sbar-row" v-for="item in [{name:'HSC',pct:28},{name:'Medical',pct:22},{name:'BUET',pct:18},{name:'BCS',pct:15},{name:'SSC',pct:10},{name:'DU',pct:5},{name:'Bank',pct:2}]" :key="item.name">
-                <span class="sbar-name">{{ item.name }}</span>
-                <div class="sbar-track"><div class="sbar-fill" :style="{ width: item.pct + '%' }" /></div>
-                <span class="sbar-pct">{{ item.pct }}%</span>
+          <div class="sys-sidebar">
+            <div class="panel">
+              <div class="panel-head"><span class="panel-title">ADMIN ACTIONS</span></div>
+              <div class="sys-actions">
+                <button class="iso-btn iso-btn--ghost iso-btn--full sys-act-btn" @click="runCachePurge()">⚙ Purge CDN Cache</button>
+                <button class="iso-btn iso-btn--ghost iso-btn--full sys-act-btn" @click="runRecalc()">▣ Recalc Leaderboard</button>
+                <button class="iso-btn iso-btn--ghost iso-btn--full sys-act-btn" @click="runBackup()">◈ Run DB Backup</button>
+                <button class="iso-btn iso-btn--ghost iso-btn--full sys-act-btn" @click="runStreakCron()">⬡ Trigger Streak Cron</button>
               </div>
             </div>
+            <!-- Audit log in sidebar -->
+            <div class="panel">
+              <div class="panel-head"><span class="panel-title">AUDIT LOG</span></div>
+              <AdminRecentActions :actions="auditLog.slice(0, 8)" />
+            </div>
           </div>
-        </div>
-
-        <div class="ov-bottom-row">
-          <!-- Recent admin actions component -->
-          <AdminRecentActions :actions="auditLog.slice(0, 6)" />
-
-          <!-- Quick actions component -->
-          <AdminQuickActions @action="handleAction" />
-
-          <!-- System health component -->
-          <AdminSystemHealth
-            :services="systemServices"
-            :logs="systemLogs.slice(0, 4)"
-            :dbUsed="2.3"
-            :dbTotal="8"
-          />
         </div>
       </div>
 

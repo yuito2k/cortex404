@@ -849,7 +849,7 @@ const sidebarCollapsed = ref(
   typeof window !== 'undefined' && window.innerWidth <= 1024
 )
 const mobileDrawerOpen  = ref(false)
-const activeTab = ref('overview')
+const activeTab = ref('content')
 
 const route = useRoute()
 
@@ -953,16 +953,16 @@ function closeModal() { modal.show = false; modal.type = null; modal.data = null
 function handleAction(type) {
   if (type === 'addQuestion') {
     if (activeTab.value === 'questions') openModal('addQuestion')
-    else navigateTo('/dashboard/admin/questions?open=addQuestion')
+    else navigateTo('/admin/questions?open=addQuestion')
   }
   else if (type === 'announcement') {
     if (activeTab.value === 'content') openModal('announcement')
-    else navigateTo('/dashboard/admin/content?open=announcement')
+    else navigateTo('/admin/content?open=announcement')
   }
   else if (type === 'purgecache')   { logAction('system', 'CDN cache purge triggered', 'Admin'); showToast('Cache purge initiated.') }
   else if (type === 'recalcleaderboard') { logAction('system', 'Leaderboard recalc triggered', 'Admin'); showToast('Leaderboard recalculation started.') }
-  else if (type === 'viewusers')    { if (activeTab.value !== 'users')  navigateTo('/dashboard/admin/users') }
-  else if (type === 'viewsystem')   { if (activeTab.value !== 'system') navigateTo('/dashboard/admin/system') }
+  else if (type === 'viewusers')    { if (activeTab.value !== 'users')  navigateTo('/admin/users') }
+  else if (type === 'viewsystem')   { if (activeTab.value !== 'system') navigateTo('/admin/system') }
 }
 
 // Auto-open a modal when navigated here via a quick action from another admin page
@@ -1663,74 +1663,75 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
       <!-- ═══════════════════════════════════════════════════
            OVERVIEW TAB
       ══════════════════════════════════════════════════════ -->
-      <div v-if="activeTab === 'overview'" class="tab-body">
+      <div v-if="activeTab === 'content'" class="tab-body">
 
         <!-- Page Header -->
         <div class="page-header">
           <div class="header-left">
-            <div class="page-chip"><span class="chip-dot" /> Admin Panel</div>
-            <h1 class="page-title">Platform Overview.<br><span class="text-outline">Everything at a Glance.</span></h1>
-            <p class="page-sub">Live metrics, activity trends, and system health for Cortex404.</p>
+            <div class="page-chip"><span class="chip-dot" /> Content</div>
+            <h1 class="page-title">Announcements & Packs.<br><span class="text-outline">Broadcast to Students.</span></h1>
+            <p class="page-sub">Manage platform announcements and exam question packs.</p>
           </div>
           <div class="header-right">
             <div class="header-stat-card">
-              <span class="hsc-label">Platform Status</span>
-              <span class="hsc-value">Operational</span>
+              <span class="hsc-label">Live Announcements</span>
+              <span class="hsc-value">{{ announcements.filter(a=>a.status==='live').length }}</span>
               <div class="hsc-row">
-                <span class="h-dot-inline healthy" /><span class="hsc-meta">All 5 services healthy</span>
+                <span class="hsc-meta">{{ announcements.filter(a=>a.status==='draft').length }} drafts pending publish</span>
               </div>
-              <div class="hsc-bar-wrap"><div class="hsc-bar-fill" style="width:100%" /></div>
+              <div class="hsc-bar-wrap"><div class="hsc-bar-fill" :style="{width: (announcements.filter(a=>a.status==='live').length / announcements.length * 100) + '%'}" /></div>
             </div>
           </div>
         </div>
 
-        <AdminStats :stats="overviewStats" />
-
-        <div class="ov-row">
-          <!-- Activity chart -->
-          <div class="panel ov-chart-panel">
+        <div class="content-layout">
+          <div class="panel ann-panel">
             <div class="panel-head">
-              <span class="panel-title">EXAM ACTIVITY — LAST 14 DAYS</span>
+              <span class="panel-title">ANNOUNCEMENTS</span>
+              <span class="mono dim">{{ announcements.length }} total</span>
             </div>
-            <div class="activity-chart">
-              <div class="ac-bars">
-                <div v-for="(val, i) in weeklyActivity" :key="i" class="ac-bar" :style="{ height: val + '%' }" :title="val + ' exams'">
-                  <div class="ac-bar-inner" />
+            <div class="ann-form">
+              <input v-model="newAnnTitle" class="fb-input ann-input" placeholder="New announcement title…" @keyup.enter="addAnnouncement" />
+              <button class="iso-btn iso-btn--fill" @click="addAnnouncement">+ Create</button>
+            </div>
+            <div class="ann-list">
+              <div class="ann-item" v-for="a in announcements" :key="a.id">
+                <div class="ann-info">
+                  <span class="ann-title-text">{{ a.title }}</span>
+                  <span class="ann-date mono dim">{{ a.date }}</span>
+                </div>
+                <div class="ann-controls">
+                  <span class="status-badge" :class="a.status">{{ a.status }}</span>
+                  <button class="act-btn unban" v-if="a.status==='draft'" @click="publishAnn(a)" title="Publish">▶</button>
+                  <button class="act-btn ban" @click="deleteAnn(a)" title="Delete">✕</button>
                 </div>
               </div>
-              <div class="ac-labels">
-                <span v-for="(_, i) in weeklyActivity" :key="i">D{{ i + 1 }}</span>
-              </div>
             </div>
           </div>
 
-          <!-- Stream breakdown -->
-          <div class="panel ov-breakdown-panel">
-            <div class="panel-head"><span class="panel-title">USER STREAMS</span></div>
-            <div class="stream-bars">
-              <div class="sbar-row" v-for="item in [{name:'HSC',pct:28},{name:'Medical',pct:22},{name:'BUET',pct:18},{name:'BCS',pct:15},{name:'SSC',pct:10},{name:'DU',pct:5},{name:'Bank',pct:2}]" :key="item.name">
-                <span class="sbar-name">{{ item.name }}</span>
-                <div class="sbar-track"><div class="sbar-fill" :style="{ width: item.pct + '%' }" /></div>
-                <span class="sbar-pct">{{ item.pct }}%</span>
+          <div class="content-sidebar">
+            <div class="panel">
+              <div class="panel-head"><span class="panel-title">QUESTION BANK STATS</span></div>
+              <div class="cstat-list">
+                <div class="cstat-row" v-for="item in [{label:'Total',val:'8,441'},{label:'Published',val:'7,980'},{label:'Draft',val:'341'},{label:'Flagged',val:'120'},{label:'Avg Difficulty',val:'Medium'},{label:'Top Stream',val:'HSC'}]" :key="item.label">
+                  <span class="cstat-label">{{ item.label }}</span>
+                  <span class="cstat-val mono">{{ item.val }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><span class="panel-title">EXAM PACKS</span></div>
+              <div class="pack-list">
+                <div class="pack-row" v-for="p in [{name:'SSC 2025 Full Pack',status:'live',qs:800},{name:'HSC Physics Set A',status:'live',qs:200},{name:'BUET Mock Series',status:'draft',qs:300},{name:'BCS Preli 44th',status:'live',qs:200},{name:'Medical Digest 25',status:'draft',qs:500}]" :key="p.name">
+                  <div class="pack-info">
+                    <span class="pack-name">{{ p.name }}</span>
+                    <span class="mono dim">{{ p.qs }} Qs</span>
+                  </div>
+                  <span class="status-badge" :class="p.status">{{ p.status }}</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-
-        <div class="ov-bottom-row">
-          <!-- Recent admin actions component -->
-          <AdminRecentActions :actions="auditLog.slice(0, 6)" />
-
-          <!-- Quick actions component -->
-          <AdminQuickActions @action="handleAction" />
-
-          <!-- System health component -->
-          <AdminSystemHealth
-            :services="systemServices"
-            :logs="systemLogs.slice(0, 4)"
-            :dbUsed="2.3"
-            :dbTotal="8"
-          />
         </div>
       </div>
 

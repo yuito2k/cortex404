@@ -849,7 +849,7 @@ const sidebarCollapsed = ref(
   typeof window !== 'undefined' && window.innerWidth <= 1024
 )
 const mobileDrawerOpen  = ref(false)
-const activeTab = ref('overview')
+const activeTab = ref('questions')
 
 const route = useRoute()
 
@@ -961,8 +961,8 @@ function handleAction(type) {
   }
   else if (type === 'purgecache')   { logAction('system', 'CDN cache purge triggered', 'Admin'); showToast('Cache purge initiated.') }
   else if (type === 'recalcleaderboard') { logAction('system', 'Leaderboard recalc triggered', 'Admin'); showToast('Leaderboard recalculation started.') }
-  else if (type === 'viewusers')    { if (activeTab.value !== 'users')  navigateTo('/dashboard/admin/users') }
-  else if (type === 'viewsystem')   { if (activeTab.value !== 'system') navigateTo('/dashboard/admin/system') }
+  else if (type === 'viewusers')    { if (activeTab.value !== 'users')  navigateTo('/admin/users') }
+  else if (type === 'viewsystem')   { if (activeTab.value !== 'system') navigateTo('/admin/system') }
 }
 
 // Auto-open a modal when navigated here via a quick action from another admin page
@@ -1663,74 +1663,227 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
       <!-- ═══════════════════════════════════════════════════
            OVERVIEW TAB
       ══════════════════════════════════════════════════════ -->
-      <div v-if="activeTab === 'overview'" class="tab-body">
+      <div v-if="activeTab === 'questions'" class="tab-body">
 
         <!-- Page Header -->
         <div class="page-header">
           <div class="header-left">
-            <div class="page-chip"><span class="chip-dot" /> Admin Panel</div>
-            <h1 class="page-title">Platform Overview.<br><span class="text-outline">Everything at a Glance.</span></h1>
-            <p class="page-sub">Live metrics, activity trends, and system health for Cortex404.</p>
+            <div class="page-chip"><span class="chip-dot" /> Question Bank</div>
+            <h1 class="page-title">8,441 Questions.<br><span class="text-outline">Publish, Flag, Control.</span></h1>
+            <p class="page-sub">Review, moderate, and add questions across all exam streams and subjects.</p>
           </div>
           <div class="header-right">
             <div class="header-stat-card">
-              <span class="hsc-label">Platform Status</span>
-              <span class="hsc-value">Operational</span>
+              <span class="hsc-label">Flagged</span>
+              <span class="hsc-value hsc-value--warn">120</span>
               <div class="hsc-row">
-                <span class="h-dot-inline healthy" /><span class="hsc-meta">All 5 services healthy</span>
+                <span class="hsc-meta">341 drafts · 7,980 published</span>
               </div>
-              <div class="hsc-bar-wrap"><div class="hsc-bar-fill" style="width:100%" /></div>
+              <div class="hsc-bar-wrap"><div class="hsc-bar-fill hsc-bar--warn" style="width:1.4%" /></div>
             </div>
           </div>
         </div>
 
-        <AdminStats :stats="overviewStats" />
+        <div class="filter-bar">
+          <div class="fb-search">
+            <span class="fb-icon">⌕</span>
+            <input v-model="qSearch" class="fb-input" placeholder="Search questions…" />
+          </div>
+          <div class="fb-pills">
+            <button v-for="s in streams" :key="s" class="pill" :class="{active:qStream===s}" @click="qStream=s">{{ s }}</button>
+          </div>
+          <!-- Subject filter -->
+          <select v-model="qSubject" class="q-filter-select">
+            <option v-for="s in availableQSubjects" :key="s" :value="s">
+              {{ s === 'All' ? 'All Subjects' : s }}
+            </option>
+          </select>
 
-        <div class="ov-row">
-          <!-- Activity chart -->
-          <div class="panel ov-chart-panel">
-            <div class="panel-head">
-              <span class="panel-title">EXAM ACTIVITY — LAST 14 DAYS</span>
+          <!-- Chapter filter — only shows when a subject is selected -->
+          <select v-model="qChapter" class="q-filter-select" v-if="qSubject !== 'All'">
+            <option v-for="c in availableQChapters" :key="c" :value="c">
+              {{ c === 'All' ? 'All Chapters' : c }}
+            </option>
+          </select>
+          <div class="fb-pills">
+            <button v-for="d in difficulties" :key="d" class="pill" :class="{active:qDiff===d,[diffClass(d)]:d!=='All'}" @click="qDiff=d">{{ d }}</button>
+          </div>
+          <div class="fb-pills">
+            <button v-for="s in qStatuses" :key="s" class="pill" :class="{active:qStatus===s}" @click="qStatus=s">{{ s }}</button>
+          </div>
+          <button class="iso-btn iso-btn--fill add-btn" @click="openModal('addQuestion')">+ Add Question</button>
+        </div>
+
+        <div class="panel table-panel">
+          <div class="table-scroll"><div class="data-table questions-table">
+            <div class="dt-head">
+              <span>ID</span><span>Question</span><span>Stream</span>
+              <span>Subject</span><span>Difficulty</span><span>Status</span>
+              <span>Reports</span><span>Actions</span>
             </div>
-            <div class="activity-chart">
-              <div class="ac-bars">
-                <div v-for="(val, i) in weeklyActivity" :key="i" class="ac-bar" :style="{ height: val + '%' }" :title="val + ' exams'">
-                  <div class="ac-bar-inner" />
+            <!-- Replace your v-for block with this -->
+            <template v-for="q in paginatedQuestions" :key="q.id">
+              <!-- Original row — completely unchanged -->
+              <div class="dt-row">
+                <span class="mono dim">{{ q.id }}</span>
+                <span class="q-text" v-html="renderLatexText(q.text)"></span>
+                <span class="stream-tag">{{ q.stream }}</span>
+                <span class="mono dim">{{ q.subject.english }}</span>
+                <span class="diff-badge" :class="diffClass(q.diff)">{{ q.diff }}</span>
+                <span class="status-badge" :class="q.status.toLowerCase()">{{ q.status }}</span>
+                <span class="reports-count" :class="q.reports > 0 ? 'has-reports' : ''">{{ q.reports }}</span>
+                <div class="dt-actions">
+                  <button class="act-btn expand" @click="toggleExpand(q.id)" :title="expandedRows.has(q.id) ? 'Collapse' : 'Expand'">
+                    {{ expandedRows.has(q.id) ? '▲' : '▼' }}
+                  </button>
+                  <button class="act-btn view" @click="openModal('editQuestion', q)" title="Edit">✎</button>
+                  <!--<button class="act-btn" :class="q.status==='Published'?'ban':'unban'" @click="toggleQStatus(q)">
+                    {{ q.status === 'Published' ? '◻' : '▣' }}
+                  </button>-->
+                  <button class="act-btn ban" @click="deleteQuestion(q)" title="Delete">✕</button>
                 </div>
               </div>
-              <div class="ac-labels">
-                <span v-for="(_, i) in weeklyActivity" :key="i">D{{ i + 1 }}</span>
+            
+              <!-- Expanded panel sits OUTSIDE dt-row, spans full grid width naturally -->
+              <!--<div
+                v-if="expandedRows.has(q.id)"
+                class="dt-expanded"
+                style="grid-column: 1 / -1;"
+              >
+                <div class="expand-grid">
+                  <div class="expand-field" v-for="(value, key) in q" :key="key">
+                    <span class="expand-label">{{ key }}</span>
+                    <span class="expand-value">{{ typeof value === 'object' ? JSON.stringify(value, null, 2) : value }}</span>
+                  </div>
+                </div>
+              </div>-->
+
+              <div
+                v-if="expandedRows.has(q.id)"
+                class="dt-expanded"
+                style="grid-column: 1 / -1;"
+              >
+                <!-- Toggle bar -->
+                <div class="expand-toolbar">
+                  <span class="expand-title mono">Question #{{ q.id }}</span>
+                  <div class="expand-view-toggle">
+                    <button
+                      class="view-toggle-btn"
+                      :class="{ active: !rawViewRows.has(q.id) }"
+                      @click="rawViewRows.delete(q.id) || rawViewRows.value.delete(q.id)"
+                    >Preview</button>
+                    <button
+                      class="view-toggle-btn"
+                      :class="{ active: rawViewRows.has(q.id) }"
+                      @click="toggleRawView(q.id)"
+                    >Raw</button>
+                  </div>
+                </div>
+              
+                <!-- PREVIEW MODE -->
+                <div v-if="!rawViewRows.has(q.id)" class="expand-preview">
+
+                  <div class="ep-section" v-if="q.stimulus_image">
+                    <span class="ep-label">Stimulus Image</span>
+                    <img :src="q.stimulus_image" class="ep-img" />
+                  </div>
+                
+                  <div class="ep-section" v-if="q.stimulus?.english || q.stimulus?.bangla">
+                    <span class="ep-label">Stimulus</span>
+                    <p class="ep-text" v-html="renderLatexText(q.stimulus?.english)"></p>
+                    <p class="ep-text ep-bn" v-html="renderLatexText(q.stimulus?.bangla)"></p>
+                  </div>
+
+                  <div class="ep-section" v-if="q.question_image">
+                    <span class="ep-label">Question Image</span>
+                    <img :src="q.question_image" class="ep-img" />
+                  </div>
+                
+                  <div class="ep-section">
+                    <span class="ep-label">Question</span>
+                    <p class="ep-text" v-html="renderLatexText(q.question?.english)"></p>
+                    <p class="ep-text ep-bn" v-html="renderLatexText(q.question?.bangla)"></p>
+                  </div>
+                
+                  <div class="ep-section" v-if="q.options?.english?.length">
+                    <span class="ep-label">Options</span>
+                    <div class="ep-options">
+                      <div
+                        v-for="(opt, i) in q.options.english"
+                        :key="i"
+                        class="ep-option"
+                        :class="{ 'ep-option--correct': i === q.correct_index }"
+                      >
+                        <span class="ep-opt-letter">{{ ['A','B','C','D'][i] }}</span>
+                        <span v-html="renderLatexText(opt)"></span>
+                        <span class="ep-opt-bn" v-if="q.options.bangla?.[i]" v-html="' / ' + renderLatexText(q.options.bangla[i])"></span>
+                        <span class="ep-correct-tag" v-if="i === q.correct_index">✓ correct</span>
+                      </div>
+                    </div>
+                  </div>
+                
+                  <div class="ep-section" v-if="q.explanation?.english || q.explanation?.bangla">
+                    <span class="ep-label">Explanation</span>
+                    <p class="ep-text" v-html="renderLatexText(q.explanation?.english)"></p>
+                    <p class="ep-text ep-bn" v-html="renderLatexText(q.explanation?.bangla)"></p>
+                  </div>
+                
+                  <div class="ep-meta-row">
+                    <span><b>(Stream:</b> {{ q.stream }})</span>
+                    <span><b>(Subject:</b> {{ q.subject?.english }})</span>
+                    <span><b>(Chapter:</b> {{ q.chapter?.english }})</span>
+                    <span><b>(Difficulty:</b> {{ q.diff }})</span>
+                    <span><b>(Status:</b> {{ q.status }})</span>
+                    <span><b>(Year:</b> {{ q.years?.map(y => y.english).join(', ') }})</span>
+                    <span><b>(Source:</b>{{ Array.isArray(q.source?.english) ? q.source.english.join(', ') : q.source?.english }})</span>
+                    <span v-if="q.text_book"><b>(Textbook:</b> {{ q.text_book }})</span>
+                  </div>
+
+                  <div class="ep-meta-row">
+                    <span><b>(Stream:</b> {{ q.stream }})</span>
+                    <span><b>(Subject:</b> {{ q.subject?.bangla }})</span>
+                    <span><b>(Chapter:</b> {{ q.chapter?.bangla }})</span>
+                    <span><b>(Difficulty:</b> {{ q.diff }})</span>
+                    <span><b>(Status:</b> {{ q.status }})</span>
+                    <span><b>(Year:</b> {{ q.years?.map(y => y.bangla).join(', ') }})</span>
+                    <span><b>(Source:</b>{{ Array.isArray(q.source?.bangla) ? q.source.bangla.join(', ') : q.source?.bangla }})</span>
+                    <span v-if="q.text_book"><b>(Textbook:</b> {{ q.text_book }})</span>
+                  </div>
+                
+                </div>
+              
+                <!-- RAW MODE -->
+                <div v-else class="expand-raw">
+                  <pre class="raw-pre">{{ JSON.stringify(q, null, 2) }}</pre>
+                </div>
+              
               </div>
-            </div>
+            </template>
           </div>
+          </div><!-- /table-scroll -->
+          <!--<div class="dt-footer mono">{{ filteredQuestions.length }} questions</div>-->
+          <div class="dt-footer mono">
+            <span>{{ filteredQuestions.length }} questions</span>
 
-          <!-- Stream breakdown -->
-          <div class="panel ov-breakdown-panel">
-            <div class="panel-head"><span class="panel-title">USER STREAMS</span></div>
-            <div class="stream-bars">
-              <div class="sbar-row" v-for="item in [{name:'HSC',pct:28},{name:'Medical',pct:22},{name:'BUET',pct:18},{name:'BCS',pct:15},{name:'SSC',pct:10},{name:'DU',pct:5},{name:'Bank',pct:2}]" :key="item.name">
-                <span class="sbar-name">{{ item.name }}</span>
-                <div class="sbar-track"><div class="sbar-fill" :style="{ width: item.pct + '%' }" /></div>
-                <span class="sbar-pct">{{ item.pct }}%</span>
-              </div>
+            <div class="q-pagination" v-if="totalQPages > 1">
+              <button class="pg-btn" :disabled="qPage === 1" @click="qPage = 1">«</button>
+              <button class="pg-btn" :disabled="qPage === 1" @click="qPage--">‹</button>
+            
+              <template v-for="p in totalQPages" :key="p">
+                <!-- show first, last, current ±1, and ellipsis -->
+                <template v-if="p === 1 || p === totalQPages || Math.abs(p - qPage) <= 1">
+                  <button class="pg-btn" :class="{ active: p === qPage }" @click="qPage = p">{{ p }}</button>
+                </template>
+                <span v-else-if="p === 2 && qPage > 4" class="pg-ellipsis">…</span>
+                <span v-else-if="p === totalQPages - 1 && qPage < totalQPages - 3" class="pg-ellipsis">…</span>
+              </template>
+            
+              <button class="pg-btn" :disabled="qPage === totalQPages" @click="qPage++">›</button>
+              <button class="pg-btn" :disabled="qPage === totalQPages" @click="qPage = totalQPages">»</button>
             </div>
+          
+            <span class="mono dim">page {{ qPage }} / {{ totalQPages }}</span>
           </div>
-        </div>
-
-        <div class="ov-bottom-row">
-          <!-- Recent admin actions component -->
-          <AdminRecentActions :actions="auditLog.slice(0, 6)" />
-
-          <!-- Quick actions component -->
-          <AdminQuickActions @action="handleAction" />
-
-          <!-- System health component -->
-          <AdminSystemHealth
-            :services="systemServices"
-            :logs="systemLogs.slice(0, 4)"
-            :dbUsed="2.3"
-            :dbTotal="8"
-          />
         </div>
       </div>
 
