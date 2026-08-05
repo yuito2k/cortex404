@@ -341,7 +341,7 @@ function fmtAttendees(n) {
   <div class="exams-page">
 
     <!-- ══ PAGE HEADER ═══════════════════════════════════════════════════════ -->
-    <div class="page-header">
+    <div class="setup-header">
       <div class="header-left">
         <div class="page-chip"><span class="chip-dot" /> Exams</div>
         <h1 class="page-title">Find Your<br><span class="text-outline">Exam.</span></h1>
@@ -749,13 +749,21 @@ function fmtAttendees(n) {
 }
 
 /* ─── PAGE HEADER ─────────────────────────────────────────────────────────── */
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 24px;
-  flex-wrap: wrap;
+.setup-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 2rem; padding: 2rem;
+  border: 1px solid var(--border); background: #0d0d0d;
+  position: relative; overflow: hidden;
+  box-shadow: 4px 4px 0 0 rgba(240,240,234,0.04);
 }
+.setup-header::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image: radial-gradient(circle, rgba(240,240,234,0.06) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+}
+
 .header-left { display: flex; flex-direction: column; gap: 10px; }
 .page-chip {
   display: inline-flex; align-items: center; gap: 8px;

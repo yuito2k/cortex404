@@ -269,6 +269,12 @@ export default {
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/><path d="M4 6h4M4 10h8M4 14h4"/></svg>`,
       },
       {
+        to: '/dashboard/results',
+        label: 'Results',
+        badge: null,
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M7 6H4a2 2 0 0 0 2 4"/><path d="M17 6h3a2 2 0 0 1-2 4"/></svg>`,
+      },
+      {
         to: '/dashboard/mock-exam',
         label: 'Mock Exam',
         badge: null,

@@ -41,6 +41,7 @@ const pageTitle = computed(() => {
   const map: Record<string, string> = {
     '/dashboard': 'Overview',
     '/dashboard/exams': 'Exams',
+    '/dashboard/results': 'Results',
     '/dashboard/mock-exam': 'Mock Exam',
     '/dashboard/question-bank': 'Question Bank',
     '/dashboard/public-exams': 'Public Exams',

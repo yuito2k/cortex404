@@ -14,8 +14,8 @@
     </div>
 
     <!-- Page Header -->
-    <div v-if="!focusMode" class="page-header">
-      <div class="page-header__left">
+    <div v-if="!focusMode" class="setup-header">
+      <div class="setup-header__left">
         <div class="page-chip">
           <span class="chip-dot"></span>
           EDTUBE
@@ -46,6 +46,8 @@
         </div>
       </div>
     </div>
+
+    <br>
 
     <!-- Stream → Subject → Chapter Nav -->
     <div v-if="!focusMode" class="filter-bar">
@@ -709,12 +711,19 @@ watch(selectedStream, () => {
 }
 
 /* ── Page Header ── */
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 28px;
+.setup-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 2rem; padding: 2rem;
+  border: 1px solid var(--border); background: #0d0d0d;
+  position: relative; overflow: hidden;
+  box-shadow: 4px 4px 0 0 rgba(240,240,234,0.04);
+}
+.setup-header::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image: radial-gradient(circle, rgba(240,240,234,0.06) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
 }
 
 .page-chip {
