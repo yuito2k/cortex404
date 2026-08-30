@@ -49,7 +49,7 @@ const pageTitle = computed(() => {
     '/dashboard/model-test': 'Model Test',
     '/dashboard/progress': 'Progress',
     '/dashboard/leaderboard': 'Leaderboard',
-    '/dashboard/omr-checker': 'OMR Checker',
+    '/dashboard/omr': 'OMR',
     '/dashboard/edverse': 'EdVerse',
     '/dashboard/routine': 'Routine',
     '/dashboard/settings': 'Settings',
