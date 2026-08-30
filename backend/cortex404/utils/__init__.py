@@ -1,0 +1,1 @@
+from . import qr, detector, omr_template_generator

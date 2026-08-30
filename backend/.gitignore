@@ -1,35 +1,3 @@
-# Nuxt dev/build outputs
-.output
-.data
-.nuxt
-.nitro
-.cache
-dist
-
-# Node
-node_modules
-
-# Bun
-bun.lockb
-
-# Supabase
-.temp/
-.supabase/
-.env.local
-.env.local.bak
-
-# Logs
-*.log
-
-# Env
-.env
-.env.*
-!.env.example
-
-# OS
-.DS_Store
-Thumbs.db
-
 ### Database ###
 *.accdb
 *.db
