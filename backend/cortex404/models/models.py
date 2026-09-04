@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Any
 from pydantic import BaseModel
 from tortoise import fields, Model
 from datetime import datetime, timezone
@@ -16,7 +16,7 @@ class GenerateRequest(BaseModel):
     student_id:   str           # your internal student ID, printed on sheet
     student_name: str
     exam_id:   str
-    questions:    list[Question]
+    questions:    list[Any]
     template_id:  Optional[str] = None
 
 

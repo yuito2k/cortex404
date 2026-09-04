@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
   }
 
   //if (question_count < 1 || question_count > 25) {
-    //throw createError({ statusCode: 400, message: 'question_count must be between 1 and 25' })
+  //throw createError({ statusCode: 400, message: 'question_count must be between 1 and 25' })
   //}
 
   // ── Duplicate check ──────────────────────────────────────────────────────
@@ -54,10 +54,10 @@ export default defineEventHandler(async (event) => {
       .createSignedUrl(`${user.id}/${active.sheet_code}.pdf`, 3600)
 
     return {
-      sheet_code:  active.sheet_code,
-      signed_url:  signed.data?.signedUrl ?? active.pdf_url,
+      sheet_code: active.sheet_code,
+      signed_url: signed.data?.signedUrl ?? active.pdf_url,
       is_existing: true,
-      created_at:  active.created_at,
+      created_at: active.created_at,
     }
   }
 
@@ -67,7 +67,7 @@ export default defineEventHandler(async (event) => {
   //               correct_option (0-indexed int), subject_code, chapter_id
   let exam_data = null
   if (exam_id) {
-    const { data: sessionData } = await adminSb
+    const { data: sessionData, error } = await supabase
       .from('preset_exams')
       .select('*')
       .eq('id', exam_id)
@@ -78,12 +78,12 @@ export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
 
   const sup = createClient(
-       exam_data.stream.startsWith('HSC') ? config.public.supabaseCortexHSC_URL : config.public.supabaseCortexMedical_URL,
-       exam_data.stream.startsWith('HSC') ? config.public.supabaseCortexHSC_KEY : config.public.supabaseCortexMedical_KEY
+    exam_data.stream.startsWith('hsc') ? config.public.supabaseCortexHSC_URL : config.public.supabaseCortexMedical_URL,
+    exam_data.stream.startsWith('hsc') ? config.public.supabaseCortexHSC_KEY : config.public.supabaseCortexMedical_KEY
   )
 
   const ids: number[] = exam_data?.question_ids
-    //if (ids.length) {
+  //if (ids.length) {
 
   //const supa = selectedSession.value?.stream.includes('HSC') ? HSC_supabase : Medical_supabase
 
@@ -118,11 +118,10 @@ export default defineEventHandler(async (event) => {
   const selected = shuffled
 
   // ── Format questions for the Python service ──────────────────────────────
-  console.log(selected)
   const questions = selected.map((q: any) => ({
-    id:            q.id,
-    text:          q.question,
-    options:       [q.option_a, q.option_b, q.option_c, q.option_d],
+    id: q.id,
+    text: q.question,
+    options: q.options,
     correct_index: q.correct_index,   // 0=A, 1=B, 2=C, 3=D
   }))
 
@@ -137,7 +136,7 @@ export default defineEventHandler(async (event) => {
   const OMR_SERVICE_URL = process.env.OMR_SERVICE_URL ?? 'http://localhost:8000'
 
   const payload = {
-    student_id:      user.id,
+    student_id: user.id,
     student_name: profile?.full_name ?? user.email ?? 'Student',
     //student_id:   profile?.student_id ?? user.id.slice(0, 8).toUpperCase(),
     exam_id,
@@ -146,10 +145,10 @@ export default defineEventHandler(async (event) => {
 
   let omrResponse: any
   try {
-    const res = await $fetch(`${OMR_SERVICE_URL}/generate`, {
-      method:  'POST',
+    const res = await $fetch(`${OMR_SERVICE_URL}/api/v1/omr/generate`, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(payload),
+      body: JSON.stringify(payload),
     })
     omrResponse = res
   } catch (err: any) {
@@ -161,9 +160,10 @@ export default defineEventHandler(async (event) => {
   }
 
   return {
-    sheet_code:  omrResponse.sheet_code,
-    signed_url:  omrResponse.signed_url,
+    sheet_code: omrResponse.sheet_code,
+    signed_url: omrResponse.signed_url,
+    pdf_url: omrResponse.pdf_url,
     is_existing: false,
-    status:      'generated',
+    status: 'generated',
   }
 })

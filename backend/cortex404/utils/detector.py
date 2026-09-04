@@ -23,6 +23,8 @@ from typing import Optional
 
 from cortex404.config import Config
 
+cfg = Config
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Image loading

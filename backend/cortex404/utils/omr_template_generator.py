@@ -319,6 +319,54 @@ def draw_cut_line(c, t):
 
 
 def _draw_question(c, x_l, x_r, y_top, qno, text, options):
+    txt_x   = x_l + Q_NUM_W
+    col_w   = x_r - x_l
+    txt_w   = col_w - Q_NUM_W
+    chars   = max(int(txt_w / (Q_FONT * 0.52)), 20)
+    q_lines = textwrap.wrap(text, width=chars) or [text[:chars]]
+
+    c.setFont("Helvetica-Bold", Q_FONT)
+    c.setFillColor(colors.black)
+    c.drawString(x_l, y_top - Q_LH, f"{qno}.")
+
+    c.setFont("Helvetica", Q_FONT)
+    y = y_top - Q_LH
+    for line in q_lines:
+        c.drawString(txt_x, y, line)
+        y -= Q_LH
+
+    opt_y  = y_top - Q_LH - len(q_lines) * Q_LH - 2
+    half_w = col_w / 2
+    opt_chars = max(int((half_w - 22) / (Q_FONT * 0.52)), 8)
+
+    c.setFont("Helvetica", Q_FONT - 0.5)
+    for pair_row in range(2):
+        row_y = opt_y - pair_row * Q_OPT_H
+        for col_idx in range(2):
+            oi  = pair_row * 2 + col_idx
+            lbl = ["A", "B", "C", "D"][oi]
+            txt = str((options or ["—","—","—","—"])[:4][oi])
+            if len(txt) > opt_chars:
+                txt = txt[:opt_chars - 1] + "…"
+            ox = x_l + col_idx * half_w
+            c.setFont("Helvetica-Bold", Q_FONT - 0.5)
+            c.drawString(ox, row_y, f"({lbl})")
+            c.setFont("Helvetica", Q_FONT - 0.5)
+            c.drawString(ox + 17, row_y, txt)
+
+    # ── only these lines change ──────────────────────────
+    slot_h   = Q_LH + len(q_lines) * Q_LH + 2 * Q_OPT_H + 10  # 10pt bottom padding
+    slot_bot = y_top - slot_h
+    c.setStrokeColor(RULE_GRAY)
+    c.setLineWidth(0.3)
+    c.line(x_l, slot_bot + 2, x_r, slot_bot + 2)
+    c.setStrokeColor(colors.black)
+    c.setLineWidth(1)
+    return slot_h                                                # ← new
+    # ────────────────────────────────────────────────────
+
+
+def _old_draw_question(c, x_l, x_r, y_top, qno, text, options):
     """
     Render one MCQ question in its slot.
     options : [opt_A, opt_B, opt_C, opt_D]
@@ -379,7 +427,68 @@ def _draw_question(c, x_l, x_r, y_top, qno, text, options):
     c.setLineWidth(1)
 
 
+def _get_question_height(text):
+    """Predicts the exact height a question slot will take before drawing it."""
+    col_w = Q_L_RX - Q_L_X
+    txt_w = col_w - Q_NUM_W
+    chars = max(int(txt_w / (Q_FONT * 0.52)), 20)
+    q_lines = textwrap.wrap(text, width=chars) or [text[:chars]]
+    return Q_LH + len(q_lines) * Q_LH + 2 * Q_OPT_H + 10
+
 def draw_question_area(c, questions, y_top, y_bot):
+    """Fills the left column first, then the right column, and tracks overflow."""
+    c.setStrokeColor(RULE_GRAY)
+    c.setLineWidth(0.5)
+    c.line(MID_X, y_top + 2, MID_X, y_bot)
+    c.setStrokeColor(colors.black)
+    c.setLineWidth(1)
+
+    left_qs = []
+    right_qs = []
+    idx = 0
+
+    # 1. Fill Left Column
+    y = y_top
+    while idx < len(questions):
+        q_h = _get_question_height(questions[idx][1])
+        if y - q_h >= y_bot:
+            left_qs.append(questions[idx])
+            y -= q_h
+            idx += 1
+        else:
+            break
+
+    # 2. Fill Right Column
+    y = y_top
+    while idx < len(questions):
+        q_h = _get_question_height(questions[idx][1])
+        if y - q_h >= y_bot:
+            right_qs.append(questions[idx])
+            y -= q_h
+            idx += 1
+        else:
+            break
+
+    # Any remaining questions go to the next page
+    overflow = questions[idx:]
+
+    # 3. Render Left Column
+    y = y_top
+    for qno, text, opts in left_qs:
+        slot_h = _draw_question(c, Q_L_X, Q_L_RX, y, qno, text, opts)
+        y -= slot_h
+
+    # 4. Render Right Column
+    y = y_top
+    for qno, text, opts in right_qs:
+        slot_h = _draw_question(c, Q_R_X, Q_R_RX, y, qno, text, opts)
+        y -= slot_h
+
+    return overflow
+
+
+
+def old_draw_question_area(c, questions, y_top, y_bot):
     """
     Fill two columns from y_top → y_bot with questions.
     Returns the list of (qno, text) tuples that didn't fit.

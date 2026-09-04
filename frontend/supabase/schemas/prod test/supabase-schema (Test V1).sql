@@ -322,9 +322,29 @@ create table if not exists public.omr_sheets (
   sheet_code text not null,
   pdf_url text not null,
 
+  --correct_answer_key jsonb not null,
+  question_ids int[],
+  correct_answer_keys int[],
+
   -- Audit
   created_by        uuid references auth.users(id) on delete set null,
-  created_at        timestamptz not null default now()
+  created_at        timestamptz not null default now(),
+  submitted_at      timestamptz,
+  graded_at         timestamptz,
+
+  -- Result Data
+  detected_answers  jsonb,
+  raw_detection     jsonb,
+  score             numeric(4,2),
+  total             numeric(4,2),
+  correct_count     int,
+  wrong_count       int,
+  skipped_count     int,
+  flagged_count     int,
+
+  -- Status
+  status            text not null default 'pending'
+                      check (status in ('pending','submitted','graded','flagged')),
 );
 
 

@@ -1,12 +1,12 @@
 import os
 import tempfile
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException
 
 class Generate:
     def __init__(self, app):
         self.app = app
         self.router = APIRouter(
-            prefix="/api/v1/generate",
+            prefix="/api/v1/omr",
             tags=["generate on v1"]
         )
 
@@ -46,16 +46,16 @@ class Generate:
             if len(req.questions) > 25:
                 raise HTTPException(400, f"Maximum 25 questions per sheet (got {len(req.questions)}).")
             for q in req.questions:
-                if len(q.options) != 4:
-                    raise HTTPException(400, f"Question {q.id} must have exactly 4 options.")
-                if not (0 <= q.correct_index <= 3):
-                    raise HTTPException(400, f"Question {q.id} correct_index must be 0–3.")
+                if len(q['options']['english']) != 4:
+                    raise HTTPException(400, f"Question {q['id']} must have exactly 4 options.")
+                if not (0 <= q['correct_index'] <= 3):
+                    raise HTTPException(400, f"Question {q['id']} correct_index must be 0–3.")
 
             # ── Generate PDF ──────────────────────────────────────────────────────
             sheet_code   = self.app.generate_id()
-            question_ids = [q.id for q in req.questions]
-            answer_key   = [q.correct_index for q in req.questions]
-            questions_fmt = [(i+1, q.question, q.options) for i, q in enumerate(req.questions)]
+            question_ids = [q['id'] for q in req.questions]
+            answer_key   = [q['correct_index'] for q in req.questions]
+            questions_fmt = [(i+1, q['text']['english'], q['options']['english']) for i, q in enumerate(req.questions)]
 
             with tempfile.TemporaryDirectory() as tmp:
                 pdf_path = os.path.join(tmp, f"{sheet_code}.pdf")
@@ -69,7 +69,7 @@ class Generate:
                 )
 
                 # ── Upload to Supabase Storage ─────────────────────────────────────
-                storage_path = f"exam/{req.exam_id}/{sheet_code}.pdf"
+                storage_path = f"exam/{req.exam_id}/students/{req.student_id}/{sheet_code}.pdf"
                 with open(pdf_path, "rb") as f:
                     pdf_bytes = f.read()
 

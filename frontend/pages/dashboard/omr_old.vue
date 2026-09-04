@@ -18,9 +18,6 @@ definePageMeta({ middleware: 'auth', layout: 'dashboard' })
 const config = useRuntimeConfig()
 const supabase = useSupabaseClient()
 
-const userID = useSupabaseUser();
-const { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userID.value?.id).single();
-
 /* ----------------------------- tabs ----------------------------- */
 const activeTab = ref('generate') // 'generate' | 'scan'
 
@@ -45,6 +42,18 @@ const customNegative = ref(0.25)
 const questionCountPills = [20, 30, 50, 100]
 const durationPills = [20, 30, 45, 60, 90]
 const negativePills = [0, 0.25, 0.5]
+
+const examSet = ref('A') // A / B / C — printed variants for anti-copying
+const examSets = ['A', 'B', 'C']
+
+const rollFrom = ref('100001')
+const rollTo = ref('100001')
+const copiesCount = computed(() => {
+  const a = parseInt(rollFrom.value, 10)
+  const b = parseInt(rollTo.value, 10)
+  if (Number.isNaN(a) || Number.isNaN(b) || b < a) return 0
+  return Math.min(b - a + 1, 500)
+})
 
 const selectedPreset = computed(() =>
   presetExams.value.find(p => p.id === selectedPresetId.value) || null
@@ -76,46 +85,64 @@ async function loadPresets() {
 watch(selectedStream, loadPresets, { immediate: true })
 
 const generating = ref(false)
+const generatedCount = ref(0)
 const generateError = ref('')
-const pdfUrl = ref('')
 
 /** The PDF itself is rendered server-side by FastAPI (it owns the exact
- *  bubble geometry the OpenCV pipeline expects). This POSTs the sheet
- *  spec and expects back { pdf_url }, which is then shown inline as a
- *  preview (and offered as a direct download link). */
+ *  bubble geometry the OpenCV pipeline expects), so this just POSTs the
+ *  sheet spec and streams the returned PDF blob down to the browser. */
 async function generateOMRPdf() {
   generateError.value = ''
   if (sourceMode.value === 'preset' && !selectedPreset.value) {
     generateError.value = 'Pick a preset exam first.'
     return
   }
+  if (copiesCount.value < 1) {
+    generateError.value = 'Roll range is invalid.'
+    return
+  }
 
   generating.value = true
-  pdfUrl.value = ''
+  generatedCount.value = 0
 
+  const rollStart = parseInt(rollFrom.value, 10)
   const examId = sourceMode.value === 'preset' ? selectedPreset.value.id : null
 
   const payload = {
-    exam_id: examId,
-    //question_count: effectiveQuestionCount.value,
-    //negative_marking: sourceMode.value === 'preset' ? selectedPreset.value.negative_marking : customNegative.value,
+    source_mode: sourceMode.value,
+    preset_exam_id: examId,
+    title: sourceMode.value === 'preset' ? selectedPreset.value.title : `${customSubject.value} Practice Test`,
+    subject: sourceMode.value === 'preset' ? selectedPreset.value.subject : customSubject.value,
+    stream: selectedStream.value,
+    question_count: effectiveQuestionCount.value,
+    negative_marking: sourceMode.value === 'preset' ? selectedPreset.value.negative_marking : customNegative.value,
+    set: examSet.value,
+    roll_from: rollStart,
+    roll_to: parseInt(rollTo.value, 10),
   }
 
   try {
     const base = config.public.omrApiBase || '' // FastAPI backend base URL
-    const res = await fetch('/api/omr/generate', {
+    const res = await fetch(`${base}/api/v1/omr/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
 
-    console.log(res)
-
     if (!res.ok) throw new Error(`Backend responded ${res.status}`)
 
-    const data = await res.json()
-    if (!data.pdf_url) throw new Error('Backend response missing pdf_url')
-    pdfUrl.value = data.pdf_url
+    // Backend streams back a single multi-page PDF covering the whole roll range.
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `omr-${examId || 'custom'}-${examSet.value}-${rollStart}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+
+    generatedCount.value = copiesCount.value
   } catch (err) {
     generateError.value = 'Could not generate the PDF. Check the backend connection and try again.'
     console.error(err)
@@ -176,7 +203,8 @@ async function submitScan() {
 
     scanPhase.value = 'processing'
 
-    const res = await fetch(`${config.public.omrApiBase}/api/v1/omr/scan`, {
+    const base = config.public.omrApiBase || '' // FastAPI backend base URL
+    const res = await fetch(`${base}/api/v1/omr/scan`, {
       method: 'POST',
       body: formData,
     })
@@ -187,7 +215,7 @@ async function submitScan() {
     scanResult.value = normalizeResult(data)
     scanPhase.value = 'result'
   } catch (err) {
-    console.log(err)
+    console.error(err)
     scanError.value = 'Could not grade this sheet. Check lighting/angle and try again.'
     scanPhase.value = 'error'
   }
@@ -203,17 +231,17 @@ async function submitScan() {
  * slightly different payload shape.
  */
 function normalizeResult(data) {
-  const answers = Array.isArray(data.question_results) ? data.question_results : []
+  const answers = Array.isArray(data.answers) ? data.answers : []
   return {
     examId: data.exam_id ?? '—',
     roll: data.roll_number ?? '—',
     set: data.set ?? '—',
     total: data.total ?? answers.length,
-    correct: data.correct_count ?? answers.filter(a => a.correct_opt === a.selected_opt).length,
-    wrong: data.wrong_count ?? answers.filter(a => a.correct_opt !== a.selected_opt).length,
-    blank: data.skipped_count ?? answers.filter(a => a.selected_opt === null).length,
-    flagged: data.flagged_count ?? answers.filter(a => a.status === 'flagged').length,
-    finalScore: data.score ?? 0,
+    correct: data.correct ?? answers.filter(a => a.status === 'correct').length,
+    wrong: data.wrong ?? answers.filter(a => a.status === 'wrong').length,
+    blank: data.blank ?? answers.filter(a => a.status === 'blank').length,
+    flagged: data.flagged ?? answers.filter(a => a.status === 'flagged').length,
+    finalScore: data.final_score ?? 0,
     negativeApplied: !!data.negative_applied,
     answers,
   }
@@ -222,11 +250,7 @@ function normalizeResult(data) {
 const filteredAnswers = computed(() => {
   if (!scanResult.value) return []
   if (resultFilter.value === 'all') return scanResult.value.answers
-  if (resultFilter.value === 'correct') return scanResult.value.answers.filter(a => a.correct_opt === a.selected_opt)
-  if (resultFilter.value === 'wrong') return scanResult.value.answers.filter(a => a.correct_opt !== a.selected_opt && a.selected_opt !== null)
-  if (resultFilter.value === 'skipped') return scanResult.value.answers.filter(a => a.selected_opt === null)
-  if (resultFilter.value === 'flagged') return scanResult.value.answers.filter(a => a.status === 'flagged')
-  //return scanResult.value.answers.filter(a => a.status === resultFilter.value)
+  return scanResult.value.answers.filter(a => a.status === resultFilter.value)
 })
 
 function scoreClass(pct) {
@@ -353,61 +377,70 @@ const statusLabel = { correct: 'Correct', wrong: 'Wrong', blank: 'Blank', flagge
           </div>
         </template>
 
+        <div class="panel-label">SET</div>
+        <div class="pill-row">
+          <button
+            v-for="s in examSets"
+            :key="s"
+            class="pill"
+            :class="{ active: examSet === s }"
+            @click="examSet = s"
+          >Set {{ s }}</button>
+        </div>
+
+        <div class="panel-label">ROLL NUMBER RANGE</div>
+        <div class="range-row">
+          <input v-model="rollFrom" type="text" class="text-input small" placeholder="From" />
+          <span class="range-sep">→</span>
+          <input v-model="rollTo" type="text" class="text-input small" placeholder="To" />
+        </div>
+        <p class="hint">{{ copiesCount }} sheet{{ copiesCount === 1 ? '' : 's' }} will be generated, one per roll number.</p>
+
         <p v-if="generateError" class="error-note">{{ generateError }}</p>
 
         <button class="iso-btn iso-btn--fill iso-btn--full gen-btn" :disabled="generating" @click="generateOMRPdf">
           <span v-if="!generating">Generate PDF →</span>
-          <span v-else>Generating…</span>
+          <span v-else>Generating {{ copiesCount }} sheet{{ copiesCount === 1 ? '' : 's' }}…</span>
         </button>
       </section>
 
       <section class="omr-panel preview-panel">
         <div class="panel-label">PREVIEW</div>
+        <p class="hint" style="margin-top: -4px; margin-bottom: 14px;">
+          Layout mock only — the actual PDF (with fiducial markers and QR code) is rendered by the backend.
+        </p>
+        <div class="sheet-preview">
+          <div class="sheet-corner tl"></div>
+          <div class="sheet-corner tr"></div>
+          <div class="sheet-corner bl"></div>
+          <div class="sheet-corner br"></div>
 
-        <template v-if="pdfUrl">
-          <iframe :src="pdfUrl" class="pdf-frame" title="OMR sheet preview"></iframe>
-          <div class="preview-actions">
-            <a :href="pdfUrl" download target="_blank" class="iso-btn iso-btn--ghost">Download PDF ↓</a>
+          <div class="sheet-header">
+            <div>
+              <div class="sheet-brand">CORTEX404</div>
+              <div class="sheet-sub">{{ streamLabels[selectedStream] || '—' }} · SET {{ examSet }} · OMR SHEET</div>
+            </div>
+            <div class="sheet-qr"></div>
           </div>
-        </template>
 
-        <template v-else>
-          <p class="hint" style="margin-top: -4px; margin-bottom: 14px;">
-            Layout mock only — the actual PDF (with fiducial markers and QR code) is rendered by the backend.
-          </p>
-          <div class="sheet-preview">
-            <div class="sheet-corner tl"></div>
-            <div class="sheet-corner tr"></div>
-            <div class="sheet-corner bl"></div>
-            <div class="sheet-corner br"></div>
-
-            <div class="sheet-header">
-              <div>
-                <div class="sheet-brand">CORTEX404</div>
-                <div class="sheet-sub">{{ streamLabels[selectedStream] || '—' }} · OMR SHEET</div>
+          <div class="sheet-roll">
+            <div class="panel-label small">ROLL NUMBER</div>
+            <div class="roll-grid">
+              <div v-for="i in 6" :key="i" class="roll-col">
+                <div class="roll-digit-box"></div>
+                <div v-for="r in 4" :key="r" class="roll-bubble"></div>
               </div>
-              <div class="sheet-qr"></div>
-            </div>
-
-            <div class="sheet-roll">
-              <div class="panel-label small">ROLL NUMBER</div>
-              <div class="roll-grid">
-                <div v-for="i in 6" :key="i" class="roll-col">
-                  <div class="roll-digit-box"></div>
-                  <div v-for="r in 4" :key="r" class="roll-bubble"></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="sheet-questions">
-              <div v-for="q in Math.min(effectiveQuestionCount, 12)" :key="q" class="sheet-q-row">
-                <span class="sheet-q-num">{{ String(q).padStart(2, '0') }}</span>
-                <span v-for="opt in ['A','B','C','D']" :key="opt" class="sheet-opt">{{ opt }}</span>
-              </div>
-              <div v-if="effectiveQuestionCount > 12" class="sheet-more">+ {{ effectiveQuestionCount - 12 }} more questions</div>
             </div>
           </div>
-        </template>
+
+          <div class="sheet-questions">
+            <div v-for="q in Math.min(effectiveQuestionCount, 12)" :key="q" class="sheet-q-row">
+              <span class="sheet-q-num">{{ String(q).padStart(2, '0') }}</span>
+              <span v-for="opt in ['A','B','C','D']" :key="opt" class="sheet-opt">{{ opt }}</span>
+            </div>
+            <div v-if="effectiveQuestionCount > 12" class="sheet-more">+ {{ effectiveQuestionCount - 12 }} more questions</div>
+          </div>
+        </div>
       </section>
     </div>
 
@@ -489,7 +522,7 @@ const statusLabel = { correct: 'Correct', wrong: 'Wrong', blank: 'Blank', flagge
             <button class="pill" :class="{ active: resultFilter === 'all' }" @click="resultFilter = 'all'">All</button>
             <button class="pill" :class="{ active: resultFilter === 'correct' }" @click="resultFilter = 'correct'">Correct</button>
             <button class="pill" :class="{ active: resultFilter === 'wrong' }" @click="resultFilter = 'wrong'">Wrong</button>
-            <button class="pill" :class="{ active: resultFilter === 'skipped' }" @click="resultFilter = 'skipped'">Skipped</button>
+            <button class="pill" :class="{ active: resultFilter === 'flagged' }" @click="resultFilter = 'flagged'">Flagged</button>
           </div>
 
           <div class="answer-list">
@@ -499,9 +532,9 @@ const statusLabel = { correct: 'Correct', wrong: 'Wrong', blank: 'Blank', flagge
               class="answer-row"
               :class="`row-${a.status}`"
             >
-              <span class="ans-q">Q{{ a.qno }}</span>
-              <span class="ans-detected">Detected: {{ a.selected_opt ?? '—' }}</span>
-              <span class="ans-correct">Correct: {{ a.correct_opt ?? '—' }}</span>
+              <span class="ans-q">Q{{ a.q }}</span>
+              <span class="ans-detected">Detected: {{ a.detected ?? '—' }}</span>
+              <span class="ans-correct">Correct: {{ a.correct ?? '—' }}</span>
               <span class="ans-status">{{ statusLabel[a.status] || a.status }}</span>
             </div>
             <div v-if="!filteredAnswers.length" class="empty-note">Nothing in this filter.</div>
@@ -657,14 +690,6 @@ const statusLabel = { correct: 'Correct', wrong: 'Wrong', blank: 'Blank', flagge
 .gen-btn { margin-top: 22px; }
 
 /* ---- preview sheet mock ---- */
-.pdf-frame {
-  width: 100%;
-  height: 560px;
-  border: 1px solid var(--border);
-  background: var(--white);
-}
-.preview-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
-
 .sheet-preview {
   position: relative;
   background: rgba(240, 240, 234, 0.02);

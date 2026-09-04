@@ -65,8 +65,11 @@ class ApiServer:
         return "CX4-" + hex(int(time.time() * 1e7))[2:]
 
     def include_routers(self):
-        user_router = Generate(self).router
-        self.app.include_router(user_router)
+        generate_router = Generate(self).router
+        self.app.include_router(generate_router)
+
+        scan_router = Scan(self).router
+        self.app.include_router(scan_router)
 
     def add_routes(self):
         @self.app.on_event("startup")
